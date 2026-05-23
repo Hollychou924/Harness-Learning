@@ -66,3 +66,36 @@ def test_dimension_weight_must_be_in_range():
             evaluation_type="text", rubric="-",
             data_sources=[],
         )
+
+from datetime import datetime
+from packages.schemas.evaluation import ProductEvaluation, Confidence
+
+def test_evaluation_extracted():
+    ev = ProductEvaluation(
+        product_id="claude-code",
+        dimension_id="E5",
+        value=3,
+        evidence_urls=["https://docs.anthropic.com/en/docs/claude-code/skills#L42-L58"],
+        evaluator="llm:claude-opus-4-7",
+        confidence=Confidence.EXTRACTED,
+        last_verified=datetime(2026, 5, 24),
+    )
+    assert ev.review_status is None  # default
+
+def test_evaluation_ambiguous_goes_to_review():
+    ev = ProductEvaluation(
+        product_id="cursor", dimension_id="J5",
+        value="unknown",
+        evidence_urls=[], evaluator="llm:claude-opus-4-7",
+        confidence=Confidence.AMBIGUOUS,
+        last_verified=datetime.now(),
+        review_status="pending",
+    )
+    assert ev.review_status == "pending"
+
+def test_confidence_enum_values():
+    assert Confidence.EXTRACTED.value == "EXTRACTED"
+    assert Confidence.UNVERIFIED.value == "UNVERIFIED"
+    assert {c.value for c in Confidence} == {
+        "EXTRACTED", "INFERRED", "AMBIGUOUS", "UNVERIFIED"
+    }
