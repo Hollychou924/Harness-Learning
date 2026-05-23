@@ -28,3 +28,41 @@ def test_product_invalid_category_rejected():
             id="x", name="x", category="other", priority="P0",
             homepage="https://x.test", keywords=["x"],
         )
+
+from packages.schemas.dimension import Dimension
+
+def test_dimension_minimal():
+    d = Dimension(
+        id="E5",
+        name="自定义工具/Hook 系统",
+        group="Agent Harness 执行",
+        importance="critical",
+        weight_in_group_pct=20.0,
+        evaluation_type="score_0_3",
+        rubric="0=无 / 1=Function call / 2=Skill 系统 / 3=Skill+Hook+SubAgent",
+        data_sources=["L0:official_docs", "L2:search"],
+    )
+    assert d.id == "E5"
+    assert d.enum_values is None
+
+def test_dimension_with_enum():
+    d = Dimension(
+        id="A1", name="产品形态", group="A",
+        importance="medium", weight_in_group_pct=33.3,
+        evaluation_type="enum",
+        enum_values=["IDE 插件", "独立编辑器", "桌面客户端", "CLI"],
+        rubric="见枚举",
+        data_sources=["L0:official_docs"],
+    )
+    assert "CLI" in d.enum_values
+
+def test_dimension_weight_must_be_in_range():
+    import pytest
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
+        Dimension(
+            id="X", name="x", group="x",
+            importance="low", weight_in_group_pct=150.0,
+            evaluation_type="text", rubric="-",
+            data_sources=[],
+        )
