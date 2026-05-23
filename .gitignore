@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+.uv/
+node_modules/
+.DS_Store
+.env
+.env.local
+*.log
+wiki/raw/*/
+!wiki/raw/.gitkeep
