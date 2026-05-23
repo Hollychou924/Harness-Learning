@@ -181,37 +181,49 @@
 
 ### 5.1 目录结构
 
+> 设计灵感: Karpathy 原版 + 借鉴 nashsu/llm_wiki (purpose.md/Two-Step CoT/Async Review) + sdyckjq-lab/llm-wiki-skill (Confidence 标注/离线 HTML 图谱) + ussumant/llm-wiki-compiler (topics+concepts 双轨/9 slash 命令)。
+
 ```
 wiki/
-├── raw/                    # 原始抓取 (Markdown / HTML / JSON)
+├── purpose.md              # 🆕 wiki 灵魂(目标/关键问题/研究范围/演化思路) — 借鉴 nashsu
+├── index.md                # 🆕 内容索引(每页一行+元信息,LLM 导航入口) — Karpathy 原版
+├── log.md                  # 🆕 时间日志(append-only,## [date] op | title) — Karpathy 原版
+│
+├── raw/                    # 原始抓取 (immutable, LLM 只读)
 │   └── {product_id}/
 │       ├── {YYYY-MM-DD}/
 │       │   ├── homepage.html
 │       │   ├── docs/<page>.md
 │       │   ├── changelog/<release>.md
-│       │   └── _meta.json    # 抓取元信息(URL/timestamp/hash)
+│       │   └── _meta.json    # 抓取元信息(URL/timestamp/sha256)
 │
-├── compiled/              # LLM 编译入 wiki (符合 SCHEMA)
+├── compiled/               # LLM 编译产物 — 产品视角
 │   └── {product_id}/
 │       ├── overview.md
 │       ├── dimensions/
-│       │   ├── execution.md
-│       │   ├── context.md
-│       │   └── ...
+│       │   ├── execution.md  · context.md  · ...
 │       ├── changelog.md
-│       └── _provenance.json  # 每个字段的来源可追溯
+│       └── _provenance.json  # 每个字段的来源可追溯(行号级)
 │
-├── schema/                # SCHEMA 约定 (Pydantic + YAML)
-│   ├── product.yaml
-│   ├── dimension.yaml
-│   ├── general-agent-dims.yaml
-│   ├── coding-agent-dims.yaml
-│   └── common-dims.yaml
+├── topics/                 # 🆕 跨产品主题专题 — 借鉴 ussumant
+│   ├── execution/  · context/  · cache/  · open-source/  · co-evolution/
+│   # 每个 group 一个目录, 维度组层面的横向对比页
 │
-└── reports/               # 历次报告归档
-    ├── daily/
-    ├── weekly/
-    └── on-demand/
+├── concepts/               # 🆕 跨产品核心概念 — 借鉴 ussumant
+│   ├── mcp.md  · prompt-cache.md  · subagent.md
+│   ├── memory-compaction.md  · agent-loop.md  · skill-system.md
+│   # 单个抽象概念, 跨产品定义+实例+对比
+│
+├── schema/                 # SCHEMA 约定 (Pydantic + YAML)
+│   ├── product.yaml  · dimension.yaml
+│   ├── general-agent-dims.yaml  · coding-agent-dims.yaml  · common-dims.yaml
+│
+├── review/                 # 🆕 Async Review 队列 — 借鉴 nashsu
+│   ├── pending/  · approved/  · rejected/
+│   # LLM flag 待人审字段, 审完决议入 _provenance.json
+│
+└── reports/                # 历次报告归档
+    ├── daily/  · weekly/  · on-demand/
 ```
 
 ### 5.2 Schema 示例 (Pydantic)
@@ -245,11 +257,63 @@ class ProductEvaluation(BaseModel):
     product_id: str
     dimension_id: str
     value: str | float | int | list[str]
-    evidence_urls: list[HttpUrl]         # 可追溯
+    evidence_urls: list[HttpUrl]         # 可追溯, 含行号锚 #L42-L58
     evaluator: str                       # "llm:claude-opus-4-7" or "human:zhouhao"
-    confidence: float                    # 0-1
+    confidence: Literal[                 # 🆕 借鉴 sdyckjq-lab/llm-wiki-skill 4 级
+        "EXTRACTED",   # 从一手源直接抽取, 有明确文字依据
+        "INFERRED",    # 从已知事实推理而来, 需标注推理链
+        "AMBIGUOUS",   # 多源冲突或模糊, 进 review 队列待人审
+        "UNVERIFIED",  # 未经验证, 不能进最终报告
+    ]
     last_verified: datetime
+    review_status: Literal["pending", "approved", "rejected"] | None = None  # 🆕 Async Review
+    review_decision_at: datetime | None = None
+    reviewer: str | None = None
 ```
+
+### 5.3 三个核心操作 (借鉴 Karpathy + nashsu + ussumant)
+
+借鉴 Karpathy 原版 Ingest / Query / Lint, 加上 nashsu 的 Two-Step CoT 与 Async Review, 以及 ussumant 的 9 个 slash 命令骨架。
+
+#### Ingest (二步 CoT — 借鉴 nashsu)
+
+```
+Step 1 (分析): LLM 读 raw 源 → 输出结构化分析草稿
+   • 抽取实体 / 关系 / 关键事实
+   • 标注每条的 evidence_urls 与 confidence
+   • 不直接写 wiki, 仅产出中间 JSON
+   ↓
+Step 2 (生成): LLM 读分析草稿 + 现有 wiki → 写/更新页面
+   • 维度卡片 / 主题页 / 概念页
+   • 自动更新 [[wikilink]]
+   • 同步 index.md 与 log.md
+   ↓
+Async Review (借鉴 nashsu): confidence=AMBIGUOUS 的字段进 review/pending
+```
+
+为什么二步: 单次 prompt 让 LLM 同时分析+写作易导致编造 evidence; 拆开后第一步可强校验, 第二步只做"已验证事实 → 文字"。实测 token 多 30%, 但准确率显著上升。
+
+#### Query (Wiki-first)
+
+对应 Path C: index.md → 命中页面 → 多源验证 → 报告。详见 §7.3。
+
+#### Lint (健康检查)
+
+定期(每周一次)执行: 矛盾检测 / 孤立页面 / 断链 / 缺失 critical 维度数据 / 过期 last_verified。
+
+#### 9 个 Slash 命令骨架 (借鉴 ussumant)
+
+| 命令 | 功能 | 频率 |
+|---|---|---|
+| `/wiki-init` | 初始化 wiki (建目录 + purpose.md + schema) | 一次 |
+| `/wiki-ingest <source>` | 单源消化 (二步 CoT) | 高频 |
+| `/wiki-compile` | 批量编译 raw/ → compiled/ (SHA256 增量) | 每日/每周 |
+| `/wiki-search <kw>` | 全文/向量混合搜索 wiki | 高频 |
+| `/wiki-query <q>` | LLM 综合回答 + 引用 | 高频 |
+| `/wiki-compare <p1> <p2> [--dims=E,F]` | 产品维度对比 | 中频 |
+| `/wiki-lint` | 健康检查 | 每周 |
+| `/wiki-visualize` | 启动离线 HTML 知识图谱 — 借鉴 sdyckjq-lab | 按需 |
+| `/wiki-review` | 处理 Async Review 队列 | 按需 |
 
 ---
 
@@ -388,13 +452,16 @@ competitive-analysis 路由器
 
 ## 8. 报告产出与团队消费
 
-### 8.1 三层产物
+### 8.1 四层产物
 
 | 层 | 形态 | 触发 | 消费者 |
 |---|---|---|---|
-| L1 默认 | Markdown + 飞书 Wiki | 每次产出 | 团队 (查阅 + 评论) |
-| L2 升级 | PPT (Marp / python-pptx) + HTML 静态站 | 人工标记 high-value | 老板 / 客户 |
+| L1 默认 | Markdown + 飞书 Wiki + **离线 HTML 知识图谱** (借鉴 sdyckjq-lab) | 每次产出 | 团队 (查阅 + 评论) |
+| L2 升级 | PPT (Marp / python-pptx) + HTML 静态站 (mkdocs-material) | 人工标记 high-value | 老板 / 客户 |
 | L3 推送 | 飞书机器人 + 邮件订阅 | 重要变更触发 | 一线 / 决策层 |
+| 🆕 **L4 GUI** | 团队成员可装 **`sdyckjq-lab/llm-wiki-skill`** 到本地 Claude Code/Codex/OpenClaw/Hermes,直接 chat 知识库 | 团队成员个人选择 | 任何想要交互式查询的人 |
+
+> **L4 设计取舍**: 不强制团队装,因为主管道 (L1-L3) 已覆盖核心场景。但安装 L4 是 zero-cost 增益: skill 是 MIT 许可,装在 `~/.<agent>/skills/llm-wiki`,读我们 wiki 仓库的本地 clone 就能用,不影响主管道。
 
 ### 8.2 PM 作品集报告 (6 篇专题, 服务 JD 应聘)
 
@@ -478,8 +545,12 @@ ai-agent-competitive-analysis/
 │   ├── layer2_search/
 │   └── layer3_community/
 ├── wiki/                            # 建议同仓 (见 §12.2 #1), 数据量大后再迁 submodule
-│   ├── raw/  · compiled/  · schema/
-│   └── reports/
+│   ├── purpose.md  · index.md  · log.md     # Karpathy 三件套
+│   ├── raw/  · compiled/                    # 原始 + 编译产物
+│   ├── topics/  · concepts/                 # 跨产品视图 (借鉴 ussumant)
+│   ├── schema/                              # Pydantic + YAML
+│   ├── review/  pending/ approved/ rejected # Async Review (借鉴 nashsu)
+│   └── reports/  daily/ weekly/ on-demand/
 ├── render/
 │   ├── md/  · html/  · pptx/
 │   └── feishu/
@@ -497,11 +568,13 @@ ai-agent-competitive-analysis/
 **目标**: 跑通 Path A + B 主线,覆盖 5 个 P0 产品 (Claude Code / Cursor / Codex / Hermes / Manus)。
 
 - [ ] 项目骨架 + uv 依赖
-- [ ] llm_wiki 三层目录 + Pydantic schema
+- [ ] **完整 wiki 目录** (purpose/index/log + raw/compiled/topics/concepts/schema/review/reports) + Pydantic schema (含 4 级 confidence 枚举)
 - [ ] 维度库 yaml (先编码 Agent 一份,通用 Agent v0)
 - [ ] L0 适配器: docs-link-collector + RSS + GitHub Releases
 - [ ] Path A 全量同步: 1 个产品打通端到端
-- [ ] LLM 编译 prompt 模板 + provenance 记录
+- [ ] **二步 CoT** 编译 prompt 模板(分析+生成两阶段) + provenance 记录(行号级)
+- [ ] Async Review 队列基础设施 (review/pending → approved/rejected 流转)
+- [ ] 9 个 slash 命令骨架 (init/ingest/compile/search/query/compare/lint/visualize/review)
 
 ### Phase 2 — Path B 增量链 (1 周)
 
@@ -598,6 +671,7 @@ ai-agent-competitive-analysis/
 | wechat-articles | ✅ 已装 (依赖 miku-ai 待补) | L3 单点全文 |
 | TrendRadar | ⏳ 待 fork 部署 | L1 中文社媒 |
 | feishu skill (用户已有) | ✅ 已装 | 飞书读写 |
+| **sdyckjq-lab/llm-wiki-skill** | ⏳ 推荐装(L4 GUI) | 团队成员本地 Claude Code 直接 chat 知识库 |
 
 ---
 
@@ -607,9 +681,11 @@ ai-agent-competitive-analysis/
 2. **A2 服务对象**: 团队竞品监控 (拒绝个人/SaaS/社区免费版)
 3. **A3 TrendRadar 集成**: 1A 独立部署 (拒绝嵌入式 fork)
 4. **A4 抓取频率**: 2B 每日 Changelog + 每周文档同步
-5. **A5 维度库结构**: 双类目 + 公共抽离 (37 通用 + 57 编码 + 10 公共)
+5. **A5 维度库结构**: 双类目 + 公共抽离 (47 通用 + 67 编码 + 10 公共)
 6. **A6 权重方案**: JD 校准 — 编码 E+F 占 38%, 通用 C 占 25%
 7. **A7 新增维度组**: M (模型-Harness 共进化) + N (开源/开发者关系)
 8. **A8 主基准产品**: Claude Code (编码) + Claude Desktop (通用)
 9. **A9 主语言**: Python (拒绝 Node)
 10. **A10 调度**: GitHub Actions (拒绝本地 cron / 自建服务器)
+11. **A11 Wiki 引擎**: 自实现 + 借鉴 3 个开源项目最佳设计 — 拒绝把 nashsu/llm_wiki(8963 stars,但是 NOASSERTION license + 桌面 app 形态,与 cron 模型不匹配)作为依赖。借鉴: nashsu 的 purpose.md/二步 CoT/Async Review/4 信号图谱; sdyckjq-lab 的 4 级 Confidence/离线 HTML 图谱; ussumant 的 9 slash 命令/topics+concepts 双轨。
+12. **A12 团队 GUI 消费**: 推荐团队成员装 sdyckjq-lab/llm-wiki-skill (MIT 许可,Skill 形式) 作为 L4 GUI 选项,但不强制,主管道不依赖它。
