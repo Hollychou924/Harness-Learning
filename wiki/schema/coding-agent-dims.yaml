@@ -1,0 +1,60 @@
+# 编码 Agent 维度库 (Phase 1 MVP — E + F 两组的 critical 维度)
+# 完整 67 维 14 组见 spec §6.2
+dimensions:
+  # E. Agent Harness 执行 (group weight 20%)
+  - id: E1
+    name: 终端/Shell 执行
+    group: E. Agent Harness 执行
+    importance: high
+    weight_in_group_pct: 15
+    evaluation_type: enum
+    enum_values: ["无", "受限沙盒", "完整 Shell + 权限模式"]
+    rubric: 是否能跑命令 / 是否有 Plan-Act 模式 / 危险命令是否拦截
+    data_sources: ["L0:official_docs"]
+
+  - id: E4
+    name: MCP 支持
+    group: E. Agent Harness 执行
+    importance: high
+    weight_in_group_pct: 18
+    evaluation_type: enum
+    enum_values: ["不支持", "可装", "原生 + Marketplace"]
+    rubric: 原生支持级别 + Marketplace 数量
+    data_sources: ["L0:official_docs", "L3:community"]
+
+  - id: E5
+    name: 自定义工具/Hook 系统
+    group: E. Agent Harness 执行
+    importance: critical
+    weight_in_group_pct: 22
+    evaluation_type: score_0_3
+    rubric: "0=无 / 1=Function call only / 2=Skill 系统 / 3=Skill+Hook+SubAgent 完整"
+    data_sources: ["L0:official_docs"]
+
+  - id: E6
+    name: 长任务持久化
+    group: E. Agent Harness 执行
+    importance: critical
+    weight_in_group_pct: 20
+    evaluation_type: score_0_3
+    rubric: "0=单回合 / 1=多回合 / 2=Checkpoint 恢复 / 3=Cloud Agent 异步"
+    data_sources: ["L0:official_docs", "L2:search"]
+
+  # F. Context Engineering (group weight 18%)
+  - id: F1
+    name: 项目配置文件
+    group: F. Context Engineering
+    importance: high
+    weight_in_group_pct: 25
+    evaluation_type: text
+    rubric: 配置文件名 + 支持范围 (如 CLAUDE.md / AGENTS.md / .cursor)
+    data_sources: ["L0:official_docs"]
+
+  - id: F3
+    name: Memory + Context Compaction
+    group: F. Context Engineering
+    importance: critical
+    weight_in_group_pct: 30
+    evaluation_type: score_0_3
+    rubric: "0=无 / 1=会话级 / 2=跨会话持久化 / 3=可编辑可分享"
+    data_sources: ["L0:official_docs", "L3:community"]

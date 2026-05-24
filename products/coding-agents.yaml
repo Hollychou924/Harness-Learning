@@ -1,0 +1,46 @@
+# 编码 Agent 产品清单 (Phase 1 MVP — 5 个 P0)
+# 完整 12 个产品见 spec §2.1
+products:
+  - id: claude-code
+    name: Claude Code
+    category: coding
+    priority: P0
+    is_baseline: true
+    homepage: https://www.anthropic.com/claude-code
+    docs_root: https://docs.anthropic.com/en/docs/claude-code
+    changelog_url: https://docs.anthropic.com/en/docs/claude-code/changelog
+    github_repo: anthropics/claude-code
+    keywords: ["claude code", "claude-code", "Claude Code"]
+
+  - id: cursor
+    name: Cursor
+    category: coding
+    priority: P0
+    homepage: https://cursor.sh
+    docs_root: https://docs.cursor.com
+    changelog_url: https://www.cursor.com/changelog
+    keywords: ["cursor", "Cursor", "cursor.sh"]
+
+  - id: codex
+    name: Codex
+    category: coding
+    priority: P0
+    homepage: https://openai.com/codex
+    docs_root: https://platform.openai.com/docs/codex
+    keywords: ["codex", "OpenAI Codex"]
+
+  - id: hermes
+    name: Hermes Agent
+    category: coding
+    priority: P0
+    homepage: https://nousresearch.com/hermes
+    github_repo: NousResearch/hermes
+    keywords: ["hermes", "Hermes Agent", "Nous Research"]
+
+  - id: manus
+    name: Manus
+    category: coding  # also general; tracked here for MVP
+    priority: P0
+    homepage: https://manus.im
+    docs_root: https://docs.manus.im
+    keywords: ["manus", "Manus", "Manus AI"]
