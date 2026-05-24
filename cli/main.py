@@ -255,5 +255,159 @@ def notify(root: Path = ROOT_OPT) -> None:
     typer.echo(f"[stub] notify — would scan {root}/changelog/ and push unsent reports")
 
 
+THEME_SLUG_TO_ENUM = {
+    "harness-design": "HARNESS_DESIGN",
+    "harness_design": "HARNESS_DESIGN",
+    "context-engineering": "CONTEXT_ENGINEERING",
+    "context_engineering": "CONTEXT_ENGINEERING",
+    "tool-ecosystem": "TOOL_ECOSYSTEM",
+    "tool_ecosystem": "TOOL_ECOSYSTEM",
+    "cache-strategy": "CACHE_STRATEGY",
+    "cache_strategy": "CACHE_STRATEGY",
+    "open-source": "OPEN_SOURCE",
+    "open_source": "OPEN_SOURCE",
+    "co-evolution": "CO_EVOLUTION",
+    "co_evolution": "CO_EVOLUTION",
+}
+
+
+@app.command(help="Generate PM portfolio reports per theme (Phase 4)")
+def portfolio(
+    theme: str = typer.Option("", "--theme", help="Theme slug (e.g. harness-design)"),
+    all_themes: bool = typer.Option(False, "--all", help="Run all 6 themes"),
+    products: str = typer.Option(
+        "", "--products", help="Comma-separated product IDs (default: all P0)"
+    ),
+    formats: str = typer.Option(
+        "markdown,pptx",
+        "--formats",
+        help="Comma-separated output formats: markdown,pptx,html",
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Print plan without rendering or writing"
+    ),
+    products_file: Path = typer.Option(
+        Path("products/coding-agents.yaml"), "--products-file"
+    ),
+    output_dir: Path = typer.Option(
+        Path("wiki/reports/portfolio"), "--output-dir"
+    ),
+    root: Path = ROOT_OPT,
+) -> None:
+    import asyncio
+
+    from packages.competitive_analysis.comparison_request import OutputFormat
+    from packages.competitive_analysis.portfolio.engine import PortfolioReportEngine
+    from packages.competitive_analysis.portfolio.theme import (
+        PortfolioReportRequest,
+        ReportTheme,
+    )
+    from packages.llm_wiki.claude_cli import ClaudeCliLLMClient
+    from packages.llm_wiki.paths import WikiLayout
+    from render.portfolio_md_renderer import render_portfolio_md
+    from render.portfolio_pptx_renderer import render_portfolio_marp
+
+    # Validate flags.
+    if not theme and not all_themes:
+        typer.echo("Error: provide --theme <slug> or --all")
+        raise typer.Exit(code=1)
+    if theme and all_themes:
+        typer.echo("Error: --theme and --all are mutually exclusive")
+        raise typer.Exit(code=1)
+
+    # Resolve themes to run.
+    if all_themes:
+        themes_to_run = list(ReportTheme)
+    else:
+        slug = theme.lower()
+        if slug not in THEME_SLUG_TO_ENUM:
+            typer.echo(
+                f"Error: unknown theme {theme!r}. "
+                f"Valid: {sorted(set(THEME_SLUG_TO_ENUM))}"
+            )
+            raise typer.Exit(code=1)
+        themes_to_run = [ReportTheme[THEME_SLUG_TO_ENUM[slug]]]
+
+    # Resolve product IDs (default: P0 priority).
+    products_raw = yaml.safe_load(products_file.read_text(encoding="utf-8"))
+    all_product_ids = [p["id"] for p in products_raw["products"]]
+    if products:
+        product_ids = [p.strip() for p in products.split(",") if p.strip()]
+    else:
+        product_ids = [
+            p["id"]
+            for p in products_raw["products"]
+            if str(p.get("priority", "")).upper() == "P0"
+        ] or all_product_ids
+
+    # Resolve output formats.
+    fmt_map = {
+        "markdown": OutputFormat.MARKDOWN,
+        "md": OutputFormat.MARKDOWN,
+        "pptx": OutputFormat.PPTX,
+        "html": OutputFormat.HTML,
+    }
+    try:
+        requested_fmts = [
+            fmt_map[f.strip().lower()] for f in formats.split(",") if f.strip()
+        ]
+    except KeyError as exc:
+        typer.echo(f"Error: invalid format: {exc}")
+        raise typer.Exit(code=1) from exc
+
+    layout = WikiLayout(root=root)
+    llm = ClaudeCliLLMClient()
+    engine = PortfolioReportEngine(layout=layout, llm=llm)
+
+    for rt in themes_to_run:
+        request = PortfolioReportRequest(
+            theme=rt,
+            product_ids=product_ids,
+            dimension_filter=None,
+            output_formats=requested_fmts,
+        )
+        slug_out = rt.name.lower().replace("_", "-")
+        out_dir = output_dir / slug_out
+
+        if dry_run:
+            typer.echo(
+                f"[dry-run] theme={rt.name} products={product_ids} "
+                f"dims={request.effective_dimensions()} "
+                f"formats={[f.value for f in requested_fmts]} → {out_dir}"
+            )
+            continue
+
+        out_dir.mkdir(parents=True, exist_ok=True)
+        body_md = asyncio.run(engine.generate(request))
+
+        title = request.title or f"{rt.jd_keyword} — Coding Agent 横评"
+        audience = "DeepSeek Agent Harness PM"
+
+        if OutputFormat.MARKDOWN in requested_fmts:
+            md = render_portfolio_md(
+                body_md=body_md,
+                title=title,
+                jd_keyword=rt.jd_keyword,
+                audience=audience,
+            )
+            (out_dir / "report.md").write_text(md, encoding="utf-8")
+            typer.echo(f"✓ {out_dir / 'report.md'}")
+        if OutputFormat.PPTX in requested_fmts:
+            marp = render_portfolio_marp(
+                body_md=body_md,
+                title=title,
+                subtitle=f"From wiki facts to PM insights — {len(product_ids)} products",
+                jd_keyword=rt.jd_keyword,
+                audience=audience,
+            )
+            (out_dir / "deck.marp.md").write_text(marp, encoding="utf-8")
+            typer.echo(f"✓ {out_dir / 'deck.marp.md'}")
+        if OutputFormat.HTML in requested_fmts:
+            typer.echo(
+                f"  (HTML output for {rt.name} not yet wired — "
+                f"use marp-cli on deck.marp.md)"
+            )
+
+
 if __name__ == "__main__":
     app()
