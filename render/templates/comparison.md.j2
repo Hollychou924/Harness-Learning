@@ -1,0 +1,29 @@
+# {{ title }}
+
+> Generated {{ generated_at }} from `wiki/compiled/`. Baseline: **{{ products[product_order[0]].name }}**.
+
+## Comparison Matrix
+
+| Dimension | {% for pid in product_order %}{{ products[pid].name }} | {% endfor %}
+|---|{% for _ in product_order %}---|{% endfor %}
+{% for dim_id in dimension_order -%}
+| **{{ dim_id }}** {{ dimensions[dim_id].name }} | {% for pid in product_order %}{{ cells[dim_id][pid].value }} | {% endfor %}
+{% endfor %}
+
+## Per-Dimension Detail
+
+{% for dim_id in dimension_order %}
+### {{ dim_id }} — {{ dimensions[dim_id].name }}
+
+**Group:** {{ dimensions[dim_id].group }} · **Importance:** {{ dimensions[dim_id].importance }} · **Weight:** {{ dimensions[dim_id].weight_in_group_pct }}%
+
+**Rubric:** {{ dimensions[dim_id].rubric }}
+
+{% for pid in product_order %}
+**{{ products[pid].name }}** — Value: `{{ cells[dim_id][pid].value }}` (Confidence: {{ cells[dim_id][pid].confidence.value }})
+{% if cells[dim_id][pid].evidence_urls %}
+{% for url in cells[dim_id][pid].evidence_urls %}- [{{ url }}]({{ url }})
+{% endfor %}{% endif %}
+{% endfor %}
+
+{% endfor %}
