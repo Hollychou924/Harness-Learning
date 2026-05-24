@@ -1,0 +1,240 @@
+{
+  "E1": {
+    "product_id": "manus",
+    "dimension_id": "E1",
+    "value": "受限沙盒",
+    "evidence_urls": [
+      "https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "E4": {
+    "product_id": "manus",
+    "dimension_id": "E4",
+    "value": "可装",
+    "evidence_urls": [
+      "https://docs.manus.im"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "E5": {
+    "product_id": "manus",
+    "dimension_id": "E5",
+    "value": 2,
+    "evidence_urls": [
+      "https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "E6": {
+    "product_id": "manus",
+    "dimension_id": "E6",
+    "value": 3,
+    "evidence_urls": [
+      "https://manus.im/blog/manus-cloud-vm"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "F1": {
+    "product_id": "manus",
+    "dimension_id": "F1",
+    "value": "无 (云端 Agent,无本地配置)",
+    "evidence_urls": [
+      "https://docs.manus.im"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "F3": {
+    "product_id": "manus",
+    "dimension_id": "F3",
+    "value": 2,
+    "evidence_urls": [
+      "https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "J5": {
+    "product_id": "manus",
+    "dimension_id": "J5",
+    "value": 2,
+    "evidence_urls": [
+      "https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "N1": {
+    "product_id": "manus",
+    "dimension_id": "N1",
+    "value": "闭源",
+    "evidence_urls": [
+      "https://manus.im/legal/terms"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "N2": {
+    "product_id": "manus",
+    "dimension_id": "N2",
+    "value": "无公共 GitHub 主仓 (闭源云服务)",
+    "evidence_urls": [
+      "https://manus.im"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "N3": {
+    "product_id": "manus",
+    "dimension_id": "N3",
+    "value": 1,
+    "evidence_urls": [
+      "https://manus.im/contact"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "N4": {
+    "product_id": "manus",
+    "dimension_id": "N4",
+    "value": "厂商独裁",
+    "evidence_urls": [
+      "https://manus.im"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "N5": {
+    "product_id": "manus",
+    "dimension_id": "N5",
+    "value": 1,
+    "evidence_urls": [
+      "https://x.com/ManusAI_HQ"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "M1": {
+    "product_id": "manus",
+    "dimension_id": "M1",
+    "value": 1,
+    "evidence_urls": [
+      "https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "M2": {
+    "product_id": "manus",
+    "dimension_id": "M2",
+    "value": "Harness 行为数据回流训练",
+    "evidence_urls": [
+      "https://manus.im/legal/privacy"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "M3": {
+    "product_id": "manus",
+    "dimension_id": "M3",
+    "value": 3,
+    "evidence_urls": [
+      "https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "M4": {
+    "product_id": "manus",
+    "dimension_id": "M4",
+    "value": "工具/Skill 级路由",
+    "evidence_urls": [
+      "https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "M5": {
+    "product_id": "manus",
+    "dimension_id": "M5",
+    "value": "无自研模型,跟随 Claude/GPT 等基础模型节奏迭代 Harness",
+    "evidence_urls": [
+      "https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  }
+}

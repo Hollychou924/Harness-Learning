@@ -2,204 +2,179 @@
 
 > **作者:** zhouhao · **JD 关键词:** Context Engineering · **目标读者:** DeepSeek Agent Harness PM
 >
-> _Generated 2026-05-24T08:35:43+00:00 from `wiki/compiled/` (DeepSeek Agent Harness PM 应聘材料)_
+> _Generated 2026-05-24T09:03:20+00:00 from `wiki/compiled/` (DeepSeek Agent Harness PM 应聘材料)_
 
 ---
 
-# 项目上下文系统比较：6 种 Context Engineering 实现路径
+# Context Engineering 路径比较：从 .cursor/rules 到 SKILL.md 体系
 
-## 1. Context Engineering 是什么
+> 目标读者：DeepSeek Harness 团队 + 模型训练团队
+> 作者视角：AI Agent PM
+> 关键词：Context Engineering、Memory、Compaction、Skills
 
-Context Engineering 指为 AI agent 设计、组织、分发和压缩"工作记忆"的工程学科。它决定了 agent 在每次推理时能看到什么、记住什么、忘掉什么——本质上是把项目知识、用户偏好、工具能力、过往决策编码为可检索的上下文资产，并在有限的 token 窗口内实现最优投放。
+## 1. 什么是 Context Engineering
 
-## 2. 六种实现路径的分类
+Context Engineering 是为 LLM Agent 系统设计「该让模型看到什么、什么时候看到、以什么形式看到」的工程实践，覆盖项目级规则、用户偏好、长期记忆与运行时压缩四层，目标是在窗口预算内保留任务相关信号、剔除噪声并支持长程任务。
 
-经过对主流 coding agent 产品的拆解，Context Engineering 在工业界形成了六条相对独立的实现路径。它们并非互斥，但每条路径有不同的设计哲学、文件载体和生命周期管理策略：
+## 2. 六种实现路径的全景图
 
-| 路径 | 命名 | 核心载体 | 代表产品 |
-|------|------|---------|---------|
-| P1 | 根目录单文件约定 | 单个 markdown | Codex / Cursor (legacy) |
-| P2 | 层级化规则目录 | rules 子目录 | Cursor / Claude Code |
-| P3 | 子 Agent 定义 | agents 目录 | Claude Code |
-| P4 | Skill Pack 体系 | skills 目录 | Claude Code |
-| P5 | 持久化 Memory 系统 | memory/ 带 frontmatter | Claude Code (auto memory) |
-| P6 | 动态 Compaction | session summary | 全部主流产品 |
+把当前主流 Agent 产品的 Context 设计方法整理出来，可以归纳为六种实现路径。它们沿着「单文件 → 目录化 → 分层 → 协议化 → 能力组件化 → 云端/模型层」演进，对应不同的工程成熟度与团队边界。
 
-下文逐条拆解。
+| 路径 | 代表产品 | 关键载体 | 层数 (F3) | 核心思想 |
+|---|---|---|---|---|
+| A 单文件规则 | Cursor 早期 | `.cursorrules` | 1 | 一个文件解决所有项目偏好 |
+| B 目录化规则 | Cursor 当前 | `.cursor/rules/*.mdc` | 2 | 按 glob 条件加载 |
+| C 分层 Memory | Claude Code | `CLAUDE.md` 三层 | 3 | 每层独立、合并装载 |
+| D 标准化协议 | Codex | `AGENTS.md` | 2 | 跨工具厂商可读的开放约定 |
+| E 能力组件化 | Claude Code 高阶 | `.claude/agents/` + `.claude/skills/` | 3 | Context 即可插拔能力包 |
+| F 云端/模型层 | Manus / Hermes | 后端 Agent state + 模型内蓄 | 1–2 | 不暴露文件，服务端/权重管理 |
 
-## 3. 各路径详解
+## 3. 六种路径的解剖
 
-### 3.1 路径 P1：根目录单文件约定
+### 3.1 路径 A：单文件规则（Cursor 早期 `.cursorrules`）
 
-**代表产品**：OpenAI Codex (AGENTS.md)、早期 Cursor (.cursorrules)、Claude Code 的 CLAUDE.md。
+**代表产品**：Cursor 早期版本。
+**文件结构**：仓库根目录一个无后缀文本文件，纯自然语言写规则。
+**Memory 机制**：完全静态，作为 system prompt 前缀注入，无任何分层。
+**Compaction 策略**：由模型窗口被动决定，规则文本本身不参与压缩。
 
-**文件结构**：项目根目录放置一个纯 markdown 文件，agent 启动时自动加载到系统提示。
+证据：https://docs.cursor.com/context/rules-for-ai
 
-```
-project-root/
-├── AGENTS.md           # Codex 约定
-├── .cursorrules        # Cursor legacy
-└── CLAUDE.md           # Claude Code 主入口
-```
+**优点**：极低门槛，单仓库秒级落地。
+**局限**：无法表达"这条规则只对测试文件生效"，规则一多就堵塞 Context。
 
-**Memory 机制**：完全由人类手写，agent 只读不写。文件内容直接拼接到每轮对话的 system prompt 前缀，是真正意义上的"持续上下文"——但代价是占用每一次 API 调用的输入 token。
+### 3.2 路径 B：目录化规则（Cursor `.cursor/rules/`）
 
-**Compaction 策略**：无内置 compaction。当文件膨胀到几千行时，唯一的优化手段是人工拆分或外链到子文档。Claude Code 文档明确建议 CLAUDE.md 控制在 200 行以内（[evidence](https://docs.anthropic.com/en/docs/claude-code/memory)）。
+**代表产品**：Cursor 当前版本。
+**文件结构**：`.cursor/rules/*.mdc`，每个文件携带 frontmatter（`description`、`globs`、`alwaysApply`），可分团队规则与个人规则。
+**Memory 机制**：F3=2，按 glob 触发的"项目级 + 条件加载"。
+**Compaction 策略**：未触发的规则不进 Prompt，本质上是"懒加载式压缩"，但触发后全文注入，无切片。
 
-**优劣**：上手成本最低，约定优于配置，所有团队成员一目了然；但缺乏粒度、无法按任务激活，不适合大型多模块仓库。
+证据：https://docs.cursor.com/context/rules-for-ai
 
-### 3.2 路径 P2：层级化规则目录
+**优点**：第一次有了"条件 Context"概念，规则之间不再互相挤占预算。
+**局限**：触发逻辑只能基于文件 glob，无法基于任务语义；Memory 与 Skill 边界仍模糊。
 
-**代表产品**：Cursor (.cursor/rules/)、Claude Code (.claude/ 目录)。
+### 3.3 路径 C：分层 Memory（Claude Code `CLAUDE.md`）
 
+**代表产品**：Claude Code。
+**文件结构**：三层 `CLAUDE.md`：
+1. 项目本地：`./CLAUDE.md`、`./CLAUDE.local.md`
+2. 用户私有：`~/.claude/CLAUDE.md`
+3. 引用拓展：`@path` 语法把任意 md 文件拉进当前层。
+
+**Memory 机制**：F3=3，三层在会话启动合并装载，支持 `@import`。
+**Compaction 策略**：分两段——`CLAUDE.md` 本体不动；运行时上下文超阈触发 auto-compact，将对话历史归纳为摘要、保留必要文件状态。
+
+证据：https://docs.anthropic.com/en/docs/claude-code/memory
+
+**优点**：把"项目知识、个人偏好、全局风格"分开，避免新人误改全局规则；三层都可见、可编辑。
+**局限**：内容仍然全量静态注入，不会按任务语义剔除无关段落。
+
+### 3.4 路径 D：标准化协议（Codex `AGENTS.md`）
+
+**代表产品**：OpenAI Codex 与开源社区共推。
+**文件结构**：项目根目录 `AGENTS.md`，被 Codex CLI 与多个兼容工具识别；Codex 另含会话级 memory store，F3=2。
+**Memory 机制**：`AGENTS.md` 是"厂商中立的开发约定"，把 README 升级为机器可读规范。
+**Compaction 策略**：会话级历史由 Codex 后端管理，类似 auto-compact；`AGENTS.md` 不参与压缩。
+
+证据：https://platform.openai.com/docs/codex/agents、https://platform.openai.com/docs/codex/memory
+
+**优点**：第一次出现"跨厂商"Context 标准，可被多个 IDE/CLI 同时使用。
+**局限**：协议本身仍然薄，没有解决"规则按任务挑选"问题，多数项目只是把 README 改了名。
+
+### 3.5 路径 E：能力组件化（`.claude/agents/` + `.claude/skills/`）
+
+**代表产品**：Claude Code 高阶用法。
 **文件结构**：
+- `.claude/agents/*.md`：子代理定义，有独立 system prompt 与工具子集（如 typescript-reviewer、tdd-guide）。
+- `.claude/skills/<name>/SKILL.md`：可召唤技能，frontmatter 携带 `description`，模型按相关度决定加载。
 
-```
-.cursor/
-└── rules/
-    ├── frontend.md      # 仅在前端文件激活
-    ├── api.md           # 仅在后端 API 激活
-    └── always.md        # 全局激活
-```
+**Memory 机制**：F3=3 的最高形态——基础 Memory（`CLAUDE.md`）+ 能力包（Agents）+ 知识包（Skills），三者独立装填。
+**Compaction 策略**：Skills 默认不在 Context 内，只在匹配时被 Skill 工具一次性读入，调用结束即释放。等于把"知识"做成"按需 RAG 文件"。
 
-每条规则带 frontmatter 声明 `globs`、`alwaysApply` 等元数据。Cursor 使用 MDC (Markdown Components) 格式（[evidence](https://docs.cursor.com/context/rules-for-ai)），Claude Code 通过文件层级实现类似效果。
+证据：https://docs.anthropic.com/en/docs/claude-code/memory
 
-**Memory 机制**：规则按文件路径或语义标签条件激活，不再"all-or-nothing"。Cursor 支持四类规则：Always、Auto Attached（按 glob）、Agent Requested（agent 自主调用）、Manual。
+**优点**：把 Context 拆成"能力可插拔"组件，每个 Skill 都是可独立审计、可分享的小规则集，是当前最先进的工程形态。
+**局限**：组件爆炸时如何让模型"选对 Skill"成为新挑战，`description` 工程化压力极大。
 
-**Compaction 策略**：通过激活条件天然实现按需注入，从源头压缩上下文。一个 50KB 的规则库，单次实际进入 prompt 的可能只有 5KB。
+### 3.6 路径 F：云端/模型层（Manus、Hermes）
 
-**优劣**：精细化程度高，但维护成本上升。条件激活逻辑写得不好会导致"规则不生效"的 debug 噩梦。
+**代表产品**：
+- **Manus**：云端通用 Agent，本地无配置文件，所有 Context 由后端 Agent runtime 管理；F3≈2（system prompt + 任务 memory）。
+- **Hermes**：以 function-calling 为核心的模型家族，把工具调用约定训练进权重；F3=1。
 
-### 3.3 路径 P3：子 Agent 定义
-
-**代表产品**：Claude Code 的 `.claude/agents/` 目录。
-
-**文件结构**：每个 agent 是一个独立 markdown 文件，带 frontmatter 描述其角色、可用工具、模型选择：
-
-```
-.claude/agents/
-├── code-reviewer.md
-├── tdd-guide.md
-└── security-reviewer.md
-```
-
-**Memory 机制**：子 agent 拥有独立的上下文窗口，主 agent 通过 Task 工具委派任务。子 agent 完成后，只有最终摘要返回主上下文——这是一种**计算性 compaction**，把"过程上下文"留在子 agent 内部，"结果上下文"上交给主流程。
-
-**Compaction 策略**：天然按角色隔离。一个 50 轮对话的 security review 可能在子 agent 内部消耗 80K token，但只给主 agent 返回 500 字摘要。
-
-**优劣**：对复杂任务的 token 经济性极佳，但增加了系统设计复杂度——agent 之间的协议、错误传播、结果格式都需要显式约定。
-
-### 3.4 路径 P4：Skill Pack 体系
-
-**代表产品**：Claude Code 的 superpowers/skills 体系（[evidence](https://docs.anthropic.com/en/docs/claude-code/memory)）。
-
-**文件结构**：
-
-```
-.claude/skills/
-├── tdd-workflow/
-│   ├── SKILL.md         # 入口
-│   ├── references/
-│   └── examples/
-└── debugging/
-    └── SKILL.md
-```
-
-每个 skill 是一个目录，SKILL.md 是入口文件，frontmatter 声明 `name` 和 `description`。Agent 在合适时机调用 Skill 工具，把 SKILL.md 内容**惰性加载**到当前上下文。
-
-**Memory 机制**：skill 不进入默认 system prompt，而是在 agent "需要"时按名加载。这是把"被动 context injection"升级为"主动 capability calling"。
-
-**Compaction 策略**：与子 agent 类似的惰性加载模型。1000 个 skills 的库可以共存，单次任务可能只激活 1-2 个。
-
-**优劣**：可发布、可共享、可版本化，类似 npm 包。但 agent 的"主动调用判断"依赖 description 写得好不好，调用率波动大。
-
-### 3.5 路径 P5：持久化 Memory 系统
-
-**代表产品**：Claude Code 的 auto memory（用户级 `~/.claude/projects/<project>/memory/`）。
-
-**文件结构**：
-
-```
-memory/
-├── MEMORY.md                # 索引文件，永远入 prompt
-├── user_role.md             # 用户身份
-├── feedback_testing.md      # 用户反馈
-├── project_q1_goals.md      # 项目状态
-└── reference_grafana.md     # 外部资源
-```
-
-每个 memory 是独立文件，frontmatter 声明 `name`、`description`、`metadata.type`（user / feedback / project / reference 四类）。
-
-**Memory 机制**：MEMORY.md 是常驻索引，单个 memory 在 description 命中时被加载。Agent 在对话中**主动写入**新 memory（用户身份、反馈、项目状态），实现跨会话学习。
-
-**Compaction 策略**：通过分类 + 索引实现冷热分层。MEMORY.md 控制在 200 行以内（系统硬截断），单个 memory 文件按需加载。
-
-**优劣**：是六种路径中唯一支持 agent 自主写入的，跨会话连续性最强。但记忆衰减、冲突解决、记忆"幻觉"是公开难题——一条三个月前的 memory 可能引用早已不存在的文件路径。
-
-### 3.6 路径 P6：动态 Compaction
-
-**代表产品**：所有主流 coding agent。
-
-**文件结构**：无独立文件，是运行时机制。
-
-**Memory 机制**：当对话接近上下文窗口上限，agent harness 自动触发摘要：早期消息被压缩为结构化 summary，原始消息释放。Claude Code 在 session summary 中保留任务列表、关键决策、未完成事项。
+**文件结构**：本地无 Context 文件。
+**Memory 机制**：
+- Manus：云端 Agent state，按 session 隔离，文件操作通过虚拟文件系统挂载。
+- Hermes：Context 已"内蓄"到模型权重，运行时只需最少提示。
 
 **Compaction 策略**：
-- **Auto compaction**：上下文超过阈值（通常 70-80%）触发；
-- **Manual compaction**：用户显式 `/compact`；
-- **Session boundary compaction**：会话结束时生成 next session 摘要。
+- Manus：自研三件套——KV-cache 前缀重用、虚拟文件系统挂载、Tool Result 删减与回放。
+- Hermes：主要靠模型自身窗口压缩 + 训练时短上下文偏好。
 
-**优劣**：是上下文窗口的"最后一道防线"，但摘要本身存在信息损失风险。被压缩掉的"为什么这么做"经常比"做了什么"更难恢复。
+证据：https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus、https://github.com/NousResearch/hermes-function-calling
+
+**优点**：用户零配置，云端可做激进压缩与 KV-cache 重用；Hermes 的"训练替代提示"思路在长期是更优解。
+**局限**：可见性、可编辑性、可分享性最弱，不适合企业合规与高定制场景。
 
 ## 4. Memory 三轴评分矩阵
 
-将上述六条路径在三个维度上打分（1-5 分）：
+按"可见性、可编辑性、可分享性"三轴打 1–5 分（5 最好）：
 
-| 路径 | 可见性 | 可编辑性 | 可分享性 | 综合 |
-|------|--------|---------|---------|------|
-| P1 单文件 | 5 | 5 | 5 | 15 |
-| P2 规则目录 | 4 | 4 | 5 | 13 |
-| P3 子 Agent | 4 | 4 | 5 | 13 |
-| P4 Skill | 4 | 4 | 5 | 13 |
-| P5 持久 Memory | 3 | 4 | 2 | 9 |
-| P6 动态 Compaction | 1 | 1 | 1 | 3 |
+| 路径 | 可见性 | 可编辑性 | 可分享性 | 总分 |
+|---|---|---|---|---|
+| A 单文件规则 | 5 | 5 | 4 | 14 |
+| B 目录化规则 | 5 | 5 | 5 | 15 |
+| C `CLAUDE.md` 分层 | 5 | 5 | 4 | 14 |
+| D `AGENTS.md` 协议 | 5 | 5 | 5 | 15 |
+| E Agents + Skills | 4 | 4 | 5 | 13 |
+| F 云端/模型层 | 1 | 2 | 2 | 5 |
 
-**三轴定义**：
-- **可见性**：开发者能否直接查看 agent 当前持有的 context（路径 P1 最高，因为 CLAUDE.md 就是源文件；P6 最低，因为 compaction summary 通常不展示）；
-- **可编辑性**：开发者能否手动修改 context 内容（P1-P4 都是文本文件可直接编辑；P5 介于中间，因为 agent 也会写入；P6 不可编辑）；
-- **可分享性**：context 能否随仓库 git commit 分发给团队（P1-P4 直接进 repo，P5 是用户级私密目录不进 repo，P6 是运行时状态）。
+**轴解读**：
+- **可见性**：用户能否直观看到"模型现在被注入了什么"。本地文件满分；云端黑盒最低。
+- **可编辑性**：用户能否在不改后端的前提下调整 Context。Markdown 满分；模型权重几乎不可编辑。
+- **可分享性**：能否在团队/社区复用。`AGENTS.md`、`.cursor/rules` 进 Git 仓库满分；云端 session 私有最低。
 
-**关键洞察**：可见性、可编辑性、可分享性三者**正相关**——文件越显式，越容易被人类理解、修改、协作。这解释了为什么 .cursorrules 和 CLAUDE.md 这类"原始"约定能广泛传播：它们牺牲了精细化能力，换来了零理解成本。
+**关键洞察**：
+1. 路径 B 与 D 总分并列（15），但适配场景不同——B 偏 IDE，D 偏 CLI / CI。DeepSeek Harness 应同时兼容这两条。
+2. 路径 E（Skills）可见性下降一档，但带来"按需加载"——这是目前唯一能从根本上解决长上下文困境的机制。
+3. 路径 F 三轴都低，但成本最低，是 ToC 通用 Agent 的合理选择；对 DeepSeek 的开发者工具产品不适配。
 
-## 5. DeepSeek 应该如何设计 Context 系统
+## 5. DeepSeek Context 系统设计的三条建议
 
-基于以上拆解，给 DeepSeek Harness 团队和模型训练团队三条具体建议：
+### 5.1 建议一：三层分层 + `AGENTS.md` 协议双轨
 
-### 建议 1：以 P1+P2 为底盘，而非从 P5 起步
+借鉴 Claude Code 的三层职责拆分，但文件名用社区标准 `AGENTS.md` 而非自造命名：
+- `./AGENTS.md`：项目级，进 Git。
+- `./AGENTS.local.md`：项目内个人覆写，进 `.gitignore`。
+- `~/.deepseek/AGENTS.md`：用户全局，跨项目生效。
 
-不要直接做 auto memory（P5）。auto memory 是 Claude Code 跑了一年、用户对 agent 已经形成稳定心智之后才上线的高阶功能。直接做 P5 会面临三个难题：用户看不到 agent 在记什么（可见性差）、记错了不知道改哪里（可编辑性差）、记忆的有效衰减期不明确。
+这样同时拿到了路径 C 的"职责清晰"和路径 D 的"跨工具兼容"，是当前最低风险路线。参考：https://platform.openai.com/docs/codex/agents、https://docs.anthropic.com/en/docs/claude-code/memory
 
-**正确顺序**：先把 `DEEPSEEK.md`（根目录单文件，路径 P1）和 `.deepseek/rules/`（条件激活规则，路径 P2）跑通，让用户先建立"我可以通过编辑这些文件影响 agent 行为"的心智。然后在 6 个月后再迭代 P5 持久化 memory。
+### 5.2 建议二：把 Skills 作为下一代核心，先锁协议，再建仓库
 
-### 建议 2：用 Skill Pack（P4）做能力市场，不要做插件
+不要在 v1 就堆 50 个 Skill，应先把 `SKILL.md` 的 frontmatter 协议（`name`、`description`、触发条件、参数约定）锁死。三阶段：
+- **阶段一**：发布 SKILL spec，提供 5–10 个高频官方 Skill（debugging、tdd、code-review、security-review 等），与 Claude Code 命名兼容以降低迁移成本。
+- **阶段二**：开放第三方 Skill marketplace，模型按 `description` 召唤。
+- **阶段三**：训练阶段把"如何挑选 Skill"作为强化学习任务，让模型获得 Skill 选取直觉，把路径 F（Hermes 内蓄）和路径 E（Claude Code 组件化）合一。
 
-Cursor 走的是"自定义 commands"路线（命令式），Claude Code 走的是 Skill Pack（声明式 + 惰性加载）。两者本质区别：Skill 由 agent 自己判断何时激活，命令由用户显式触发。
+这是 DeepSeek 最有可能"超车 Claude Code"的差异化点：Claude Code 的 Skill 选取仍是 description 文本匹配，而 DeepSeek 可以用模型训练把它做成原生能力。
 
-DeepSeek 应该选 Skill Pack 路线。原因：(1) DeepSeek 的强项是模型推理能力，把"激活判断"交给模型本身是发挥优势；(2) Skill Pack 是可分享、可版本化的资产，能形成生态；(3) 与训练团队协同——可以专门训练模型在 Skill description 上的 retrieval 能力，作为 evaluation 指标。
+### 5.3 建议三：Compaction 做成"分级 + 可恢复"，借鉴 Manus 虚拟文件系统
 
-具体落地：在 v1 发布时预置 10-20 个官方 Skill（debugging、tdd、code-review、refactor），并开放 `~/.deepseek/skills/` 用户目录。
+Compaction 是 Harness 团队最容易低估的工作。Manus 的实践证明，简单"截断 + 摘要"在长任务里会丢关键状态。建议三级：
+- **L1 实时 KV-cache 重用**：高频前缀（system prompt + `AGENTS.md`）做缓存，与 DeepSeek-V3 的 context cache 能力直接打通。
+- **L2 文件化外存**：工具调用结果（长代码、长文档）落到虚拟文件系统，Prompt 仅保留路径与摘要，模型用"读文件"工具按需取回，这是 Manus 的核心打法。参考：https://manus.im/blog/Context-Engineering-for-AI-Agents-Lessons-from-Building-Manus
+- **L3 会话级摘要**：超过窗口才摘要，并保留"原始历史路径"以备回滚，对应 Claude Code 已有的 auto-compact 形态。
 
-### 建议 3：把 Compaction（P6）做成显式资产，而非黑盒
+模型训练侧需要配合两件事：
+1. 训练数据增加"读文件再回答"的轨迹，让模型习惯把 Context 当作可寻址外存，而不是"必须全读"。
+2. 增加"自我压缩"轨迹，让模型主动写"我已知道 X，请将其从 Context 移除"这类指令。
 
-P6 在所有产品里都是黑盒——压缩后的内容不展示、不可编辑、不可追溯。但这恰恰是 DeepSeek 可以差异化的地方：把 session summary 落盘为 `.deepseek/sessions/<id>/summary.md`，并在下次进入同一项目时由用户选择是否 resume。
+## 结语
 
-这做了三件事：(1) 让"对话历史"成为团队资产，而不是某个工程师电脑里的临时状态；(2) 给训练团队提供干净的 trajectory 数据集（用户已经标注哪些 session 值得保留）；(3) 跨会话连续性不再依赖 P5 的 memory 推断，而是用户显式选择，可见性大幅提升。
-
-具体设计：每个 session 结束时生成结构化摘要（任务、决策、未完成事项、引用文件），Compaction 不再是"agent 偷偷做的事"，而是 agent 和人协作生成的工程产出物。
-
----
-
-**总结**：Context Engineering 的本质不是"如何塞更多东西进窗口"，而是"如何让上下文在团队、时间、任务三个维度上可治理"。Cursor 和 Claude Code 提供了两套各有侧重的范式，DeepSeek 的机会在于把 P4（Skill）和 P6（Compaction）做得比所有竞品都更显式、更资产化、更可训练——这恰好对齐了 DeepSeek 团队"模型 × 工程"双轮驱动的禀赋。
+Context Engineering 的演进路径已经从「`.cursorrules` 的一行说明」走到「Skills 仓库 + 虚拟文件系统 + 模型内蓄」。对 DeepSeek Harness 而言，路径 C + D 的"可见 Context"（`AGENTS.md` 三层分层）是 v1 的合理目标；真正的护城河在路径 E + F 的混合——把 Skills 做成开放协议，把 Compaction 做成模型训练的一等任务。这两件事做到位，DeepSeek 不再是"另一个支持 `AGENTS.md` 的工具"，而是"第一个 Context 系统由模型本身设计的工具"。
 
 
 ---
@@ -211,4 +186,4 @@ nashsu/llm_wiki + sdyckjq-lab/llm-wiki-skill 三套开源借鉴整合。
 
 代码与方法论开源: `github.com/<user>/ai-agent-competitive-analysis`
 
-—— zhouhao, 2026-05-24T08:35:43+00:00
+—— zhouhao, 2026-05-24T09:03:20+00:00

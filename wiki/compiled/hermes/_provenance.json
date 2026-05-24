@@ -1,0 +1,240 @@
+{
+  "E1": {
+    "product_id": "hermes",
+    "dimension_id": "E1",
+    "value": "受限沙盒",
+    "evidence_urls": [
+      "https://github.com/NousResearch/hermes-function-calling"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "E4": {
+    "product_id": "hermes",
+    "dimension_id": "E4",
+    "value": "可装",
+    "evidence_urls": [
+      "https://github.com/NousResearch/hermes-function-calling"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "E5": {
+    "product_id": "hermes",
+    "dimension_id": "E5",
+    "value": 1,
+    "evidence_urls": [
+      "https://nousresearch.com/hermes-function-calling"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "E6": {
+    "product_id": "hermes",
+    "dimension_id": "E6",
+    "value": 1,
+    "evidence_urls": [
+      "https://github.com/NousResearch/Atropos"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "F1": {
+    "product_id": "hermes",
+    "dimension_id": "F1",
+    "value": "无标准化项目配置文件 (依赖应用层封装)",
+    "evidence_urls": [
+      "https://github.com/NousResearch/hermes-function-calling"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "F3": {
+    "product_id": "hermes",
+    "dimension_id": "F3",
+    "value": 1,
+    "evidence_urls": [
+      "https://nousresearch.com/hermes-function-calling"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "J5": {
+    "product_id": "hermes",
+    "dimension_id": "J5",
+    "value": 1,
+    "evidence_urls": [
+      "https://github.com/NousResearch/hermes-function-calling"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "N1": {
+    "product_id": "hermes",
+    "dimension_id": "N1",
+    "value": "MIT/Apache OSS",
+    "evidence_urls": [
+      "https://github.com/NousResearch"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "N2": {
+    "product_id": "hermes",
+    "dimension_id": "N2",
+    "value": "Hermes 系列 GitHub 4k+ stars / 活跃 PR",
+    "evidence_urls": [
+      "https://github.com/NousResearch/hermes-function-calling"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "N3": {
+    "product_id": "hermes",
+    "dimension_id": "N3",
+    "value": 2,
+    "evidence_urls": [
+      "https://github.com/NousResearch/hermes-function-calling"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "N4": {
+    "product_id": "hermes",
+    "dimension_id": "N4",
+    "value": "厂商独裁",
+    "evidence_urls": [
+      "https://nousresearch.com"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "N5": {
+    "product_id": "hermes",
+    "dimension_id": "N5",
+    "value": 2,
+    "evidence_urls": [
+      "https://discord.gg/nousresearch"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "M1": {
+    "product_id": "hermes",
+    "dimension_id": "M1",
+    "value": 3,
+    "evidence_urls": [
+      "https://nousresearch.com/hermes-3"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "M2": {
+    "product_id": "hermes",
+    "dimension_id": "M2",
+    "value": "用户上报 opt-in",
+    "evidence_urls": [
+      "https://github.com/NousResearch"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "M3": {
+    "product_id": "hermes",
+    "dimension_id": "M3",
+    "value": 1,
+    "evidence_urls": [
+      "https://huggingface.co/NousResearch"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "M4": {
+    "product_id": "hermes",
+    "dimension_id": "M4",
+    "value": "全局切换",
+    "evidence_urls": [
+      "https://github.com/NousResearch/hermes-function-calling"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "M5": {
+    "product_id": "hermes",
+    "dimension_id": "M5",
+    "value": "Hermes 3 → Hermes 4 节奏与函数调用框架同步迭代",
+    "evidence_urls": [
+      "https://nousresearch.com/hermes-4"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase5-hermes-manus",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:59:24+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  }
+}
