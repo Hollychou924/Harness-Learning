@@ -1,0 +1,86 @@
+{
+  "E1": {
+    "product_id": "claude-code",
+    "dimension_id": "E1",
+    "value": "完整 Shell + 权限模式",
+    "evidence_urls": [
+      "https://docs.anthropic.com/en/docs/claude-code/security#permissions"
+    ],
+    "evaluator": "seed:demo-2026-05-24",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T06:54:46.159083Z",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "E4": {
+    "product_id": "claude-code",
+    "dimension_id": "E4",
+    "value": "原生 + Marketplace",
+    "evidence_urls": [
+      "https://docs.anthropic.com/en/docs/claude-code/mcp"
+    ],
+    "evaluator": "seed:demo-2026-05-24",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T06:54:46.159083Z",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "E5": {
+    "product_id": "claude-code",
+    "dimension_id": "E5",
+    "value": 3,
+    "evidence_urls": [
+      "https://docs.anthropic.com/en/docs/claude-code/skills"
+    ],
+    "evaluator": "seed:demo-2026-05-24",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T06:54:46.159083Z",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "E6": {
+    "product_id": "claude-code",
+    "dimension_id": "E6",
+    "value": 2,
+    "evidence_urls": [
+      "https://docs.anthropic.com/en/docs/claude-code/checkpoints"
+    ],
+    "evaluator": "seed:demo-2026-05-24",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T06:54:46.159083Z",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "F1": {
+    "product_id": "claude-code",
+    "dimension_id": "F1",
+    "value": "CLAUDE.md + .claude/agents/ + .claude/skills/",
+    "evidence_urls": [
+      "https://docs.anthropic.com/en/docs/claude-code/memory"
+    ],
+    "evaluator": "seed:demo-2026-05-24",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T06:54:46.159083Z",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "F3": {
+    "product_id": "claude-code",
+    "dimension_id": "F3",
+    "value": 3,
+    "evidence_urls": [
+      "https://docs.anthropic.com/en/docs/claude-code/memory"
+    ],
+    "evaluator": "seed:demo-2026-05-24",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T06:54:46.159083Z",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  }
+}

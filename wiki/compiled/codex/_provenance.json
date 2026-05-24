@@ -1,0 +1,86 @@
+{
+  "E1": {
+    "product_id": "codex",
+    "dimension_id": "E1",
+    "value": "完整 Shell + 权限模式",
+    "evidence_urls": [
+      "https://platform.openai.com/docs/codex/security"
+    ],
+    "evaluator": "seed:demo-2026-05-24",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T06:54:46.159083Z",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "E4": {
+    "product_id": "codex",
+    "dimension_id": "E4",
+    "value": "原生 + Marketplace",
+    "evidence_urls": [
+      "https://platform.openai.com/docs/codex/mcp"
+    ],
+    "evaluator": "seed:demo-2026-05-24",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T06:54:46.159083Z",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "E5": {
+    "product_id": "codex",
+    "dimension_id": "E5",
+    "value": 2,
+    "evidence_urls": [
+      "https://platform.openai.com/docs/codex/agents"
+    ],
+    "evaluator": "seed:demo-2026-05-24",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T06:54:46.159083Z",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "E6": {
+    "product_id": "codex",
+    "dimension_id": "E6",
+    "value": 3,
+    "evidence_urls": [
+      "https://platform.openai.com/docs/codex/cloud"
+    ],
+    "evaluator": "seed:demo-2026-05-24",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T06:54:46.159083Z",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "F1": {
+    "product_id": "codex",
+    "dimension_id": "F1",
+    "value": "AGENTS.md",
+    "evidence_urls": [
+      "https://platform.openai.com/docs/codex/agents"
+    ],
+    "evaluator": "seed:demo-2026-05-24",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T06:54:46.159083Z",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "F3": {
+    "product_id": "codex",
+    "dimension_id": "F3",
+    "value": 2,
+    "evidence_urls": [
+      "https://platform.openai.com/docs/codex/memory"
+    ],
+    "evaluator": "seed:demo-2026-05-24",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T06:54:46.159083Z",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  }
+}
