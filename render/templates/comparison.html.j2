@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>{{ title }}</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;max-width:1100px;margin:2rem auto;padding:0 1rem;color:#222}
+h1{border-bottom:2px solid #2c5282}
+table{border-collapse:collapse;width:100%;margin:1rem 0}
+th,td{border:1px solid #cbd5e0;padding:.6rem;text-align:left}
+th{background:#edf2f7}
+.dim-detail{background:#f7fafc;padding:1rem;border-left:4px solid #4299e1;margin:1rem 0}
+.confidence-EXTRACTED{color:#22543d;background:#c6f6d5}
+.confidence-INFERRED{color:#1a365d;background:#bee3f8}
+.confidence-AMBIGUOUS{color:#7c2d12;background:#feebc8}
+.confidence-UNVERIFIED{color:#742a2a;background:#fed7d7}
+.confidence-EXTRACTED,.confidence-INFERRED,.confidence-AMBIGUOUS,.confidence-UNVERIFIED{padding:.1rem .4rem;border-radius:3px;font-size:.85em}
+</style>
+</head>
+<body>
+<h1>{{ title }}</h1>
+{% if product_order %}
+<p><em>Generated {{ generated_at }} · Baseline: <strong>{{ products[product_order[0]].name }}</strong></em></p>
+{% else %}
+<p><em>Generated {{ generated_at }}</em></p>
+{% endif %}
+
+<h2>Comparison Matrix</h2>
+<table>
+<thead><tr><th>Dimension</th>{% for pid in product_order %}<th>{{ products[pid].name }}</th>{% endfor %}</tr></thead>
+<tbody>
+{% for dim_id in dimension_order %}
+<tr>
+<td><strong>{{ dim_id }}</strong> {{ dimensions[dim_id].name }}</td>
+{% for pid in product_order %}<td>{{ cells[dim_id][pid].value }}</td>{% endfor %}
+</tr>
+{% endfor %}
+</tbody>
+</table>
+
+<h2>Per-Dimension Detail</h2>
+{% for dim_id in dimension_order %}
+<div class="dim-detail">
+<h3>{{ dim_id }} — {{ dimensions[dim_id].name }}</h3>
+<p><strong>Group:</strong> {{ dimensions[dim_id].group }} · <strong>Weight:</strong> {{ dimensions[dim_id].weight_in_group_pct }}%</p>
+<p><strong>Rubric:</strong> {{ dimensions[dim_id].rubric }}</p>
+<ul>
+{% for pid in product_order %}
+<li><strong>{{ products[pid].name }}:</strong> {{ cells[dim_id][pid].value }} <span class="confidence-{{ cells[dim_id][pid].confidence.value }}">{{ cells[dim_id][pid].confidence.value }}</span></li>
+{% endfor %}
+</ul>
+</div>
+{% endfor %}
+</body>
+</html>
