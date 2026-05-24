@@ -5,3 +5,4 @@
 
 ## [2026-05-24 03:19 UTC] path-b | claude-code: 11 signals, score=0.60
 ## [2026-05-24 03:34 UTC] path-b | claude-code: 11 signals, score=0.60
+## [2026-05-24 04:17 UTC] path-c | Claude Code vs Cursor -> 2 format(s)

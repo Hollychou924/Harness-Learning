@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>Claude Code vs Cursor</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;max-width:1100px;margin:2rem auto;padding:0 1rem;color:#222}
+h1{border-bottom:2px solid #2c5282}
+table{border-collapse:collapse;width:100%;margin:1rem 0}
+th,td{border:1px solid #cbd5e0;padding:.6rem;text-align:left}
+th{background:#edf2f7}
+.dim-detail{background:#f7fafc;padding:1rem;border-left:4px solid #4299e1;margin:1rem 0}
+.confidence-EXTRACTED{color:#22543d;background:#c6f6d5}
+.confidence-INFERRED{color:#1a365d;background:#bee3f8}
+.confidence-AMBIGUOUS{color:#7c2d12;background:#feebc8}
+.confidence-UNVERIFIED{color:#742a2a;background:#fed7d7}
+.confidence-EXTRACTED,.confidence-INFERRED,.confidence-AMBIGUOUS,.confidence-UNVERIFIED{padding:.1rem .4rem;border-radius:3px;font-size:.85em}
+</style>
+</head>
+<body>
+<h1>Claude Code vs Cursor</h1>
+<p><em>Generated 2026-05-24T04:17:23+00:00 · Baseline: <strong>Claude Code</strong></em></p>
+
+<h2>Comparison Matrix</h2>
+<table>
+<thead><tr><th>Dimension</th><th>Claude Code</th><th>Cursor</th></tr></thead>
+<tbody>
+<tr>
+<td><strong>E1</strong> 终端/Shell 执行</td>
+<td>未评估</td><td>未评估</td></tr>
+<tr>
+<td><strong>E4</strong> MCP 支持</td>
+<td>未评估</td><td>未评估</td></tr>
+<tr>
+<td><strong>E5</strong> 自定义工具/Hook 系统</td>
+<td>未评估</td><td>未评估</td></tr>
+<tr>
+<td><strong>E6</strong> 长任务持久化</td>
+<td>未评估</td><td>未评估</td></tr>
+<tr>
+<td><strong>F1</strong> 项目配置文件</td>
+<td>未评估</td><td>未评估</td></tr>
+<tr>
+<td><strong>F3</strong> Memory + Context Compaction</td>
+<td>未评估</td><td>未评估</td></tr>
+</tbody>
+</table>
+
+<h2>Per-Dimension Detail</h2>
+<div class="dim-detail">
+<h3>E1 — 终端/Shell 执行</h3>
+<p><strong>Group:</strong> E. Agent Harness 执行 · <strong>Weight:</strong> 15.0%</p>
+<p><strong>Rubric:</strong> 是否能跑命令 / 是否有 Plan-Act 模式 / 危险命令是否拦截</p>
+<ul>
+<li><strong>Claude Code:</strong> 未评估 <span class="confidence-UNVERIFIED">UNVERIFIED</span></li>
+<li><strong>Cursor:</strong> 未评估 <span class="confidence-UNVERIFIED">UNVERIFIED</span></li>
+</ul>
+</div>
+<div class="dim-detail">
+<h3>E4 — MCP 支持</h3>
+<p><strong>Group:</strong> E. Agent Harness 执行 · <strong>Weight:</strong> 18.0%</p>
+<p><strong>Rubric:</strong> 原生支持级别 + Marketplace 数量</p>
+<ul>
+<li><strong>Claude Code:</strong> 未评估 <span class="confidence-UNVERIFIED">UNVERIFIED</span></li>
+<li><strong>Cursor:</strong> 未评估 <span class="confidence-UNVERIFIED">UNVERIFIED</span></li>
+</ul>
+</div>
+<div class="dim-detail">
+<h3>E5 — 自定义工具/Hook 系统</h3>
+<p><strong>Group:</strong> E. Agent Harness 执行 · <strong>Weight:</strong> 22.0%</p>
+<p><strong>Rubric:</strong> 0=无 / 1=Function call only / 2=Skill 系统 / 3=Skill+Hook+SubAgent 完整</p>
+<ul>
+<li><strong>Claude Code:</strong> 未评估 <span class="confidence-UNVERIFIED">UNVERIFIED</span></li>
+<li><strong>Cursor:</strong> 未评估 <span class="confidence-UNVERIFIED">UNVERIFIED</span></li>
+</ul>
+</div>
+<div class="dim-detail">
+<h3>E6 — 长任务持久化</h3>
+<p><strong>Group:</strong> E. Agent Harness 执行 · <strong>Weight:</strong> 20.0%</p>
+<p><strong>Rubric:</strong> 0=单回合 / 1=多回合 / 2=Checkpoint 恢复 / 3=Cloud Agent 异步</p>
+<ul>
+<li><strong>Claude Code:</strong> 未评估 <span class="confidence-UNVERIFIED">UNVERIFIED</span></li>
+<li><strong>Cursor:</strong> 未评估 <span class="confidence-UNVERIFIED">UNVERIFIED</span></li>
+</ul>
+</div>
+<div class="dim-detail">
+<h3>F1 — 项目配置文件</h3>
+<p><strong>Group:</strong> F. Context Engineering · <strong>Weight:</strong> 25.0%</p>
+<p><strong>Rubric:</strong> 配置文件名 + 支持范围 (如 CLAUDE.md / AGENTS.md / .cursor)</p>
+<ul>
+<li><strong>Claude Code:</strong> 未评估 <span class="confidence-UNVERIFIED">UNVERIFIED</span></li>
+<li><strong>Cursor:</strong> 未评估 <span class="confidence-UNVERIFIED">UNVERIFIED</span></li>
+</ul>
+</div>
+<div class="dim-detail">
+<h3>F3 — Memory + Context Compaction</h3>
+<p><strong>Group:</strong> F. Context Engineering · <strong>Weight:</strong> 30.0%</p>
+<p><strong>Rubric:</strong> 0=无 / 1=会话级 / 2=跨会话持久化 / 3=可编辑可分享</p>
+<ul>
+<li><strong>Claude Code:</strong> 未评估 <span class="confidence-UNVERIFIED">UNVERIFIED</span></li>
+<li><strong>Cursor:</strong> 未评估 <span class="confidence-UNVERIFIED">UNVERIFIED</span></li>
+</ul>
+</div>
+</body>
+</html>
