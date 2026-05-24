@@ -292,6 +292,9 @@ def portfolio(
     output_dir: Path = typer.Option(
         Path("wiki/reports/portfolio"), "--output-dir"
     ),
+    llm_timeout: int = typer.Option(
+        600, "--llm-timeout", help="claude CLI subprocess timeout (sec)"
+    ),
     root: Path = ROOT_OPT,
 ) -> None:
     import asyncio
@@ -356,7 +359,7 @@ def portfolio(
         raise typer.Exit(code=1) from exc
 
     layout = WikiLayout(root=root)
-    llm = ClaudeCliLLMClient()
+    llm = ClaudeCliLLMClient(timeout=llm_timeout)
     engine = PortfolioReportEngine(layout=layout, llm=llm)
 
     for rt in themes_to_run:

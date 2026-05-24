@@ -58,3 +58,109 @@ dimensions:
     evaluation_type: score_0_3
     rubric: "0=无 / 1=会话级 / 2=跨会话持久化 / 3=可编辑可分享"
     data_sources: ["L0:official_docs", "L3:community"]
+
+  # J. 推理与缓存 (Phase 4 expansion — single-dim cache strategy)
+  - id: J5
+    name: Prompt / KV Cache 策略
+    group: J. 推理与缓存
+    importance: critical
+    weight_in_group_pct: 100
+    evaluation_type: score_0_3
+    rubric: "0=无显式缓存 / 1=被动 provider cache / 2=显式 cache breakpoints / 3=显式 + 跨会话持久"
+    data_sources: ["L0:official_docs", "L1:engineering_blog"]
+
+  # N. 开源与社区 (Phase 4 expansion)
+  - id: N1
+    name: 代码开源协议
+    group: N. 开源与社区
+    importance: high
+    weight_in_group_pct: 18
+    evaluation_type: enum
+    enum_values: ["闭源", "源可用", "MIT/Apache OSS"]
+    rubric: 是否在 GitHub 开源 + 协议是否允许商用
+    data_sources: ["L0:official_docs", "L3:community"]
+
+  - id: N2
+    name: GitHub 关注度
+    group: N. 开源与社区
+    importance: medium
+    weight_in_group_pct: 18
+    evaluation_type: text
+    rubric: GitHub stars + 月度 PR 数量级
+    data_sources: ["L3:community"]
+
+  - id: N3
+    name: 第三方贡献机制
+    group: N. 开源与社区
+    importance: high
+    weight_in_group_pct: 22
+    evaluation_type: score_0_3
+    rubric: "0=无 / 1=Issue Only / 2=PR 接受 / 3=Plugin/Skill marketplace + 公共贡献"
+    data_sources: ["L0:official_docs", "L3:community"]
+
+  - id: N4
+    name: 治理模式
+    group: N. 开源与社区
+    importance: medium
+    weight_in_group_pct: 20
+    evaluation_type: enum
+    enum_values: ["厂商独裁", "RFC 流程", "基金会/委员会"]
+    rubric: 是否有公开 RFC / 决策是否透明
+    data_sources: ["L0:official_docs", "L3:community"]
+
+  - id: N5
+    name: 社区生态健康度
+    group: N. 开源与社区
+    importance: high
+    weight_in_group_pct: 22
+    evaluation_type: score_0_3
+    rubric: "0=无 / 1=单一渠道 / 2=Discord+论坛 / 3=Discord+论坛+大会+独立播客"
+    data_sources: ["L3:community"]
+
+  # M. 模型与 Harness 共进化 (Phase 4 expansion)
+  - id: M1
+    name: 模型-Harness 耦合度
+    group: M. 模型与 Harness 共进化
+    importance: critical
+    weight_in_group_pct: 25
+    evaluation_type: score_0_3
+    rubric: "0=Harness 模型无关 / 1=单模型适配 / 2=同厂商家族 / 3=训练阶段联合优化"
+    data_sources: ["L0:official_docs", "L1:engineering_blog"]
+
+  - id: M2
+    name: 训练反馈回路
+    group: M. 模型与 Harness 共进化
+    importance: high
+    weight_in_group_pct: 20
+    evaluation_type: enum
+    enum_values: ["无公开机制", "用户上报 opt-in", "Harness 行为数据回流训练"]
+    rubric: 是否能用 Harness 真实使用数据训练后续模型
+    data_sources: ["L0:official_docs"]
+
+  - id: M3
+    name: 多厂商模型支持
+    group: M. 模型与 Harness 共进化
+    importance: high
+    weight_in_group_pct: 18
+    evaluation_type: score_0_3
+    rubric: "0=单一 / 1=两家 / 2=主流三家 / 3=全开放含本地"
+    data_sources: ["L0:official_docs"]
+
+  - id: M4
+    name: 模型版本切换粒度
+    group: M. 模型与 Harness 共进化
+    importance: medium
+    weight_in_group_pct: 18
+    evaluation_type: enum
+    enum_values: ["不可切换", "全局切换", "对话级切换", "工具/Skill 级路由"]
+    rubric: 用户能否在不同任务用不同模型
+    data_sources: ["L0:official_docs"]
+
+  - id: M5
+    name: 共进化节奏
+    group: M. 模型与 Harness 共进化
+    importance: high
+    weight_in_group_pct: 19
+    evaluation_type: text
+    rubric: 模型与 Harness 同步发版的节奏 (如 Sonnet 4.6 + Claude Code 2.0 同周)
+    data_sources: ["L0:official_docs", "L1:engineering_blog"]

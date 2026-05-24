@@ -82,5 +82,159 @@
     "review_status": null,
     "review_decision_at": null,
     "reviewer": null
+  },
+  "J5": {
+    "product_id": "claude-code",
+    "dimension_id": "J5",
+    "value": 3,
+    "evidence_urls": [
+      "https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "N1": {
+    "product_id": "claude-code",
+    "dimension_id": "N1",
+    "value": "源可用",
+    "evidence_urls": [
+      "https://github.com/anthropics/claude-code"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "N2": {
+    "product_id": "claude-code",
+    "dimension_id": "N2",
+    "value": "21k+ stars / 月度数百 issues + community PR",
+    "evidence_urls": [
+      "https://github.com/anthropics/claude-code"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "N3": {
+    "product_id": "claude-code",
+    "dimension_id": "N3",
+    "value": 3,
+    "evidence_urls": [
+      "https://github.com/anthropics/claude-code/tree/main/plugins"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "N4": {
+    "product_id": "claude-code",
+    "dimension_id": "N4",
+    "value": "厂商独裁",
+    "evidence_urls": [
+      "https://docs.anthropic.com/en/docs/claude-code"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "N5": {
+    "product_id": "claude-code",
+    "dimension_id": "N5",
+    "value": 2,
+    "evidence_urls": [
+      "https://www.anthropic.com/news"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "M1": {
+    "product_id": "claude-code",
+    "dimension_id": "M1",
+    "value": 3,
+    "evidence_urls": [
+      "https://www.anthropic.com/research/swe-bench-sonnet"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "M2": {
+    "product_id": "claude-code",
+    "dimension_id": "M2",
+    "value": "用户上报 opt-in",
+    "evidence_urls": [
+      "https://docs.anthropic.com/en/docs/claude-code/data-usage"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "M3": {
+    "product_id": "claude-code",
+    "dimension_id": "M3",
+    "value": 1,
+    "evidence_urls": [
+      "https://docs.anthropic.com/en/docs/claude-code/configuration"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "M4": {
+    "product_id": "claude-code",
+    "dimension_id": "M4",
+    "value": "全局切换",
+    "evidence_urls": [
+      "https://docs.anthropic.com/en/docs/claude-code/cli-reference"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "M5": {
+    "product_id": "claude-code",
+    "dimension_id": "M5",
+    "value": "Sonnet 4.6 + Claude Code 2.0 同周发布;Opus 4.7 + Claude Code 2.x 同步",
+    "evidence_urls": [
+      "https://www.anthropic.com/news/claude-code-2"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
   }
 }

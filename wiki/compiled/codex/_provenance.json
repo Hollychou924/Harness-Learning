@@ -82,5 +82,159 @@
     "review_status": null,
     "review_decision_at": null,
     "reviewer": null
+  },
+  "J5": {
+    "product_id": "codex",
+    "dimension_id": "J5",
+    "value": 2,
+    "evidence_urls": [
+      "https://platform.openai.com/docs/guides/prompt-caching"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "N1": {
+    "product_id": "codex",
+    "dimension_id": "N1",
+    "value": "MIT/Apache OSS",
+    "evidence_urls": [
+      "https://github.com/openai/codex"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "N2": {
+    "product_id": "codex",
+    "dimension_id": "N2",
+    "value": "26k+ stars / 月度高活跃 PR",
+    "evidence_urls": [
+      "https://github.com/openai/codex"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "N3": {
+    "product_id": "codex",
+    "dimension_id": "N3",
+    "value": 2,
+    "evidence_urls": [
+      "https://github.com/openai/codex/blob/main/CONTRIBUTING.md"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "N4": {
+    "product_id": "codex",
+    "dimension_id": "N4",
+    "value": "RFC 流程",
+    "evidence_urls": [
+      "https://github.com/openai/codex/issues"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "N5": {
+    "product_id": "codex",
+    "dimension_id": "N5",
+    "value": 2,
+    "evidence_urls": [
+      "https://community.openai.com/c/codex"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "M1": {
+    "product_id": "codex",
+    "dimension_id": "M1",
+    "value": 3,
+    "evidence_urls": [
+      "https://openai.com/index/introducing-codex/"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "M2": {
+    "product_id": "codex",
+    "dimension_id": "M2",
+    "value": "用户上报 opt-in",
+    "evidence_urls": [
+      "https://platform.openai.com/docs/codex/privacy"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "M3": {
+    "product_id": "codex",
+    "dimension_id": "M3",
+    "value": 2,
+    "evidence_urls": [
+      "https://platform.openai.com/docs/codex/models"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "M4": {
+    "product_id": "codex",
+    "dimension_id": "M4",
+    "value": "对话级切换",
+    "evidence_urls": [
+      "https://platform.openai.com/docs/codex/models"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "M5": {
+    "product_id": "codex",
+    "dimension_id": "M5",
+    "value": "GPT-5-Codex + Codex CLI 同步发布",
+    "evidence_urls": [
+      "https://openai.com/index/introducing-codex/"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
   }
 }

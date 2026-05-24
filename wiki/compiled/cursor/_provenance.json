@@ -82,5 +82,159 @@
     "review_status": null,
     "review_decision_at": null,
     "reviewer": null
+  },
+  "J5": {
+    "product_id": "cursor",
+    "dimension_id": "J5",
+    "value": 1,
+    "evidence_urls": [
+      "https://docs.cursor.com/account/pricing"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "N1": {
+    "product_id": "cursor",
+    "dimension_id": "N1",
+    "value": "闭源",
+    "evidence_urls": [
+      "https://www.cursor.com/legal/terms"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "N2": {
+    "product_id": "cursor",
+    "dimension_id": "N2",
+    "value": "无公共 GitHub 主仓 (闭源)",
+    "evidence_urls": [
+      "https://www.cursor.com"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "N3": {
+    "product_id": "cursor",
+    "dimension_id": "N3",
+    "value": 1,
+    "evidence_urls": [
+      "https://forum.cursor.com"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "N4": {
+    "product_id": "cursor",
+    "dimension_id": "N4",
+    "value": "厂商独裁",
+    "evidence_urls": [
+      "https://www.cursor.com/changelog"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "N5": {
+    "product_id": "cursor",
+    "dimension_id": "N5",
+    "value": 2,
+    "evidence_urls": [
+      "https://forum.cursor.com"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "M1": {
+    "product_id": "cursor",
+    "dimension_id": "M1",
+    "value": 2,
+    "evidence_urls": [
+      "https://www.cursor.com/blog/composer"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "M2": {
+    "product_id": "cursor",
+    "dimension_id": "M2",
+    "value": "Harness 行为数据回流训练",
+    "evidence_urls": [
+      "https://www.cursor.com/legal/privacy"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "M3": {
+    "product_id": "cursor",
+    "dimension_id": "M3",
+    "value": 3,
+    "evidence_urls": [
+      "https://docs.cursor.com/settings/models"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "M4": {
+    "product_id": "cursor",
+    "dimension_id": "M4",
+    "value": "工具/Skill 级路由",
+    "evidence_urls": [
+      "https://docs.cursor.com/settings/models"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "M5": {
+    "product_id": "cursor",
+    "dimension_id": "M5",
+    "value": "Composer-1 自研模型 + Cursor 1.x 自定节奏",
+    "evidence_urls": [
+      "https://www.cursor.com/blog/composer-1"
+    ],
+    "evaluator": "seed:demo-2026-05-24-phase4",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-24T08:46:37+00:00",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
   }
 }
