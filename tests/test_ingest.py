@@ -1,6 +1,15 @@
 import json
 from pathlib import Path
-from packages.llm_wiki.ingest import IngestEngine, IngestSource, AnalysisDraft, StubLLM
+
+import pytest
+
+from packages.llm_wiki.ingest import (
+    AnalysisDraft,
+    IngestEngine,
+    IngestError,
+    IngestSource,
+    StubLLM,
+)
 
 SAMPLE_DOC = """
 # Skills
@@ -65,3 +74,28 @@ def test_step2_generate_writes_dimension_card(tmp_wiki: Path):
     assert card.exists()
     content = card.read_text(encoding="utf-8")
     assert "Skill+Hook+SubAgent" in content
+
+
+def test_analyze_strips_code_fence(tmp_wiki: Path):
+    stub = StubLLM(
+        analyze_response='```json\n{"facts": [], "entities": [], "topics": []}\n```',
+    )
+    engine = IngestEngine(llm=stub, wiki_root=tmp_wiki)
+    draft = engine.analyze(IngestSource(url="x", content="y", product_id="p"))
+    assert draft.facts == []
+
+
+def test_analyze_raises_on_malformed_json(tmp_wiki: Path):
+    stub = StubLLM(analyze_response="not valid json")
+    engine = IngestEngine(llm=stub, wiki_root=tmp_wiki)
+    with pytest.raises(IngestError) as excinfo:
+        engine.analyze(IngestSource(url="https://example.com/x", content="y", product_id="p"))
+    assert excinfo.value.source_url == "https://example.com/x"
+    assert "non-JSON" in str(excinfo.value)
+
+
+def test_analyze_raises_on_wrong_shape(tmp_wiki: Path):
+    stub = StubLLM(analyze_response='{"facts": "not a list"}')
+    engine = IngestEngine(llm=stub, wiki_root=tmp_wiki)
+    with pytest.raises(IngestError):
+        engine.analyze(IngestSource(url="x", content="y", product_id="p"))
