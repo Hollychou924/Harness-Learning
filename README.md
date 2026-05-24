@@ -2,12 +2,13 @@
 
 26 个 AI Agent 产品(14 通用 + 12 编码)的竞品分析自动化管道。基于 Karpathy LLM Wiki 模式 + JD 校准的双类目维度库。
 
-**Status:** Phase 1 MVP
+**Status:** Phase 2 complete (Path B daily incremental)
 
 ## Spec & Plan
 
 - Design spec: `docs/superpowers/specs/2026-05-23-ai-agent-competitive-analysis-design.md`
-- Implementation plan: `docs/superpowers/plans/2026-05-24-phase1-mvp.md`
+- Phase 1 plan: `docs/superpowers/plans/2026-05-24-phase1-mvp.md`
+- Phase 2 plan: `docs/superpowers/plans/2026-05-24-phase2-changelog-incremental.md`
 
 ## Phase 1 MVP coverage
 
@@ -19,6 +20,21 @@
 - ✅ Async Review queue
 - ✅ Path A end-to-end sync
 - ✅ 9 slash commands CLI
+
+Phase 1.1 hardening: atomic file writes (tempfile + os.replace), RSS timezone-aware parsing, IngestEngine error handling.
+
+## Phase 2 coverage
+
+- ✅ ChangelogEntry schema with 7-source enum (tz-aware validator)
+- ✅ Signal aggregator (dedup by URL + product association by keyword)
+- ✅ L1 adapters: AIHOT / wechat-article-search / TrendRadar
+- ✅ L2 adapter: multi-search-engine (DDG MVP cross-verifier)
+- ✅ 3-factor importance scorer (signal count × 0.4 + source weight × 0.3 + LLM relevance × 0.3)
+- ✅ Per-product daily changelog reports (`wiki/changelog/{product}/{date}.md`)
+- ✅ Path B end-to-end orchestrator (sync_path_b)
+- ✅ Feishu bot push for high-score changes (Layer 3 notify)
+- ✅ CLI: `wiki path-b` + `wiki notify` (11 commands total)
+- ✅ GitHub Actions daily cron at UTC 00:00 (北京 08:00)
 
 ## Quick start
 
@@ -32,25 +48,39 @@ uv run wiki init
 # Run all tests
 uv run pytest
 
-# (Phase 2 onwards) Compile 5 P0 products
+# Phase 1: Compile P0 products via Path A
 uv run wiki compile --only claude-code,cursor,codex,hermes,manus
+
+# Phase 2: Run daily changelog incremental (Path B)
+uv run wiki path-b --threshold 0.5
+uv run wiki notify
 ```
 
 ## Architecture
 
 See spec §3-§10. Key modules:
-- `packages/llm_wiki/` — 知识中枢
+
+- `packages/llm_wiki/` — 知识中枢 (Karpathy wiki + ingest engine)
 - `packages/docs_link_collector/` — 文档雷达
-- `packages/ai_agent_research/` — 动态追踪器(Phase 2)
-- `packages/competitive_analysis/` — 对比输出引擎(Phase 3)
-- `adapters/layer{0,1,2,3}_*/` — 数据源适配器
+- `packages/ai_agent_research/` — 动态追踪器 (Phase 2)
+  - `changelog_entry.py` — ChangelogEntry schema
+  - `aggregator.py` — SignalAggregator (dedup + product association)
+  - `scorer.py` — 3-factor importance scoring
+  - `changelog_ingest.py` — per-product daily report writer
+  - `path_b_sync.py` — Path B orchestration
+- `packages/competitive_analysis/` — 对比输出引擎 (Phase 3)
+- `adapters/`:
+  - `layer0_official/` — GitHub Releases / RSS / docs sitemap (Phase 1)
+  - `layer1_radar/` — AIHOT / wechat-article-search / TrendRadar (Phase 2)
+  - `layer2_search/` — multi-search-engine cross-verification (Phase 2)
+  - `layer3_notify/` — Feishu bot webhook (Phase 2)
 
 ## Roadmap
 
-| Phase | 时长 | 目标 |
-|---|---|---|
-| 1 (current) | 2 周 | MVP — 5 P0 产品端到端跑通 Path A |
-| 2 | 1 周 | Path B 增量链 + L1/L2 数据源 |
-| 3 | 2 周 | Path C 对比引擎 + 渲染层 |
-| 4 | 持续 | 6 篇 PM 作品集报告 + DeepSeek 风 PPT |
-| 5 | 持续 | P2 长尾产品扩展 + 维度库迭代 |
+| Phase | 时长 | 目标 | Status |
+|---|---|---|---|
+| 1 | 2 周 | MVP — 5 P0 产品端到端跑通 Path A | ✅ Complete |
+| 2 | 1 周 | Path B 增量链 + L1/L2 数据源 | ✅ Complete |
+| 3 | 2 周 | Path C 对比引擎 + 渲染层 | Pending |
+| 4 | 持续 | 6 篇 PM 作品集报告 + DeepSeek 风 PPT | Pending |
+| 5 | 持续 | P2 长尾产品扩展 + 维度库迭代 | Pending |
