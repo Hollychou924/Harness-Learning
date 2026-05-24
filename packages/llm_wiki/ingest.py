@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from packages.llm_wiki.atomic import atomic_write_text
+
 
 @dataclass(frozen=True)
 class IngestSource:
@@ -90,6 +92,6 @@ class IngestEngine:
         written: dict[str, Path] = {}
         for dim_id, md in cards.items():
             path = product_dir / f"{dim_id}.md"
-            path.write_text(md, encoding="utf-8")
+            atomic_write_text(path, md)
             written[dim_id] = path
         return written

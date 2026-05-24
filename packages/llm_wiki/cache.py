@@ -2,6 +2,9 @@ import hashlib
 import json
 from pathlib import Path
 
+from packages.llm_wiki.atomic import atomic_write_text
+
+
 def content_hash(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -22,5 +25,4 @@ class SourceCache:
         self.flush()
 
     def flush(self) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(self._data, indent=2), encoding="utf-8")
+        atomic_write_text(self.path, json.dumps(self._data, indent=2))

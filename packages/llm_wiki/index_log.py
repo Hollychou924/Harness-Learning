@@ -1,4 +1,6 @@
 import re
+
+from packages.llm_wiki.atomic import atomic_write_text
 from packages.llm_wiki.paths import WikiLayout
 
 PRODUCT_MARKER = "<!-- products section auto-managed -->"
@@ -22,4 +24,4 @@ def update_product_in_index(layout: WikiLayout, *, product_id: str, summary: str
 
     # Collapse double-blank lines from removal
     content = re.sub(r"\n{3,}", "\n\n", content)
-    layout.index.write_text(content, encoding="utf-8")
+    atomic_write_text(layout.index, content)
