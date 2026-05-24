@@ -1,0 +1,38 @@
+---
+marp: true
+theme: default
+size: 16:9
+paginate: true
+header: "{{ title }}"
+footer: "Generated {{ generated_at }}"
+---
+
+# {{ title }}
+
+Baseline: **{{ products[product_order[0]].name }}**
+{% if product_order|length > 1 -%}
+Compared with: {% for pid in product_order[1:] %}**{{ products[pid].name }}**{{ ", " if not loop.last }}{% endfor %}
+{%- endif %}
+
+---
+
+## Comparison Matrix
+
+| Dimension | {% for pid in product_order %}{{ products[pid].name }} | {% endfor %}
+|---|{% for _ in product_order %}---|{% endfor %}
+{% for dim_id in dimension_order -%}
+| **{{ dim_id }}** {{ dimensions[dim_id].name }} | {% for pid in product_order %}{{ cells[dim_id][pid].value }} | {% endfor %}
+{% endfor %}
+
+{% for dim_id in dimension_order %}
+---
+
+## {{ dim_id }} — {{ dimensions[dim_id].name }}
+
+**Rubric:** {{ dimensions[dim_id].rubric }}
+
+{% for pid in product_order %}
+- **{{ products[pid].name }}:** `{{ cells[dim_id][pid].value }}` ({{ cells[dim_id][pid].confidence.value }})
+{% endfor %}
+
+{% endfor %}
