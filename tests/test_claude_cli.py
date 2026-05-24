@@ -3,6 +3,8 @@ import subprocess
 from unittest.mock import patch
 from packages.llm_wiki.ingest import IngestSource, AnalysisDraft
 from packages.llm_wiki.claude_cli import ClaudeCliLLMClient
+from packages.schemas.dimension import Dimension
+
 
 def _make_source() -> IngestSource:
     return IngestSource(
@@ -10,6 +12,31 @@ def _make_source() -> IngestSource:
         content="Claude Code Skills are reusable instructions...",
         product_id="claude-code",
     )
+
+
+def _make_dims() -> list[Dimension]:
+    return [
+        Dimension(
+            id="E5",
+            name="自定义工具/Hook 系统",
+            group="E. Agent Harness 执行",
+            importance="critical",
+            weight_in_group_pct=22,
+            evaluation_type="score_0_3",
+            rubric="0=无 / 1=Function call only / 2=Skill 系统 / 3=Skill+Hook+SubAgent 完整",
+            data_sources=["L0:official_docs"],
+        ),
+        Dimension(
+            id="F1",
+            name="项目配置文件",
+            group="F. Context Engineering",
+            importance="high",
+            weight_in_group_pct=25,
+            evaluation_type="text",
+            rubric="配置文件名 + 支持范围 (如 CLAUDE.md / AGENTS.md / .cursor)",
+            data_sources=["L0:official_docs"],
+        ),
+    ]
 
 def test_analyze_calls_claude_cli_with_prompt():
     fake_response = json.dumps({"facts": [], "entities": [], "topics": []})
@@ -94,3 +121,73 @@ def test_call_raises_on_missing_binary():
         client = ClaudeCliLLMClient(claude_bin="/nonexistent/claude")
         with pytest.raises(RuntimeError, match="not found"):
             client.analyze(_make_source())
+
+
+def test_analyze_prompt_includes_dim_table_when_dims_passed():
+    """When dimensions are provided, the analyze prompt embeds the dim table."""
+    fake_response = json.dumps({"facts": [], "entities": [], "topics": []})
+    with patch("packages.llm_wiki.claude_cli.subprocess.run") as m:
+        m.return_value = subprocess.CompletedProcess(
+            args=[], returncode=0, stdout=fake_response, stderr="",
+        )
+        client = ClaudeCliLLMClient(dimensions=_make_dims())
+        client.analyze(_make_source())
+
+    prompt = m.call_args[0][0][2]
+    assert "| ID | Name | Type | Rubric |" in prompt
+    assert "| E5 |" in prompt
+    assert "自定义工具/Hook 系统" in prompt
+    assert "| F1 |" in prompt
+    assert "项目配置文件" in prompt
+    assert "do NOT invent new ones" in prompt
+
+
+def test_generate_prompt_for_known_dim_includes_name_and_rubric():
+    """For a known dim, the generate prompt embeds dim name + rubric + eval type."""
+    facts = [{
+        "claim": "Skills support hooks",
+        "evidence_url": "https://docs.anthropic.com/x",
+        "confidence": "EXTRACTED",
+        "dimension_id": "E5",
+    }]
+    draft = AnalysisDraft(facts=facts, entities=[], topics=[])
+
+    with patch("packages.llm_wiki.claude_cli.subprocess.run") as m:
+        m.return_value = subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="# E5 自定义工具/Hook 系统\n", stderr="",
+        )
+        client = ClaudeCliLLMClient(dimensions=_make_dims())
+        client.generate(draft, _make_source())
+
+    prompt = m.call_args[0][0][2]
+    assert "E5" in prompt
+    assert "自定义工具/Hook 系统" in prompt
+    assert "score_0_3" in prompt  # evaluation_type
+    assert "Skill+Hook+SubAgent" in prompt  # rubric content
+    assert "Skills support hooks" in prompt  # fact carried through
+
+
+def test_generate_prompt_for_unknown_dim_falls_back():
+    """An unknown dim_id should still render via the fallback template."""
+    facts = [{
+        "claim": "Mystery feature",
+        "evidence_url": "https://x.test/m",
+        "confidence": "INFERRED",
+        "dimension_id": "Z99",  # not in our schema
+    }]
+    draft = AnalysisDraft(facts=facts, entities=[], topics=[])
+
+    with patch("packages.llm_wiki.claude_cli.subprocess.run") as m:
+        m.return_value = subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="# Z99 Unknown\n", stderr="",
+        )
+        client = ClaudeCliLLMClient(dimensions=_make_dims())
+        result = client.generate(draft, _make_source())
+
+    assert result == "# Z99 Unknown\n"
+    prompt = m.call_args[0][0][2]
+    # Fallback template doesn't carry rubric (no Z99 in our schema)
+    assert "Z99" in prompt
+    assert "Mystery feature" in prompt
+    # Known-dim keywords should NOT leak
+    assert "自定义工具/Hook 系统" not in prompt

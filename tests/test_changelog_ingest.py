@@ -37,8 +37,11 @@ def test_write_changelog_report_creates_file(tmp_wiki: Path) -> None:
     target = tmp_wiki / "changelog" / "claude-code" / "2026-05-23.md"
     assert target.exists()
     content = target.read_text(encoding="utf-8")
-    assert "Claude Code" in content
+    # Header is composed by write_changelog_report (not the LLM stub) and
+    # always includes the product_id + ISO date.
+    assert "claude-code" in content
     assert "2026-05-23" in content
+    assert "每日变更" in content
 
 
 def test_changelog_dir_created_in_wiki_layout(tmp_wiki: Path) -> None:
@@ -77,3 +80,50 @@ def test_empty_entries_is_noop(tmp_wiki: Path) -> None:
         llm=stub,
     )
     assert not (tmp_wiki / "changelog" / "claude-code" / "2026-05-23.md").exists()
+
+
+def test_multi_dim_cards_concatenated_with_header(tmp_wiki: Path) -> None:
+    """When analyze returns facts spanning multiple dim_ids, the daily report
+    concatenates one card per dim under a `# {product_id} 每日变更` header."""
+    init_wiki(tmp_wiki)
+    layout = WikiLayout(tmp_wiki)
+
+    analyze_payload = {
+        "facts": [
+            {
+                "claim": "E5 fact",
+                "evidence_url": "https://x.test/e5",
+                "confidence": "EXTRACTED",
+                "dimension_id": "E5",
+            },
+            {
+                "claim": "F1 fact",
+                "evidence_url": "https://x.test/f1",
+                "confidence": "EXTRACTED",
+                "dimension_id": "F1",
+            },
+        ],
+        "entities": [],
+        "topics": [],
+    }
+    # StubLLM.generate returns the same canned string per dim — daily report
+    # should still contain the header + 2 separator-delimited card sections.
+    stub = StubLLM(
+        analyze_response=__import__("json").dumps(analyze_payload),
+        generate_response="CARD_BODY",
+    )
+    write_changelog_report(
+        layout=layout,
+        product_id="claude-code",
+        report_date=date(2026, 5, 23),
+        entries=[_entry("v2.1.150 release")],
+        llm=stub,
+    )
+    target = tmp_wiki / "changelog" / "claude-code" / "2026-05-23.md"
+    content = target.read_text(encoding="utf-8")
+
+    assert content.startswith("# claude-code 每日变更 · 2026-05-23")
+    assert "**信号数:** 1 · **维度命中:** 2" in content
+    # Two separator blocks — one per dim card
+    assert content.count("\n---\n") == 2
+    assert content.count("CARD_BODY") == 2

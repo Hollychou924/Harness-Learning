@@ -17,8 +17,10 @@ def write_changelog_report(
     """Generate a per-product daily changelog report at wiki/changelog/{product_id}/{date}.md.
 
     Bundles all entries into one IngestSource (concat title+summary+source_url),
-    runs IngestEngine.analyze, then a single LLM generate() call producing the
-    full daily summary markdown. Writes via atomic_write_text.
+    runs IngestEngine.analyze, then engine.generate which groups facts by dim_id
+    and renders one card per dimension. The daily markdown is composed as a
+    header + per-dim sections; entries that don't hit any schema dim still get
+    surfaced in the raw signals section.
 
     Empty entries → no-op (returns early).
     """
@@ -38,8 +40,23 @@ def write_changelog_report(
 
     engine = IngestEngine(llm=llm, wiki_root=layout.root)
     draft = engine.analyze(src)
-    # Single LLM generate() call producing the full daily summary (not per-dimension)
-    md = engine.llm.generate(draft, src)
+    # Per-dim render: engine.generate groups draft.facts by dimension_id and
+    # calls llm.generate once per dim, returning {dim_id: markdown}.
+    cards = engine.generate(draft, src)
+
+    sections = [f"# {product_id} 每日变更 · {report_date.isoformat()}\n"]
+    sections.append(f"**信号数:** {len(entries)} · **维度命中:** {len(cards)}\n")
+
+    if not cards:
+        sections.append(
+            "\n_本日没有命中我们 schema 中任一维度。原始信号见 `entries` 段。_\n"
+        )
+        sections.append("\n## 原始信号\n\n" + body)
+    else:
+        for dim_id in sorted(cards.keys()):
+            sections.append(f"\n---\n\n{cards[dim_id]}\n")
+
+    md = "\n".join(sections)
 
     target = layout.root / "changelog" / product_id / f"{report_date.isoformat()}.md"
     atomic_write_text(target, md)

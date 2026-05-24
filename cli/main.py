@@ -127,9 +127,16 @@ def path_b(
     from packages.llm_wiki.paths import WikiLayout
     from packages.ai_agent_research.path_b_sync import sync_path_b
     from packages.ai_agent_research.scorer import StubKeywordScorer
+    from packages.schemas.dimension import Dimension
+
+    # Load schema dimensions so the LLM client can constrain its output to
+    # known IDs (avoids inventing categories like "E1 Ecosystem & Integrations").
+    dims_path = Path("wiki/schema/coding-agent-dims.yaml")
+    dims_raw = yaml.safe_load(dims_path.read_text(encoding="utf-8"))
+    dimensions = [Dimension(**d) for d in dims_raw["dimensions"]]
 
     layout = WikiLayout(root)
-    llm = ClaudeCliLLMClient(claude_bin=claude_bin)
+    llm = ClaudeCliLLMClient(claude_bin=claude_bin, dimensions=dimensions)
     # Phase 2.x: stubbed at 0.5; Phase 3 will replace with LLM-driven relevance scoring
     scorer = StubKeywordScorer(value=0.5)
 
