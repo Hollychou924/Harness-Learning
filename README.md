@@ -2,7 +2,7 @@
 
 26 个 AI Agent 产品(14 通用 + 12 编码)的竞品分析自动化管道。基于 Karpathy LLM Wiki 模式 + JD 校准的双类目维度库。
 
-**Status:** Phase 3 complete (Path C 对比引擎 + 渲染层)
+**Status:** Phase 4 complete (PM 作品集报告管线 + 6 篇 DeepSeek 应聘材料)
 
 ## Spec & Plan
 
@@ -10,6 +10,8 @@
 - Phase 1 plan: `docs/superpowers/plans/2026-05-24-phase1-mvp.md`
 - Phase 2 plan: `docs/superpowers/plans/2026-05-24-phase2-changelog-incremental.md`
 - Phase 3 plan: `docs/superpowers/plans/2026-05-24-phase3-comparison-engine.md`
+- Phase 4 plan: `docs/superpowers/plans/2026-05-24-phase4-pm-portfolio.md`
+- **应聘材料索引:** `docs/job-application/README.md`
 
 ## Phase 1 MVP coverage
 
@@ -36,6 +38,18 @@ Phase 1.1 hardening: atomic file writes (tempfile + os.replace), RSS timezone-aw
 - ✅ Feishu bot push for high-score changes (Layer 3 notify)
 - ✅ CLI: `wiki path-b` + `wiki notify` (11 commands total)
 - ✅ GitHub Actions daily cron at UTC 00:00 (北京 08:00)
+
+## Phase 4 coverage
+
+- ✅ ReportTheme enum (6 JD-aligned themes) + PortfolioReportRequest schema
+- ✅ 6 主题 prompts (Harness Engineering / Context Engineering / Tool Ecosystem / Cache / Open Source / Co-evolution)
+- ✅ PortfolioReportEngine (wiki facts + theme prompt → free-form LLM long-form essay)
+- ✅ DeepSeek-style portfolio renderers (markdown + Marp deck with 蓝绿色 palette)
+- ✅ LLMClient.complete(prompt) protocol — bypasses dimension-card hardcoding
+- ✅ 11-dim schema expansion (J5 cache + N1-N5 community + M1-M5 co-evolution)
+- ✅ CLI: `wiki portfolio --theme <slug>` / `--all` (12 commands total)
+- ✅ 6 篇真实 LLM 长文报告产出（130-225 行 MD + 150-250 行 deck），3 个 P0 产品 (claude-code/cursor/codex)
+- ✅ 应聘材料归档: `docs/job-application/`
 
 ## Phase 3 coverage
 
@@ -74,6 +88,11 @@ uv run wiki notify
 uv run wiki compare claude-code cursor --formats markdown,html
 uv run wiki compare claude-code cursor codex --dims E5,F3 --formats markdown,html,pptx
 # Output: wiki/reports/on-demand/{baseline}-vs-{compare}-{timestamp}/comparison.{md,html,pptx}
+
+# Phase 4: PM portfolio reports (DeepSeek 应聘作品)
+uv run wiki portfolio --theme harness-design --products claude-code,cursor,codex
+uv run wiki portfolio --all --products claude-code,cursor,codex
+# Output: wiki/reports/portfolio/{theme}/report.md + deck.marp.md
 ```
 
 ## Architecture
@@ -112,5 +131,5 @@ See spec §3-§10. Key modules:
 | 1 | 2 周 | MVP — 5 P0 产品端到端跑通 Path A | ✅ Complete |
 | 2 | 1 周 | Path B 增量链 + L1/L2 数据源 | ✅ Complete |
 | 3 | 2 周 | Path C 对比引擎 + 渲染层 | ✅ Complete |
-| 4 | 持续 | 6 篇 PM 作品集报告 + DeepSeek 风 PPT | Pending |
-| 5 | 持续 | P2 长尾产品扩展 + 维度库迭代 | Pending |
+| 4 | 1 天 | 6 篇 PM 作品集报告 + DeepSeek 风 PPT | ✅ Complete |
+| 5 | 持续 | P2 长尾产品扩展 + 维度库迭代 (含 hermes/manus seed) | Pending |
