@@ -50,14 +50,106 @@ def query(question: str, root: Path = ROOT_OPT) -> None:
     typer.echo(f"[stub] query: {question}")
 
 
-@app.command(help="Compare two products on selected dimensions (stub for Phase 1)")
+@app.command(help="Compare baseline product against others on selected dimensions")
 def compare(
-    p1: str = typer.Argument(...),
-    p2: str = typer.Argument(...),
-    dims: str = typer.Option("", "--dims"),
+    baseline: str = typer.Argument(..., help="Baseline product ID"),
+    others: list[str] = typer.Argument(
+        ..., help="One or more compare product IDs (space- or comma-separated)"
+    ),
+    dims: str = typer.Option(
+        "", "--dims", help="Comma-separated dimension IDs (default: all)"
+    ),
+    formats: str = typer.Option(
+        "markdown",
+        "--formats",
+        help="Comma-separated output formats: markdown,html,pptx,feishu",
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Print plan without rendering or writing"
+    ),
+    products_file: Path = typer.Option(
+        Path("products/coding-agents.yaml"), "--products-file"
+    ),
+    dims_file: Path = typer.Option(
+        Path("wiki/schema/coding-agent-dims.yaml"), "--dims-file"
+    ),
+    feishu_parent: str = typer.Option(
+        "", "--feishu-parent", help="Feishu wiki parent node token"
+    ),
     root: Path = ROOT_OPT,
 ) -> None:
-    typer.echo(f"[stub] compare {p1} vs {p2} on dims=[{dims}]")
+    import asyncio
+
+    from packages.competitive_analysis.comparison_request import (
+        ComparisonRequest,
+        OutputFormat,
+    )
+    from packages.competitive_analysis.path_c_sync import sync_path_c
+    from packages.schemas.dimension import Dimension
+
+    # Load products + dimensions.
+    products_raw = yaml.safe_load(products_file.read_text(encoding="utf-8"))
+    products_index = {p["id"]: Product(**p) for p in products_raw["products"]}
+
+    dims_raw = yaml.safe_load(dims_file.read_text(encoding="utf-8"))
+    dimensions = [Dimension(**d) for d in dims_raw["dimensions"]]
+
+    # Validate baseline.
+    if baseline not in products_index:
+        typer.echo(f"[error] baseline {baseline!r} not found in {products_file}")
+        raise typer.Exit(1)
+
+    # Allow callers to pass either `cursor codex` or `cursor,codex` (or a mix).
+    other_ids = [
+        token.strip()
+        for chunk in others
+        for token in chunk.split(",")
+        if token.strip()
+    ]
+    for pid in other_ids:
+        if pid not in products_index:
+            typer.echo(f"[error] product {pid!r} not found in {products_file}")
+            raise typer.Exit(1)
+
+    # Parse dim filter + formats.
+    dim_filter = [d.strip() for d in dims.split(",") if d.strip()] or None
+    try:
+        output_formats = [
+            OutputFormat(f.strip()) for f in formats.split(",") if f.strip()
+        ]
+    except ValueError as exc:
+        typer.echo(f"[error] invalid format: {exc}")
+        raise typer.Exit(1) from exc
+
+    request = ComparisonRequest(
+        baseline_product_id=baseline,
+        compare_product_ids=other_ids,
+        dimension_filter=dim_filter,
+        output_formats=output_formats,
+    )
+
+    if dry_run:
+        typer.echo(
+            f"[dry-run] compare baseline={baseline} others={other_ids} "
+            f"dims={request.dimension_filter or 'all'} "
+            f"formats={[f.value for f in request.output_formats]}"
+        )
+        return
+
+    layout = WikiLayout(root)
+    result = asyncio.run(
+        sync_path_c(
+            request=request,
+            layout=layout,
+            products_index=products_index,
+            dimensions=dimensions,
+            feishu_parent_node=feishu_parent or None,
+        )
+    )
+
+    typer.echo("\n=== Outputs ===")
+    for fmt, path in result.items():
+        typer.echo(f"  {fmt}: {path}")
 
 
 @app.command(help="Health-check wiki (orphans, contradictions, missing critical dims)")
