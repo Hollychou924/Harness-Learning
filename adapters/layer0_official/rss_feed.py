@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 import feedparser
 
 @dataclass(frozen=True)
@@ -15,8 +15,7 @@ def parse_feed(content: str | bytes) -> list[FeedEntry]:
     for e in parsed.entries:
         published: datetime | None = None
         if getattr(e, "published_parsed", None):
-            import time
-            published = datetime.fromtimestamp(time.mktime(e.published_parsed))
+            published = datetime(*e.published_parsed[:6], tzinfo=timezone.utc)
         out.append(FeedEntry(
             title=e.get("title", ""),
             url=e.get("link", ""),

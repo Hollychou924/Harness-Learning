@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from adapters.layer0_official.rss_feed import parse_feed, FeedEntry
 
 SAMPLE_RSS = """<?xml version="1.0" encoding="UTF-8"?>
@@ -28,6 +28,7 @@ def test_parse_feed_extracts_entries():
     assert entries[0].title == "Claude Code v2.1.146 release"
     assert entries[0].url == "https://www.anthropic.com/news/claude-code-2-1-146"
     assert isinstance(entries[0].published, datetime)
+    assert entries[0].published == datetime(2026, 5, 22, 10, 0, 0, tzinfo=timezone.utc)
     assert "simplify" in entries[0].summary
 
 def test_parse_feed_empty():
