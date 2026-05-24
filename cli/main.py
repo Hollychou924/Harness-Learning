@@ -98,5 +98,35 @@ def review(
     typer.echo(f"[stub] review {action} {slug}")
 
 
+@app.command("path-b", help="Run Path B (daily changelog incremental sync)")
+def path_b(
+    products_file: Path = typer.Option(Path("products/coding-agents.yaml")),
+    only: str = typer.Option("", "--only", help="Comma-separated product IDs"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Plan only, no API calls"),
+    threshold: float = typer.Option(0.5, "--threshold"),
+    root: Path = ROOT_OPT,
+) -> None:
+    raw = yaml.safe_load(products_file.read_text(encoding="utf-8"))
+    products = [Product(**p) for p in raw["products"]]
+    if only:
+        keep = set(only.split(","))
+        products = [p for p in products if p.id in keep]
+
+    if dry_run:
+        typer.echo(f"[dry-run] would sync Path B for {len(products)} product(s):")
+        for p in products:
+            typer.echo(f"  - {p.id} (keywords: {', '.join(p.keywords[:3])})")
+        return
+
+    # Real run requires LLM client — Phase 3 will wire anthropic SDK.
+    typer.echo(f"[Phase 2 stub] would call sync_path_b with {len(products)} products at threshold {threshold}")
+    typer.echo("Real impl: import sync_path_b from packages.ai_agent_research.path_b_sync")
+
+
+@app.command("notify", help="Push pending changelog reports to Feishu")
+def notify(root: Path = ROOT_OPT) -> None:
+    typer.echo(f"[stub] notify — would scan {root}/changelog/ and push unsent reports")
+
+
 if __name__ == "__main__":
     app()
