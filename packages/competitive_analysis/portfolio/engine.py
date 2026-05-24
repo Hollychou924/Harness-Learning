@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from packages.competitive_analysis.portfolio.prompts import get_theme_prompt
 from packages.competitive_analysis.portfolio.theme import PortfolioReportRequest
 from packages.competitive_analysis.wiki_query import WikiQuery
-from packages.llm_wiki.ingest import AnalysisDraft, IngestSource, LLMClient
+from packages.llm_wiki.ingest import LLMClient
 from packages.llm_wiki.paths import WikiLayout
 
 logger = logging.getLogger(__name__)
@@ -89,14 +89,4 @@ class PortfolioReportEngine:
             "不要 markdown 围栏,直接输出。"
         )
 
-        src = IngestSource(
-            url=f"portfolio:{request.theme.name}",
-            content=prompt_body,
-            product_id="portfolio",
-        )
-        draft = AnalysisDraft(
-            facts=[{"role": "portfolio", "content": prompt_body}],
-            entities=[],
-            topics=[],
-        )
-        return self.llm.generate(draft, src)
+        return self.llm.complete(prompt_body)

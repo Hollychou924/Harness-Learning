@@ -160,6 +160,14 @@ class ClaudeCliLLMClient:
             )
         return self._call(prompt)
 
+    def complete(self, prompt: str) -> str:
+        """Free-form completion: send `prompt` directly, return raw stdout.
+
+        Used by the portfolio engine for long-form essays where the per-dimension
+        card template is the wrong shape.
+        """
+        return self._call(prompt)
+
     def _call(self, prompt: str) -> str:
         try:
             result = subprocess.run(

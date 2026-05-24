@@ -52,7 +52,7 @@ async def test_engine_generates_long_form_md(tmp_wiki: Path) -> None:
         _seed_evaluation(tmp_wiki, product_id=pid, dimension_id="E5")
 
     fake_md = "# 测试报告\n\n执行摘要...\n\n## 模式 1\n...\n"
-    stub = StubLLM(generate_response=fake_md)
+    stub = StubLLM(complete_response=fake_md)
     engine = PortfolioReportEngine(layout=layout, llm=stub)
 
     request = PortfolioReportRequest(
@@ -74,7 +74,7 @@ async def test_engine_returns_placeholder_when_no_wiki_data(
 
     # Stub would return this if it were called — but the engine should
     # short-circuit before invoking the LLM at all.
-    stub = StubLLM(generate_response="SHOULD_NOT_APPEAR")
+    stub = StubLLM(complete_response="SHOULD_NOT_APPEAR")
     engine = PortfolioReportEngine(layout=layout, llm=stub)
 
     request = PortfolioReportRequest(
@@ -107,13 +107,11 @@ async def test_engine_passes_theme_outline_and_facts_to_llm(
     captured: dict[str, object] = {}
 
     class CapturingLLM(StubLLM):
-        def generate(self, draft, source):  # type: ignore[override]
-            captured["source_url"] = source.url
-            captured["source_content"] = source.content
-            captured["draft_facts"] = draft.facts
-            return super().generate(draft, source)
+        def complete(self, prompt):  # type: ignore[override]
+            captured["prompt"] = prompt
+            return super().complete(prompt)
 
-    stub = CapturingLLM(generate_response="# OK\n")
+    stub = CapturingLLM(complete_response="# OK\n")
     engine = PortfolioReportEngine(layout=layout, llm=stub)
 
     request = PortfolioReportRequest(
@@ -122,13 +120,12 @@ async def test_engine_passes_theme_outline_and_facts_to_llm(
     )
     await engine.generate(request)
 
-    body = captured["source_content"]
+    body = captured["prompt"]
     assert isinstance(body, str)
     assert "KV Cache / Prompt Cache" in body  # theme.jd_keyword
     assert "[claude-code] J5=3" in body  # fact line
     assert "https://x.test/evidence" in body  # evidence URL
     assert "Prompt Cache 是什么" in body  # outline section from prompt spec
-    assert captured["source_url"] == "portfolio:CACHE_STRATEGY"
 
 
 async def test_engine_respects_dimension_filter_override(
@@ -145,11 +142,11 @@ async def test_engine_respects_dimension_filter_override(
     captured_body: dict[str, str] = {}
 
     class CapturingLLM(StubLLM):
-        def generate(self, draft, source):  # type: ignore[override]
-            captured_body["content"] = source.content
-            return super().generate(draft, source)
+        def complete(self, prompt):  # type: ignore[override]
+            captured_body["content"] = prompt
+            return super().complete(prompt)
 
-    stub = CapturingLLM(generate_response="# OK\n")
+    stub = CapturingLLM(complete_response="# OK\n")
     engine = PortfolioReportEngine(layout=layout, llm=stub)
 
     request = PortfolioReportRequest(

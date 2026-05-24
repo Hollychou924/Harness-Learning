@@ -49,6 +49,7 @@ class AnalysisDraft:
 class LLMClient(Protocol):
     def analyze(self, source: IngestSource) -> str: ...
     def generate(self, draft: AnalysisDraft, source: IngestSource) -> str: ...
+    def complete(self, prompt: str) -> str: ...
 
 
 @dataclass
@@ -57,12 +58,16 @@ class StubLLM:
 
     analyze_response: str = "{}"
     generate_response: str = ""
+    complete_response: str = ""
 
     def analyze(self, source: IngestSource) -> str:
         return self.analyze_response
 
     def generate(self, draft: AnalysisDraft, source: IngestSource) -> str:
         return self.generate_response
+
+    def complete(self, prompt: str) -> str:
+        return self.complete_response
 
 
 class IngestEngine:
