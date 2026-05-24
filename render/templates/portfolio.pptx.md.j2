@@ -1,0 +1,42 @@
+---
+marp: true
+theme: gaia
+size: 16:9
+paginate: true
+backgroundColor: #FAFAFA
+color: #1A1A1A
+style: |
+  section { font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", sans-serif; padding: 60px; }
+  h1 { color: #0A6E6F; border-bottom: 2px solid #0A6E6F; padding-bottom: .3em; }
+  h2 { color: #0A6E6F; }
+  h3 { color: #0A6E6F; }
+  table { font-size: 0.8em; }
+  th { background: #E8F4F4; color: #0A6E6F; }
+  blockquote { border-left: 4px solid #0A6E6F; color: #555; padding-left: 1em; }
+  a { color: #0A6E6F; }
+header: "{{ title }}"
+footer: "{{ author }} · {{ generated_at }}"
+---
+
+# {{ title }}
+
+> {{ subtitle }}
+
+**作者:** {{ author }}
+**JD 关键词:** {{ jd_keyword }}
+**目标读者:** {{ audience }}
+
+---
+
+{{ body_md }}
+
+---
+
+# 致谢
+
+数据来源: 26 个 Agent 产品的 wiki/compiled (基于 Karpathy LLM Wiki 模式 +
+nashsu/llm_wiki + sdyckjq-lab/llm-wiki-skill 借鉴整合)
+
+代码与方法论开源: `github.com/<user>/ai-agent-competitive-analysis`
+
+—— {{ author }}, {{ generated_at }}
