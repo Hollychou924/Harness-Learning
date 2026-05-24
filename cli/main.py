@@ -104,6 +104,10 @@ def path_b(
     only: str = typer.Option("", "--only", help="Comma-separated product IDs"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Plan only, no API calls"),
     threshold: float = typer.Option(0.5, "--threshold"),
+    claude_bin: str = typer.Option(
+        "/opt/homebrew/bin/claude", "--claude-bin",
+        help="Path to claude CLI binary (default: /opt/homebrew/bin/claude)",
+    ),
     root: Path = ROOT_OPT,
 ) -> None:
     raw = yaml.safe_load(products_file.read_text(encoding="utf-8"))
@@ -118,9 +122,33 @@ def path_b(
             typer.echo(f"  - {p.id} (keywords: {', '.join(p.keywords[:3])})")
         return
 
-    # Real run requires LLM client — Phase 3 will wire anthropic SDK.
-    typer.echo(f"[Phase 2 stub] would call sync_path_b with {len(products)} products at threshold {threshold}")
-    typer.echo("Real impl: import sync_path_b from packages.ai_agent_research.path_b_sync")
+    # Real run — wired up via ClaudeCliLLMClient (P1) + StubKeywordScorer (Phase 3 真 LLM scoring)
+    from packages.llm_wiki.claude_cli import ClaudeCliLLMClient
+    from packages.llm_wiki.paths import WikiLayout
+    from packages.ai_agent_research.path_b_sync import sync_path_b
+    from packages.ai_agent_research.scorer import StubKeywordScorer
+
+    layout = WikiLayout(root)
+    llm = ClaudeCliLLMClient(claude_bin=claude_bin)
+    # Phase 2.x: stubbed at 0.5; Phase 3 will replace with LLM-driven relevance scoring
+    scorer = StubKeywordScorer(value=0.5)
+
+    typer.echo(f"Running Path B for {len(products)} product(s), threshold={threshold}...")
+    result = sync_path_b(
+        products=products,
+        layout=layout,
+        llm=llm,
+        keyword_scorer=scorer,
+        score_threshold=threshold,
+    )
+
+    typer.echo("\n=== Results ===")
+    for pid, info in result.items():
+        marker = "✓ report written" if info["report_written"] else "skipped (low score)"
+        typer.echo(
+            f"  {pid}: {info['entries_aggregated']} signals, "
+            f"score={info['score']:.2f} → {marker}"
+        )
 
 
 @app.command("notify", help="Push pending changelog reports to Feishu")
