@@ -1,0 +1,39 @@
+name: daily-changelog
+on:
+  schedule:
+    - cron: '0 0 * * *'  # UTC 00:00 = 北京 08:00
+  workflow_dispatch:
+
+jobs:
+  path-b:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+      - run: uv sync --all-extras
+      - name: Install Node deps for wechat-article-search
+        run: |
+          mkdir -p ~/skills/wechat-article-search
+          # wechat-article-search skill checked into repo or installed via skillhub here
+          # For Phase 2, document but skip: cd ~/skills/wechat-article-search && npm install cheerio
+        continue-on-error: true
+      - name: Run Path B
+        env:
+          TRENDRADAR_OUTPUT_URL: ${{ secrets.TRENDRADAR_OUTPUT_URL }}
+          FEISHU_BOT_WEBHOOK: ${{ secrets.FEISHU_BOT_WEBHOOK }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: uv run wiki path-b --threshold 0.5
+      - name: Commit changelog updates
+        run: |
+          git config user.email "actions@github.com"
+          git config user.name "github-actions[bot]"
+          git add wiki/changelog/ wiki/log.md || true
+          git diff --staged --quiet || git commit -m "chore(changelog): daily Path B sync $(date -u +%Y-%m-%d)"
+          git push || true
