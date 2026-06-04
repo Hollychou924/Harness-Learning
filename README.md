@@ -2,7 +2,7 @@
 
 26 个 AI Agent 产品(14 通用 + 12 编码)的竞品分析自动化管道。基于 Karpathy LLM Wiki 模式 + JD 校准的双类目维度库。
 
-**Status:** Phase 4 complete (PM 作品集报告管线 + 6 篇 DeepSeek 应聘材料)
+**Status:** Phase 5 in progress (harness 工程知识深化 + 7 个产品编译 + 7 篇作品集报告)
 
 ## Spec & Plan
 
@@ -50,6 +50,18 @@ Phase 1.1 hardening: atomic file writes (tempfile + os.replace), RSS timezone-aw
 - ✅ CLI: `wiki portfolio --theme <slug>` / `--all` (12 commands total)
 - ✅ 6 篇真实 LLM 长文报告产出（130-225 行 MD + 150-250 行 deck），3 个 P0 产品 (claude-code/cursor/codex)
 - ✅ 应聘材料归档: `docs/job-application/`
+
+## Phase 5 coverage (in progress)
+
+- ✅ 产品编译扩展至 7 个：原 5 P0 + `codebuddy` + `qoder`(国产编码 agent)
+- ✅ 第 7 篇作品集报告 `community-divergence`(社区分化主题,含 deck)
+- ✅ harness 工程知识深化:6 篇 concepts(`harness-engineering` / `progressive-disclosure` / `prompt-context-harness` / `spec-driven-agent-development` / `quest-mode-agent-development` / `etclovg-agent-harness-taxonomy`)
+- ✅ 7 个产品 entities + 10 篇 topics(agent-evaluation 系列、阿里/腾讯/AWS 云厂商 agent collection、harness 社区综合)
+- ✅ 3 篇深度 comparisons(openclaw/claude-code/hermes 运行时架构、codebuddy/qoder 国产对比)
+- ✅ analysis 产物:`entity-scan`(实体频率)+ `term-frequency`(术语词频)+ `harness-collection-insights`
+- ✅ 知识沉淀:`lessons/`(prompt-only agent 不可生产化)+ `timelines/`(harness 设计演进)+ `_framework/`(wiki 综合 SOP)
+- ✅ ingest 审计:15 篇 `review/ingest-coverage/` + 8 张 `review/source-cards/`
+- ✅ 5 个新 ingest/分析脚本(含 2 个 `.mjs` harness collection ingester)
 
 ## Phase 3 coverage
 
@@ -132,4 +144,4 @@ See spec §3-§10. Key modules:
 | 2 | 1 周 | Path B 增量链 + L1/L2 数据源 | ✅ Complete |
 | 3 | 2 周 | Path C 对比引擎 + 渲染层 | ✅ Complete |
 | 4 | 1 天 | 6 篇 PM 作品集报告 + DeepSeek 风 PPT | ✅ Complete |
-| 5 | 持续 | P2 长尾产品扩展 + 维度库迭代 (含 hermes/manus seed) | Pending |
+| 5 | 持续 | harness 工程知识深化 + codebuddy/qoder 编译 + 社区综合 (concepts/entities/topics/comparisons) | 🚧 In progress |
