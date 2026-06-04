@@ -43,17 +43,23 @@ class CrossSourceVerifier:
         product: Product,
         dimension: Dimension,
         existing_evaluation: ProductEvaluation | None,
+        client: httpx.AsyncClient | None = None,
     ) -> ProductEvaluation:
         if existing_evaluation is not None:
             return existing_evaluation
 
-        # Missing eval — try L2 quick check
-        async with httpx.AsyncClient() as client:
+        # Missing eval — try L2 quick check. 复用调用方传入的 client(批量场景),
+        # 否则自建一个(独立调用 / 测试场景)。
+        query_text = f"{product.name} {dimension.name}"
+        if client is not None:
             verified_via_search = await verify_url_via_search(
-                client,
-                url=str(product.homepage),
-                query=f"{product.name} {dimension.name}",
+                client, url=str(product.homepage), query=query_text
             )
+        else:
+            async with httpx.AsyncClient() as own_client:
+                verified_via_search = await verify_url_via_search(
+                    own_client, url=str(product.homepage), query=query_text
+                )
 
         confidence = (
             Confidence.AMBIGUOUS if verified_via_search else Confidence.UNVERIFIED

@@ -9,6 +9,7 @@ Run with:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -274,9 +275,14 @@ def rel_from(path_from: Path, target: Path | str) -> str:
     return os.path.relpath(target_path, path_from).replace(os.sep, "/")
 
 
+def _url_hash(url: str) -> str:
+    """短哈希,用于区分同日同标题但不同 URL 的帖子,避免文件名冲突覆盖。"""
+    return hashlib.sha256(url.encode("utf-8")).hexdigest()[:8]
+
+
 def write_raw(post: Post, fetched_at: str) -> Path:
     RAW_BASE.mkdir(parents=True, exist_ok=True)
-    path = RAW_BASE / f"{date_prefix(post.date)}-{slugify(post.title)}.md"
+    path = RAW_BASE / f"{date_prefix(post.date)}-{slugify(post.title)}-{_url_hash(post.url)}.md"
     front = "\n".join(
         [
             "---",
@@ -299,7 +305,7 @@ def write_raw(post: Post, fetched_at: str) -> Path:
 def write_card(post: Post) -> Path:
     assert post.raw_path and post.destinations is not None
     CARD_BASE.mkdir(parents=True, exist_ok=True)
-    slug = slugify(post.title)
+    slug = f"{slugify(post.title)}-{_url_hash(post.url)}"
     path = CARD_BASE / f"codex-{slug}.md"
     signal_rows = "\n".join(f"| {name} | {count} |" for name, count in hit_signals(post.body))
     outline = "\n".join(f"- {h}" for h in headings(post.body)) or "- 无明显标题结构"

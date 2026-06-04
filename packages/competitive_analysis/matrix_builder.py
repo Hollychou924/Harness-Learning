@@ -3,7 +3,10 @@
 gaps are explicit (AMBIGUOUS / UNVERIFIED) instead of silently absent.
 """
 
+import asyncio
 from dataclasses import dataclass
+
+import httpx
 
 from packages.competitive_analysis.verifier import CrossSourceVerifier
 from packages.competitive_analysis.wiki_query import WikiQuery
@@ -50,18 +53,30 @@ async def build_matrix(
     query = WikiQuery(layout=layout)
     verifier = CrossSourceVerifier()
 
-    cells: dict[str, dict[str, ProductEvaluation]] = {}
-    for d in dimensions:
-        cells[d.id] = {}
-        for p in products:
-            evals = query.read_evaluations(p.id, dim_ids=[d.id])
-            existing = evals.get(d.id)
-            cell = await verifier.verify(
-                product=p,
-                dimension=d,
-                existing_evaluation=existing,
-            )
-            cells[d.id][p.id] = cell
+    # 每产品只读一次全量 provenance,再按 dim 切片(避免 N(dim) 次重复解析)
+    evals_by_product = {p.id: query.read_evaluations(p.id) for p in products}
+
+    async def build_cell(
+        d: Dimension, p: Product, client: httpx.AsyncClient
+    ) -> tuple[str, str, ProductEvaluation]:
+        existing = evals_by_product[p.id].get(d.id)
+        cell = await verifier.verify(
+            product=p,
+            dimension=d,
+            existing_evaluation=existing,
+            client=client,
+        )
+        return d.id, p.id, cell
+
+    # 复用单个 client,缺失单元格的 L2 探测并发执行
+    async with httpx.AsyncClient() as client:
+        results = await asyncio.gather(
+            *(build_cell(d, p, client) for d in dimensions for p in products)
+        )
+
+    cells: dict[str, dict[str, ProductEvaluation]] = {d.id: {} for d in dimensions}
+    for dim_id, prod_id, cell in results:
+        cells[dim_id][prod_id] = cell
 
     return ComparisonMatrix(
         product_order=[p.id for p in products],

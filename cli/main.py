@@ -9,6 +9,24 @@ app = typer.Typer(no_args_is_help=True, help="AI Agent Competitive Analysis — 
 ROOT_OPT = typer.Option(Path("wiki"), "--root", help="Wiki root directory")
 
 
+def _read_yaml(path: Path) -> dict:
+    """Load a YAML config with friendly errors instead of raw tracebacks."""
+    try:
+        return yaml.safe_load(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        typer.echo(f"[error] 配置文件不存在: {path}")
+        raise typer.Exit(1) from exc
+    except yaml.YAMLError as exc:
+        typer.echo(f"[error] YAML 解析失败 {path}: {exc}")
+        raise typer.Exit(1) from exc
+
+
+def _not_implemented(message: str) -> None:
+    """Stub commands exit non-zero so scripts/CI can detect a no-op."""
+    typer.echo(f"[未实现] {message}")
+    raise typer.Exit(1)
+
+
 @app.command(help="Initialize wiki directory structure")
 def init(root: Path = ROOT_OPT) -> None:
     init_wiki(root)
@@ -21,7 +39,10 @@ def ingest(
     product_id: str = typer.Option(..., "--product", help="Product ID"),
     root: Path = ROOT_OPT,
 ) -> None:
-    typer.echo(f"[stub] ingest {source} → {product_id} (Phase 1: see sync command)")
+    _not_implemented(
+        f"ingest {source} → {product_id}。请改用 `wiki path-b` 或直接调用 "
+        "packages.llm_wiki.sync.sync_product_path_a"
+    )
 
 
 @app.command(help="Compile raw → compiled (full sync, batch)")
@@ -30,24 +51,25 @@ def compile(
     only: str = typer.Option("", "--only", help="Comma-separated product IDs"),
     root: Path = ROOT_OPT,
 ) -> None:
-    raw = yaml.safe_load(products_file.read_text(encoding="utf-8"))
+    raw = _read_yaml(products_file)
     products = [Product(**p) for p in raw["products"]]
     if only:
         keep = set(only.split(","))
         products = [p for p in products if p.id in keep]
 
-    typer.echo(f"[Phase 1 stub] would compile {len(products)} product(s): {[p.id for p in products]}")
-    typer.echo("Real impl: call packages.llm_wiki.sync.sync_product_path_a per product")
+    typer.echo(f"[未实现] compile 尚未接通 sync,将编译 {len(products)} 个产品: {[p.id for p in products]}")
+    typer.echo("请改用 `wiki path-b`,或直接调用 packages.llm_wiki.sync.sync_product_path_a")
+    raise typer.Exit(1)
 
 
-@app.command(help="Full-text/vector search the wiki (stub for Phase 1)")
+@app.command(help="[未实现] Full-text/vector search the wiki")
 def search(query: str, root: Path = ROOT_OPT) -> None:
-    typer.echo(f"[stub] search: {query}")
+    _not_implemented(f"search: {query}")
 
 
-@app.command(help="LLM-synthesized answer with citations (stub for Phase 1)")
+@app.command(help="[未实现] LLM-synthesized answer with citations")
 def query(question: str, root: Path = ROOT_OPT) -> None:
-    typer.echo(f"[stub] query: {question}")
+    _not_implemented(f"query: {question}")
 
 
 @app.command(help="Compare baseline product against others on selected dimensions")
@@ -88,10 +110,10 @@ def compare(
     from packages.schemas.dimension import Dimension
 
     # Load products + dimensions.
-    products_raw = yaml.safe_load(products_file.read_text(encoding="utf-8"))
+    products_raw = _read_yaml(products_file)
     products_index = {p["id"]: Product(**p) for p in products_raw["products"]}
 
-    dims_raw = yaml.safe_load(dims_file.read_text(encoding="utf-8"))
+    dims_raw = _read_yaml(dims_file)
     dimensions = [Dimension(**d) for d in dims_raw["dimensions"]]
 
     # Validate baseline.
@@ -169,9 +191,9 @@ def lint(root: Path = ROOT_OPT) -> None:
     typer.echo("OK — wiki structure valid")
 
 
-@app.command(help="Launch offline HTML knowledge graph (stub for Phase 1)")
+@app.command(help="[未实现] Launch offline HTML knowledge graph")
 def visualize(root: Path = ROOT_OPT) -> None:
-    typer.echo("[stub] launch HTML graph viewer — Phase 2 deliverable")
+    _not_implemented("launch HTML graph viewer")
 
 
 @app.command(help="Process Async Review queue")
@@ -202,7 +224,7 @@ def path_b(
     ),
     root: Path = ROOT_OPT,
 ) -> None:
-    raw = yaml.safe_load(products_file.read_text(encoding="utf-8"))
+    raw = _read_yaml(products_file)
     products = [Product(**p) for p in raw["products"]]
     if only:
         keep = set(only.split(","))
@@ -224,7 +246,7 @@ def path_b(
     # Load schema dimensions so the LLM client can constrain its output to
     # known IDs (avoids inventing categories like "E1 Ecosystem & Integrations").
     dims_path = Path("wiki/schema/coding-agent-dims.yaml")
-    dims_raw = yaml.safe_load(dims_path.read_text(encoding="utf-8"))
+    dims_raw = _read_yaml(dims_path)
     dimensions = [Dimension(**d) for d in dims_raw["dimensions"]]
 
     layout = WikiLayout(root)
@@ -250,9 +272,9 @@ def path_b(
         )
 
 
-@app.command("notify", help="Push pending changelog reports to Feishu")
+@app.command("notify", help="[未实现] Push pending changelog reports to Feishu")
 def notify(root: Path = ROOT_OPT) -> None:
-    typer.echo(f"[stub] notify — would scan {root}/changelog/ and push unsent reports")
+    _not_implemented(f"notify — 扫描 {root}/changelog/ 并推送未发送报告")
 
 
 THEME_SLUG_TO_ENUM = {
@@ -332,7 +354,7 @@ def portfolio(
         themes_to_run = [ReportTheme[THEME_SLUG_TO_ENUM[slug]]]
 
     # Resolve product IDs (default: P0 priority).
-    products_raw = yaml.safe_load(products_file.read_text(encoding="utf-8"))
+    products_raw = _read_yaml(products_file)
     all_product_ids = [p["id"] for p in products_raw["products"]]
     if products:
         product_ids = [p.strip() for p in products.split(",") if p.strip()]
