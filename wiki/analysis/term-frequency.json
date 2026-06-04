@@ -1,0 +1,3115 @@
+{
+  "total_articles": 66,
+  "total_tokens": 190032,
+  "vocabulary_size": 17621,
+  "top_terms_global": [
+    [
+      "Agent",
+      3363
+    ],
+    [
+      "Harness",
+      2298
+    ],
+    [
+      "模型",
+      1999
+    ],
+    [
+      "AI",
+      1958
+    ],
+    [
+      "工具",
+      1491
+    ],
+    [
+      "代码",
+      1425
+    ],
+    [
+      "任务",
+      1230
+    ],
+    [
+      "上下文",
+      1134
+    ],
+    [
+      "系统",
+      1065
+    ],
+    [
+      "Engineering",
+      1020
+    ],
+    [
+      "问题",
+      990
+    ],
+    [
+      "核心",
+      743
+    ],
+    [
+      "设计",
+      731
+    ],
+    [
+      "项目",
+      691
+    ],
+    [
+      "而是",
+      683
+    ],
+    [
+      "验证",
+      661
+    ],
+    [
+      "工程",
+      612
+    ],
+    [
+      "运行",
+      610
+    ],
+    [
+      "能力",
+      597
+    ],
+    [
+      "约束",
+      596
+    ],
+    [
+      "架构",
+      588
+    ],
+    [
+      "环境",
+      587
+    ],
+    [
+      "文件",
+      565
+    ],
+    [
+      "测试",
+      565
+    ],
+    [
+      "工作",
+      564
+    ],
+    [
+      "结果",
+      552
+    ],
+    [
+      "信息",
+      551
+    ],
+    [
+      "调用",
+      540
+    ],
+    [
+      "状态",
+      528
+    ],
+    [
+      "文档",
+      528
+    ],
+    [
+      "md",
+      508
+    ],
+    [
+      "团队",
+      503
+    ],
+    [
+      "模式",
+      478
+    ],
+    [
+      "这些",
+      477
+    ],
+    [
+      "机制",
+      451
+    ],
+    [
+      "Prompt",
+      447
+    ],
+    [
+      "生成",
+      445
+    ],
+    [
+      "阶段",
+      443
+    ],
+    [
+      "Claude",
+      434
+    ],
+    [
+      "记忆",
+      428
+    ],
+    [
+      "规则",
+      425
+    ],
+    [
+      "OpenAI",
+      421
+    ],
+    [
+      "流程",
+      408
+    ],
+    [
+      "知识",
+      396
+    ],
+    [
+      "目标",
+      386
+    ],
+    [
+      "关键",
+      385
+    ],
+    [
+      "管理",
+      384
+    ],
+    [
+      "Anthropic",
+      378
+    ],
+    [
+      "开始",
+      376
+    ],
+    [
+      "Context",
+      376
+    ],
+    [
+      "边界",
+      374
+    ],
+    [
+      "agent",
+      373
+    ],
+    [
+      "用户",
+      371
+    ],
+    [
+      "需求",
+      370
+    ],
+    [
+      "实践",
+      364
+    ],
+    [
+      "提示",
+      361
+    ],
+    [
+      "如何",
+      359
+    ],
+    [
+      "完整",
+      354
+    ],
+    [
+      "定义",
+      351
+    ],
+    [
+      "开发",
+      346
+    ],
+    [
+      "技术",
+      345
+    ],
+    [
+      "失败",
+      341
+    ],
+    [
+      "自动",
+      340
+    ],
+    [
+      "发现",
+      339
+    ],
+    [
+      "输出",
+      334
+    ],
+    [
+      "错误",
+      326
+    ],
+    [
+      "理解",
+      323
+    ],
+    [
+      "数据",
+      322
+    ],
+    [
+      "Code",
+      320
+    ],
+    [
+      "功能",
+      315
+    ],
+    [
+      "反馈",
+      313
+    ],
+    [
+      "框架",
+      310
+    ],
+    [
+      "过程",
+      305
+    ],
+    [
+      "场景",
+      296
+    ],
+    [
+      "循环",
+      295
+    ],
+    [
+      "智能体",
+      293
+    ],
+    [
+      "构建",
+      290
+    ],
+    [
+      "LLM",
+      284
+    ],
+    [
+      "不同",
+      276
+    ],
+    [
+      "MCP",
+      275
+    ],
+    [
+      "安全",
+      274
+    ],
+    [
+      "复杂",
+      273
+    ],
+    [
+      "规范",
+      273
+    ],
+    [
+      "检查",
+      272
+    ],
+    [
+      "智体",
+      271
+    ],
+    [
+      "质量",
+      265
+    ],
+    [
+      "对话",
+      261
+    ],
+    [
+      "以及",
+      254
+    ],
+    [
+      "一次",
+      252
+    ],
+    [
+      "分析",
+      249
+    ],
+    [
+      "Skill",
+      244
+    ],
+    [
+      "时候",
+      244
+    ],
+    [
+      "提升",
+      243
+    ],
+    [
+      "每个",
+      243
+    ],
+    [
+      "工程师",
+      241
+    ],
+    [
+      "内容",
+      240
+    ],
+    [
+      "持续",
+      238
+    ],
+    [
+      "当前",
+      237
+    ],
+    [
+      "本身",
+      235
+    ],
+    [
+      "窗口",
+      235
+    ],
+    [
+      "权限",
+      234
+    ],
+    [
+      "很多",
+      232
+    ],
+    [
+      "角色",
+      230
+    ],
+    [
+      "OpenClaw",
+      228
+    ],
+    [
+      "结构化",
+      227
+    ],
+    [
+      "压缩",
+      225
+    ],
+    [
+      "人类",
+      225
+    ],
+    [
+      "策略",
+      225
+    ],
+    [
+      "评估",
+      225
+    ],
+    [
+      "明确",
+      225
+    ],
+    [
+      "配置",
+      225
+    ],
+    [
+      "控制",
+      224
+    ],
+    [
+      "路径",
+      223
+    ],
+    [
+      "一步",
+      222
+    ],
+    [
+      "独立",
+      222
+    ],
+    [
+      "基于",
+      221
+    ],
+    [
+      "历史",
+      218
+    ],
+    [
+      "负责",
+      216
+    ],
+    [
+      "真实",
+      215
+    ],
+    [
+      "方式",
+      213
+    ],
+    [
+      "时间",
+      212
+    ],
+    [
+      "逻辑",
+      210
+    ],
+    [
+      "重要",
+      208
+    ],
+    [
+      "决策",
+      207
+    ],
+    [
+      "优化",
+      207
+    ],
+    [
+      "判断",
+      206
+    ],
+    [
+      "变成",
+      206
+    ],
+    [
+      "成本",
+      205
+    ],
+    [
+      "结构",
+      203
+    ],
+    [
+      "应用",
+      203
+    ],
+    [
+      "日志",
+      203
+    ],
+    [
+      "记录",
+      201
+    ],
+    [
+      "一套",
+      200
+    ],
+    [
+      "其实",
+      200
+    ],
+    [
+      "编码",
+      199
+    ],
+    [
+      "harness",
+      198
+    ],
+    [
+      "推理",
+      197
+    ],
+    [
+      "依赖",
+      196
+    ],
+    [
+      "具体",
+      196
+    ],
+    [
+      "模块",
+      195
+    ],
+    [
+      "仓库",
+      194
+    ],
+    [
+      "作为",
+      193
+    ],
+    [
+      "业务",
+      193
+    ],
+    [
+      "Spec",
+      192
+    ],
+    [
+      "指令",
+      191
+    ],
+    [
+      "方案",
+      191
+    ],
+    [
+      "审查",
+      191
+    ],
+    [
+      "行为",
+      190
+    ],
+    [
+      "注入",
+      190
+    ],
+    [
+      "修复",
+      190
+    ],
+    [
+      "稳定",
+      189
+    ],
+    [
+      "体系",
+      189
+    ],
+    [
+      "技能",
+      188
+    ],
+    [
+      "经验",
+      186
+    ],
+    [
+      "标准",
+      185
+    ],
+    [
+      "动态",
+      185
+    ],
+    [
+      "每次",
+      184
+    ],
+    [
+      "三个",
+      183
+    ],
+    [
+      "API",
+      182
+    ],
+    [
+      "接口",
+      181
+    ],
+    [
+      "加载",
+      177
+    ],
+    [
+      "包含",
+      177
+    ],
+    [
+      "决定",
+      177
+    ],
+    [
+      "输入",
+      175
+    ],
+    [
+      "服务",
+      175
+    ],
+    [
+      "生产",
+      174
+    ],
+    [
+      "Skills",
+      174
+    ],
+    [
+      "编排",
+      173
+    ],
+    [
+      "概念",
+      173
+    ],
+    [
+      "落地",
+      173
+    ],
+    [
+      "能够",
+      171
+    ],
+    [
+      "简单",
+      170
+    ],
+    [
+      "修改",
+      170
+    ],
+    [
+      "AGENTS",
+      169
+    ],
+    [
+      "存在",
+      168
+    ],
+    [
+      "不再",
+      168
+    ],
+    [
+      "一层",
+      166
+    ],
+    [
+      "协作",
+      165
+    ],
+    [
+      "无法",
+      164
+    ],
+    [
+      "维护",
+      164
+    ],
+    [
+      "PR",
+      164
+    ],
+    [
+      "会话",
+      163
+    ],
+    [
+      "组件",
+      163
+    ],
+    [
+      "案例",
+      162
+    ],
+    [
+      "人工",
+      162
+    ],
+    [
+      "实际",
+      159
+    ],
+    [
+      "目录",
+      159
+    ],
+    [
+      "东西",
+      159
+    ],
+    [
+      "要求",
+      157
+    ],
+    [
+      "产品",
+      157
+    ],
+    [
+      "恢复",
+      156
+    ],
+    [
+      "规划",
+      155
+    ],
+    [
+      "交互",
+      154
+    ],
+    [
+      "训练",
+      154
+    ],
+    [
+      "原则",
+      153
+    ],
+    [
+      "检索",
+      153
+    ],
+    [
+      "总结",
+      153
+    ],
+    [
+      "本质",
+      152
+    ],
+    [
+      "基础",
+      152
+    ],
+    [
+      "引入",
+      151
+    ]
+  ],
+  "top_doc_freq": [
+    [
+      "而是",
+      65
+    ],
+    [
+      "工具",
+      64
+    ],
+    [
+      "任务",
+      64
+    ],
+    [
+      "问题",
+      64
+    ],
+    [
+      "Agent",
+      63
+    ],
+    [
+      "上下文",
+      63
+    ],
+    [
+      "工作",
+      63
+    ],
+    [
+      "核心",
+      63
+    ],
+    [
+      "代码",
+      63
+    ],
+    [
+      "系统",
+      62
+    ],
+    [
+      "模型",
+      62
+    ],
+    [
+      "设计",
+      62
+    ],
+    [
+      "AI",
+      62
+    ],
+    [
+      "运行",
+      62
+    ],
+    [
+      "Harness",
+      61
+    ],
+    [
+      "环境",
+      61
+    ],
+    [
+      "发现",
+      61
+    ],
+    [
+      "这些",
+      61
+    ],
+    [
+      "输出",
+      61
+    ],
+    [
+      "约束",
+      61
+    ],
+    [
+      "完整",
+      61
+    ],
+    [
+      "能力",
+      60
+    ],
+    [
+      "自动",
+      60
+    ],
+    [
+      "生成",
+      59
+    ],
+    [
+      "理解",
+      59
+    ],
+    [
+      "关键",
+      59
+    ],
+    [
+      "架构",
+      59
+    ],
+    [
+      "Engineering",
+      59
+    ],
+    [
+      "结果",
+      59
+    ],
+    [
+      "定义",
+      59
+    ],
+    [
+      "工程",
+      58
+    ],
+    [
+      "开发",
+      57
+    ],
+    [
+      "机制",
+      57
+    ],
+    [
+      "文件",
+      57
+    ],
+    [
+      "项目",
+      57
+    ],
+    [
+      "规则",
+      56
+    ],
+    [
+      "复杂",
+      56
+    ],
+    [
+      "场景",
+      56
+    ],
+    [
+      "开始",
+      56
+    ],
+    [
+      "模式",
+      56
+    ],
+    [
+      "管理",
+      56
+    ],
+    [
+      "实践",
+      56
+    ],
+    [
+      "本身",
+      55
+    ],
+    [
+      "一套",
+      55
+    ],
+    [
+      "不同",
+      55
+    ],
+    [
+      "测试",
+      55
+    ],
+    [
+      "验证",
+      55
+    ],
+    [
+      "重要",
+      55
+    ],
+    [
+      "内容",
+      55
+    ],
+    [
+      "每个",
+      55
+    ],
+    [
+      "流程",
+      55
+    ],
+    [
+      "过程",
+      54
+    ],
+    [
+      "边界",
+      54
+    ],
+    [
+      "数据",
+      54
+    ],
+    [
+      "依赖",
+      54
+    ],
+    [
+      "文档",
+      54
+    ],
+    [
+      "构建",
+      53
+    ],
+    [
+      "调用",
+      53
+    ],
+    [
+      "检查",
+      53
+    ],
+    [
+      "用户",
+      53
+    ],
+    [
+      "信息",
+      53
+    ],
+    [
+      "团队",
+      53
+    ],
+    [
+      "技术",
+      53
+    ],
+    [
+      "目标",
+      52
+    ],
+    [
+      "错误",
+      52
+    ],
+    [
+      "反馈",
+      52
+    ],
+    [
+      "状态",
+      52
+    ],
+    [
+      "作为",
+      52
+    ],
+    [
+      "结构",
+      52
+    ],
+    [
+      "窗口",
+      52
+    ],
+    [
+      "角色",
+      52
+    ],
+    [
+      "逻辑",
+      52
+    ],
+    [
+      "决策",
+      51
+    ],
+    [
+      "一次",
+      51
+    ],
+    [
+      "记忆",
+      51
+    ],
+    [
+      "简单",
+      51
+    ],
+    [
+      "阶段",
+      51
+    ],
+    [
+      "结构化",
+      51
+    ],
+    [
+      "提示",
+      51
+    ],
+    [
+      "真实",
+      50
+    ],
+    [
+      "负责",
+      50
+    ],
+    [
+      "三个",
+      50
+    ],
+    [
+      "框架",
+      50
+    ],
+    [
+      "不再",
+      50
+    ],
+    [
+      "持续",
+      50
+    ],
+    [
+      "独立",
+      50
+    ],
+    [
+      "分析",
+      50
+    ],
+    [
+      "md",
+      50
+    ],
+    [
+      "实际",
+      49
+    ],
+    [
+      "如何",
+      49
+    ],
+    [
+      "本质",
+      49
+    ],
+    [
+      "安全",
+      49
+    ],
+    [
+      "优化",
+      49
+    ],
+    [
+      "历史",
+      49
+    ],
+    [
+      "方式",
+      49
+    ],
+    [
+      "质量",
+      49
+    ],
+    [
+      "决定",
+      49
+    ],
+    [
+      "每次",
+      49
+    ],
+    [
+      "OpenAI",
+      49
+    ],
+    [
+      "Prompt",
+      49
+    ]
+  ],
+  "top_bigrams": [
+    [
+      "Harness Engineering",
+      676
+    ],
+    [
+      "Claude Code",
+      260
+    ],
+    [
+      "Context Engineering",
+      181
+    ],
+    [
+      "工具 调用",
+      179
+    ],
+    [
+      "上下文 窗口",
+      171
+    ],
+    [
+      "AGENTS md",
+      166
+    ],
+    [
+      "Prompt Engineering",
+      129
+    ],
+    [
+      "AI Agent",
+      115
+    ],
+    [
+      "3E 3C",
+      92
+    ],
+    [
+      "生成 代码",
+      81
+    ],
+    [
+      "AI 代码",
+      80
+    ],
+    [
+      "模型 能力",
+      79
+    ],
+    [
+      "et al",
+      79
+    ],
+    [
+      "复杂 任务",
+      70
+    ],
+    [
+      "Agent 系统",
+      68
+    ],
+    [
+      "调用 工具",
+      68
+    ],
+    [
+      "上下文 管理",
+      68
+    ],
+    [
+      "AI 编程",
+      68
+    ],
+    [
+      "代码 审查",
+      64
+    ],
+    [
+      "AI 生成",
+      61
+    ],
+    [
+      "CLAUDE md",
+      61
+    ],
+    [
+      "运行 环境",
+      60
+    ],
+    [
+      "系统 提示",
+      59
+    ],
+    [
+      "架构 约束",
+      59
+    ],
+    [
+      "Agent 运行",
+      54
+    ],
+    [
+      "生产 环境",
+      54
+    ],
+    [
+      "Agent Harness",
+      54
+    ],
+    [
+      "最佳 实践",
+      53
+    ],
+    [
+      "Mitchell Hashimoto",
+      51
+    ],
+    [
+      "System Prompt",
+      50
+    ],
+    [
+      "模型 本身",
+      49
+    ],
+    [
+      "上下文 压缩",
+      49
+    ],
+    [
+      "OpenAI Anthropic",
+      49
+    ],
+    [
+      "长期 记忆",
+      48
+    ],
+    [
+      "渐进式 披露",
+      47
+    ],
+    [
+      "测试 验证",
+      47
+    ],
+    [
+      "3C 3E",
+      46
+    ],
+    [
+      "AI 工程",
+      45
+    ],
+    [
+      "核心 问题",
+      45
+    ],
+    [
+      "语言 模型",
+      44
+    ],
+    [
+      "Engineering Harness",
+      44
+    ],
+    [
+      "Martin Fowler",
+      44
+    ],
+    [
+      "Sub Agent",
+      44
+    ],
+    [
+      "Agent 代码",
+      43
+    ],
+    [
+      "工具 结果",
+      41
+    ],
+    [
+      "基准 测试",
+      41
+    ],
+    [
+      "验收 标准",
+      41
+    ],
+    [
+      "Agent ic",
+      41
+    ],
+    [
+      "DeerFlow 2.0",
+      41
+    ],
+    [
+      "工程 实践",
+      40
+    ],
+    [
+      "AI Coding",
+      40
+    ],
+    [
+      "Harness 设计",
+      39
+    ],
+    [
+      "Agent Agent",
+      39
+    ],
+    [
+      "工具 定义",
+      39
+    ],
+    [
+      "Hermes Agent",
+      38
+    ],
+    [
+      "编码 Agent",
+      37
+    ],
+    [
+      "md 文件",
+      37
+    ],
+    [
+      "反馈 循环",
+      37
+    ],
+    [
+      "Agent Skills",
+      37
+    ],
+    [
+      "垃圾 回收",
+      36
+    ],
+    [
+      "发现 问题",
+      36
+    ],
+    [
+      "Agent 工作",
+      35
+    ],
+    [
+      "工具 输出",
+      35
+    ],
+    [
+      "代码 而是",
+      35
+    ],
+    [
+      "人类 工程师",
+      35
+    ],
+    [
+      "Coding Agent",
+      35
+    ],
+    [
+      "模型 Harness",
+      34
+    ],
+    [
+      "理解 Harness",
+      34
+    ],
+    [
+      "对话 历史",
+      34
+    ],
+    [
+      "Harness Agent",
+      34
+    ],
+    [
+      "Agent 上下文",
+      34
+    ],
+    [
+      "sandbox id",
+      34
+    ],
+    [
+      "模型 LLM",
+      33
+    ],
+    [
+      "Harness 模型",
+      33
+    ],
+    [
+      "系统 设计",
+      33
+    ],
+    [
+      "Harness Harness",
+      33
+    ],
+    [
+      "Prompt Context",
+      33
+    ],
+    [
+      "OpenAI 团队",
+      33
+    ],
+    [
+      "规则 文件",
+      33
+    ],
+    [
+      "需求 分析",
+      33
+    ]
+  ],
+  "by_category_top20": {
+    "1_概念入门": [
+      [
+        "Agent",
+        499
+      ],
+      [
+        "AI",
+        421
+      ],
+      [
+        "Harness",
+        384
+      ],
+      [
+        "模型",
+        329
+      ],
+      [
+        "代码",
+        317
+      ],
+      [
+        "任务",
+        229
+      ],
+      [
+        "问题",
+        224
+      ],
+      [
+        "目标",
+        215
+      ],
+      [
+        "验证",
+        201
+      ],
+      [
+        "系统",
+        186
+      ],
+      [
+        "工具",
+        170
+      ],
+      [
+        "Engineering",
+        151
+      ],
+      [
+        "而是",
+        148
+      ],
+      [
+        "项目",
+        140
+      ],
+      [
+        "Spec",
+        130
+      ],
+      [
+        "状态",
+        124
+      ],
+      [
+        "能力",
+        123
+      ],
+      [
+        "边界",
+        122
+      ],
+      [
+        "核心",
+        121
+      ],
+      [
+        "上下文",
+        119
+      ]
+    ],
+    "2_深度解析": [
+      [
+        "Agent",
+        758
+      ],
+      [
+        "模型",
+        497
+      ],
+      [
+        "Harness",
+        444
+      ],
+      [
+        "工具",
+        431
+      ],
+      [
+        "上下文",
+        337
+      ],
+      [
+        "智体",
+        271
+      ],
+      [
+        "系统",
+        257
+      ],
+      [
+        "任务",
+        239
+      ],
+      [
+        "代码",
+        238
+      ],
+      [
+        "运行",
+        195
+      ],
+      [
+        "问题",
+        184
+      ],
+      [
+        "环境",
+        183
+      ],
+      [
+        "Anthropic",
+        176
+      ],
+      [
+        "状态",
+        175
+      ],
+      [
+        "Engineering",
+        168
+      ],
+      [
+        "设计",
+        166
+      ],
+      [
+        "AI",
+        165
+      ],
+      [
+        "以及",
+        161
+      ],
+      [
+        "模式",
+        160
+      ],
+      [
+        "工作",
+        151
+      ]
+    ],
+    "3_实战案例": [
+      [
+        "Agent",
+        931
+      ],
+      [
+        "Harness",
+        674
+      ],
+      [
+        "AI",
+        637
+      ],
+      [
+        "代码",
+        450
+      ],
+      [
+        "模型",
+        296
+      ],
+      [
+        "工具",
+        285
+      ],
+      [
+        "问题",
+        270
+      ],
+      [
+        "项目",
+        267
+      ],
+      [
+        "任务",
+        258
+      ],
+      [
+        "上下文",
+        233
+      ],
+      [
+        "Engineering",
+        228
+      ],
+      [
+        "需求",
+        228
+      ],
+      [
+        "测试",
+        219
+      ],
+      [
+        "知识",
+        217
+      ],
+      [
+        "流程",
+        216
+      ],
+      [
+        "工程",
+        211
+      ],
+      [
+        "文档",
+        205
+      ],
+      [
+        "团队",
+        199
+      ],
+      [
+        "系统",
+        197
+      ],
+      [
+        "约束",
+        196
+      ]
+    ],
+    "4_特定框架": [
+      [
+        "Agent",
+        480
+      ],
+      [
+        "模型",
+        342
+      ],
+      [
+        "工具",
+        281
+      ],
+      [
+        "任务",
+        262
+      ],
+      [
+        "Harness",
+        260
+      ],
+      [
+        "Claude",
+        220
+      ],
+      [
+        "系统",
+        197
+      ],
+      [
+        "上下文",
+        197
+      ],
+      [
+        "设计",
+        170
+      ],
+      [
+        "文件",
+        169
+      ],
+      [
+        "核心",
+        167
+      ],
+      [
+        "Code",
+        159
+      ],
+      [
+        "AI",
+        152
+      ],
+      [
+        "调用",
+        143
+      ],
+      [
+        "架构",
+        141
+      ],
+      [
+        "运行",
+        139
+      ],
+      [
+        "md",
+        137
+      ],
+      [
+        "OpenClaw",
+        136
+      ],
+      [
+        "用户",
+        131
+      ],
+      [
+        "Engineering",
+        129
+      ]
+    ],
+    "5_面试_岗位": [
+      [
+        "Agent",
+        349
+      ],
+      [
+        "Harness",
+        277
+      ],
+      [
+        "模型",
+        216
+      ],
+      [
+        "AI",
+        212
+      ],
+      [
+        "代码",
+        122
+      ],
+      [
+        "Engineering",
+        120
+      ],
+      [
+        "上下文",
+        116
+      ],
+      [
+        "工具",
+        100
+      ],
+      [
+        "任务",
+        93
+      ],
+      [
+        "问题",
+        84
+      ],
+      [
+        "系统",
+        77
+      ],
+      [
+        "项目",
+        76
+      ],
+      [
+        "信息",
+        75
+      ],
+      [
+        "环境",
+        72
+      ],
+      [
+        "Context",
+        71
+      ],
+      [
+        "核心",
+        65
+      ],
+      [
+        "OpenAI",
+        58
+      ],
+      [
+        "时候",
+        55
+      ],
+      [
+        "约束",
+        52
+      ],
+      [
+        "Prompt",
+        50
+      ]
+    ],
+    "6_概念对比": [
+      [
+        "Agent",
+        246
+      ],
+      [
+        "AI",
+        204
+      ],
+      [
+        "工具",
+        166
+      ],
+      [
+        "3E",
+        138
+      ],
+      [
+        "模型",
+        126
+      ],
+      [
+        "代码",
+        113
+      ],
+      [
+        "3C",
+        92
+      ],
+      [
+        "上下文",
+        79
+      ],
+      [
+        "MCP",
+        78
+      ],
+      [
+        "Engineering",
+        76
+      ],
+      [
+        "Harness",
+        74
+      ],
+      [
+        "任务",
+        74
+      ],
+      [
+        "核心",
+        72
+      ],
+      [
+        "问题",
+        70
+      ],
+      [
+        "调用",
+        67
+      ],
+      [
+        "md",
+        65
+      ],
+      [
+        "能力",
+        60
+      ],
+      [
+        "Skills",
+        58
+      ],
+      [
+        "系统",
+        57
+      ],
+      [
+        "Skill",
+        57
+      ]
+    ],
+    "7_行业趋势": [
+      [
+        "模型",
+        193
+      ],
+      [
+        "Harness",
+        185
+      ],
+      [
+        "AI",
+        167
+      ],
+      [
+        "Engineering",
+        148
+      ],
+      [
+        "Agent",
+        100
+      ],
+      [
+        "系统",
+        94
+      ],
+      [
+        "问题",
+        87
+      ],
+      [
+        "任务",
+        75
+      ],
+      [
+        "而是",
+        74
+      ],
+      [
+        "Prompt",
+        71
+      ],
+      [
+        "代码",
+        63
+      ],
+      [
+        "信息",
+        59
+      ],
+      [
+        "工具",
+        58
+      ],
+      [
+        "结果",
+        54
+      ],
+      [
+        "上下文",
+        53
+      ],
+      [
+        "Context",
+        51
+      ],
+      [
+        "约束",
+        42
+      ],
+      [
+        "设计",
+        42
+      ],
+      [
+        "其实",
+        39
+      ],
+      [
+        "时候",
+        38
+      ]
+    ]
+  },
+  "by_source_top20": {
+    "wechat": [
+      [
+        "Agent",
+        2242
+      ],
+      [
+        "Harness",
+        1769
+      ],
+      [
+        "模型",
+        1494
+      ],
+      [
+        "AI",
+        1417
+      ],
+      [
+        "代码",
+        1028
+      ],
+      [
+        "工具",
+        1023
+      ],
+      [
+        "任务",
+        960
+      ],
+      [
+        "系统",
+        885
+      ],
+      [
+        "Engineering",
+        838
+      ],
+      [
+        "上下文",
+        815
+      ],
+      [
+        "问题",
+        757
+      ],
+      [
+        "设计",
+        590
+      ],
+      [
+        "而是",
+        550
+      ],
+      [
+        "核心",
+        545
+      ],
+      [
+        "工程",
+        501
+      ],
+      [
+        "验证",
+        497
+      ],
+      [
+        "项目",
+        487
+      ],
+      [
+        "运行",
+        472
+      ],
+      [
+        "环境",
+        469
+      ],
+      [
+        "约束",
+        463
+      ]
+    ],
+    "scrapling": [
+      [
+        "Agent",
+        167
+      ],
+      [
+        "Harness",
+        81
+      ],
+      [
+        "模型",
+        76
+      ],
+      [
+        "目标",
+        76
+      ],
+      [
+        "任务",
+        58
+      ],
+      [
+        "核心",
+        46
+      ],
+      [
+        "AI",
+        40
+      ],
+      [
+        "代码",
+        40
+      ],
+      [
+        "能力",
+        32
+      ],
+      [
+        "而是",
+        31
+      ],
+      [
+        "问题",
+        30
+      ],
+      [
+        "阶段",
+        28
+      ],
+      [
+        "运行",
+        27
+      ],
+      [
+        "Engineering",
+        26
+      ],
+      [
+        "调用",
+        25
+      ],
+      [
+        "落地",
+        24
+      ],
+      [
+        "最小",
+        23
+      ],
+      [
+        "边界",
+        22
+      ],
+      [
+        "验证",
+        22
+      ],
+      [
+        "model",
+        21
+      ]
+    ],
+    "scrapling-get": [
+      [
+        "Agent",
+        320
+      ],
+      [
+        "模型",
+        208
+      ],
+      [
+        "Harness",
+        206
+      ],
+      [
+        "工具",
+        142
+      ],
+      [
+        "AI",
+        111
+      ],
+      [
+        "上下文",
+        109
+      ],
+      [
+        "代码",
+        87
+      ],
+      [
+        "系统",
+        72
+      ],
+      [
+        "架构",
+        63
+      ],
+      [
+        "Engineering",
+        59
+      ],
+      [
+        "设计",
+        59
+      ],
+      [
+        "问题",
+        58
+      ],
+      [
+        "实践",
+        58
+      ],
+      [
+        "任务",
+        55
+      ],
+      [
+        "案例",
+        55
+      ],
+      [
+        "服务器",
+        54
+      ],
+      [
+        "文件",
+        53
+      ],
+      [
+        "Claude",
+        50
+      ],
+      [
+        "验证",
+        50
+      ],
+      [
+        "结果",
+        49
+      ]
+    ],
+    "scrapling-stealthy-fetch": [
+      [
+        "Agent",
+        477
+      ],
+      [
+        "AI",
+        366
+      ],
+      [
+        "Harness",
+        234
+      ],
+      [
+        "代码",
+        229
+      ],
+      [
+        "工具",
+        226
+      ],
+      [
+        "模型",
+        171
+      ],
+      [
+        "上下文",
+        158
+      ],
+      [
+        "项目",
+        151
+      ],
+      [
+        "3E",
+        138
+      ],
+      [
+        "问题",
+        118
+      ],
+      [
+        "功能",
+        107
+      ],
+      [
+        "核心",
+        104
+      ],
+      [
+        "文档",
+        104
+      ],
+      [
+        "工作",
+        102
+      ],
+      [
+        "测试",
+        102
+      ],
+      [
+        "MCP",
+        101
+      ],
+      [
+        "任务",
+        99
+      ],
+      [
+        "Engineering",
+        96
+      ],
+      [
+        "3C",
+        92
+      ],
+      [
+        "md",
+        91
+      ]
+    ],
+    "scrapling-fetch": [
+      [
+        "Agent",
+        157
+      ],
+      [
+        "工具",
+        83
+      ],
+      [
+        "任务",
+        58
+      ],
+      [
+        "模型",
+        50
+      ],
+      [
+        "系统",
+        41
+      ],
+      [
+        "代码",
+        41
+      ],
+      [
+        "上下文",
+        39
+      ],
+      [
+        "评测",
+        38
+      ],
+      [
+        "状态",
+        29
+      ],
+      [
+        "调用",
+        29
+      ],
+      [
+        "问题",
+        27
+      ],
+      [
+        "const",
+        25
+      ],
+      [
+        "运行",
+        25
+      ],
+      [
+        "验证",
+        24
+      ],
+      [
+        "AI",
+        24
+      ],
+      [
+        "结果",
+        24
+      ],
+      [
+        "设计",
+        23
+      ],
+      [
+        "提示",
+        23
+      ],
+      [
+        "LLM",
+        22
+      ],
+      [
+        "完整",
+        22
+      ]
+    ]
+  },
+  "articles": [
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/001-Harness-Engineering-的深度解读.md",
+      "title": "Harness Engineering 的深度解读",
+      "category": "1_概念入门",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/x7O7liLhlyuYkuGOE1WrPg",
+      "tokens": 2336
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/002-Harness-Engineering是让-AI-Agent-真正跑稳的那套系统.md",
+      "title": "Harness Engineering：是让 AI Agent 真正跑稳的那套系统",
+      "category": "1_概念入门",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/ta2GJmMsgldwuk7qJP9cWg",
+      "tokens": 1789
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/003-从玩具到生产力用真实项目讲透-AI-Agent-的-Harness-Engine.md",
+      "title": "从玩具到生产力：用真实项目讲透 AI Agent 的 Harness Engineering",
+      "category": "1_概念入门",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/xLdQ9Z3n3SNwaQtmrM28FA",
+      "tokens": 2635
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/004-Harness-Engineering个体进化到组织涌现.md",
+      "title": "Harness Engineering：个体进化到组织涌现",
+      "category": "1_概念入门",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/jCnWvNz-jb1KoExVZN83CQ",
+      "tokens": 1163
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/005-为溪--陈龙Harness-Engineering驾驭AI的工程体系和智能组织.md",
+      "title": "为溪 | 陈龙：Harness Engineering：“驾驭AI”的工程体系和智能组织",
+      "category": "1_概念入门",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/yhffDsb5vayHZnb_eP62Qg",
+      "tokens": 1983
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/006-从-提问-到-驾驭2026-年最值得工程师深挖的新技能Harness-Engin.md",
+      "title": "从 “提问” 到 “驾驭”：2026 年最值得工程师深挖的新技能——Harness Engineering 极简入门指南",
+      "category": "1_概念入门",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/LxJLhjI9O6est7p5tmMKTg",
+      "tokens": 1281
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/007-Spec让-AI-在实现前真正理解问题.md",
+      "title": "Spec：让 AI 在实现前真正理解问题",
+      "category": "1_概念入门",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/kyCzP0VtWH9kUZAxLbxRig",
+      "tokens": 1927
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/008-一文讲透Harness-Engineering即控制论.md",
+      "title": "一文讲透：Harness Engineering即控制论！",
+      "category": "1_概念入门",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/_Yn-PRW2kmoOusUbTbi3vQ",
+      "tokens": 2922
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/009-一文讲透Harness-Engineering.md",
+      "title": "一文讲透Harness Engineering",
+      "category": "1_概念入门",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/XMzbHqU1PPIVD9MCKjMUQA",
+      "tokens": 1406
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/010-两家大厂加九个博主Harness-Engineering-到底是什么这篇全景图帮.md",
+      "title": "两家大厂加九个博主，Harness Engineering 到底是什么？这篇全景图帮你理清",
+      "category": "1_概念入门",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s?search_click_id=1423096459390302536-1779540130363-2327864279&__biz=MzkxODczMTUxNg==&mid=2247487347&idx=1&sn=0c6adac997d6617fd998e12c6875f1fe&chksm=c0b8a4c0f4626751d7b413143333f3e25cbb046debb230327e28aefa5b5cb8b86a6875771ddb&scene=7&key=daf9bdc5abc4e8d00ba022b9cda8352cd1026bce99fbbb2c53f493816b46fccd4a55211dbbe12f6b4326d31333c9228a5d2190f99a6ee9cbc6b877a03160ffe80e47143c205d00c4cde0033261bee5f4ce0d593f7ff4866d624e73dda465fd128726f0c8d2e8d6c599a290cdb142b14ff169a1ace24eefc45290c3675b416adb&ascene=0&uin=NDE5NDI1NzYw&devicetype=UnifiedPCMac&version=f2641702&lang=zh_CN&countrycode=CN&exportkey=n_ChQIAhIQ7W0EyuhC4%2FDPOJ5wNyxM7RLdAQIE97dBBAEAAAAAAHgWDrw8NMEAAAAOpnltbLcz9gKNyK89dVj0gA8RjXrRDKttyFLBUG%2BI3Guvo7jzkoGiB1iQ1pLkXZxLp7HL08%2BWj1G2j4Q9F9OA1Is9y48azk0%2FdTP03knNVUVrOcCK3q0Y1UWxfhYKPrYEb9%2BVBnLrErQd9l6SpJCnp4h8%2Ffqg8HNMukZvVEiJewQ1HHeDet605pBHL6CfZduo3buCvbQ%2FzD7whIbM%2FnmUrzGy7iwjhqIL1P%2FNI8b9JaLKlhXgZjebzvKtbRSfmHvTFJDxkJaU&acctmode=0&pass_ticket=4r0GpUAiODu6qWJULSyJ7Wq%2FavffBKbTVcjLvDzjrjyK40s1Eqgvv3TQDtJLRhuW&wx_header=0",
+      "tokens": 589
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/011-从玩具到生产力用真实项目讲透-AI-Agent-的-Harness-Engine.md",
+      "title": "从玩具到生产力：用真实项目讲透 AI Agent 的 Harness Engineering",
+      "category": "1_概念入门",
+      "source": "scrapling",
+      "host": "developer.aliyun.com",
+      "url": "https://developer.aliyun.com/article/1730240",
+      "tokens": 2625
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/012-4-Real-Cases--Harness-Engineering-is-Bec.md",
+      "title": "4 Real Cases | Harness Engineering is Becoming the New Moat",
+      "category": "1_概念入门",
+      "source": "scrapling",
+      "host": "www.alibabacloud.com",
+      "url": "https://www.alibabacloud.com/blog/602970",
+      "tokens": 2376
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/013-Agent工程化逻辑跑通运行只是起点复用观测与评测才是关键.md",
+      "title": "Agent工程化逻辑：跑通运行只是起点，复用、观测与评测才是关键",
+      "category": "1_概念入门",
+      "source": "scrapling",
+      "host": "www.toutiao.com",
+      "url": "https://www.toutiao.com/article/7642541503461474816/?log_from=2174912aa42798_1779541069663",
+      "tokens": 1512
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/014-Harness-EngineeringAI-能在真正出事会炸的后端系统里写代码吗.md",
+      "title": "Harness Engineering：AI 能在真正\\\"出事会炸\\\"的后端系统里写代码吗？",
+      "category": "1_概念入门",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/VJgVPeJ5GZhVwbRtneEk_Q",
+      "tokens": 2554
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/015-别让AI瞎猜了用Harness-Engineering-终结无限返工.md",
+      "title": "别让AI瞎猜了：用Harness Engineering 终结无限返工",
+      "category": "1_概念入门",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/AFX_qsyAPBRYyqEV365O9Q",
+      "tokens": 3405
+    },
+    {
+      "path": "wiki/raw/harness-engineering/2_深度解析/001-智体Harness工程综述上.md",
+      "title": "智体Harness工程：综述（上）",
+      "category": "2_深度解析",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/yjYpJywNKLNMc_KKA8878A",
+      "tokens": 8390
+    },
+    {
+      "path": "wiki/raw/harness-engineering/2_深度解析/002-智体Harness工程综述下.md",
+      "title": "智体Harness工程：综述（下）",
+      "category": "2_深度解析",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/uZoN5ml8OPQmpOAAUPQQjg",
+      "tokens": 7579
+    },
+    {
+      "path": "wiki/raw/harness-engineering/2_深度解析/003-Harness-Engineering-深度解析.md",
+      "title": "Harness Engineering 深度解析",
+      "category": "2_深度解析",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/9LbrNjuGcP8whDihn47cpA",
+      "tokens": 2886
+    },
+    {
+      "path": "wiki/raw/harness-engineering/2_深度解析/004-Agent-开发工程化深度解析从-Tool-Calling-到-HarnessM.md",
+      "title": "Agent 开发工程化深度解析：从 Tool Calling 到 Harness、Memory、Hooks 与结构化 Observation",
+      "category": "2_深度解析",
+      "source": "scrapling-get",
+      "host": "blog.csdn.net",
+      "url": "https://blog.csdn.net/weixin_42001184/article/details/161228774?spm=1001.2014.3001.5502",
+      "tokens": 4778
+    },
+    {
+      "path": "wiki/raw/harness-engineering/2_深度解析/005-深度解析Harness-Engineering.md",
+      "title": "深度解析：Harness Engineering",
+      "category": "2_深度解析",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/-mgf8K7XZrTKoD0pMOIn3w",
+      "tokens": 3499
+    },
+    {
+      "path": "wiki/raw/harness-engineering/2_深度解析/006-万字干货理解-Harness-Engineering看这一篇就够了.md",
+      "title": "万字干货：理解 Harness Engineering，看这一篇就够了",
+      "category": "2_深度解析",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/MzB8-B00GVdJy22j42CRgg",
+      "tokens": 2484
+    },
+    {
+      "path": "wiki/raw/harness-engineering/2_深度解析/007-62页论文Harness-Engineering最新综述与模型协同训练是更强Ag.md",
+      "title": "62页论文！Harness Engineering最新综述：与模型协同训练是更强Agent的关键范式",
+      "category": "2_深度解析",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/kiztQmmRy_9tq085YnESUQ",
+      "tokens": 2154
+    },
+    {
+      "path": "wiki/raw/harness-engineering/2_深度解析/008-万字讲透Agent-Harness的十二大模块.md",
+      "title": "万字讲透Agent Harness的十二大模块",
+      "category": "2_深度解析",
+      "source": "scrapling-get",
+      "host": "www.53ai.com",
+      "url": "https://www.53ai.com/news/langchain/2026041962051.html",
+      "tokens": 3040
+    },
+    {
+      "path": "wiki/raw/harness-engineering/2_深度解析/009-Harness-Engineering-深度解析AI-Agent-时代的工程范式.md",
+      "title": "Harness Engineering 深度解析：AI Agent 时代的工程范式革命",
+      "category": "2_深度解析",
+      "source": "scrapling-stealthy-fetch",
+      "host": "zhuanlan.zhihu.com",
+      "url": "https://zhuanlan.zhihu.com/p/2014014859164026634",
+      "tokens": 8496
+    },
+    {
+      "path": "wiki/raw/harness-engineering/3_实战案例/001-Harness不是目的知识才是护城河--一个AI工程交付团队的知识沉淀实践.md",
+      "title": "Harness不是目的，知识才是护城河 —— 一个AI工程交付团队的知识沉淀实践",
+      "category": "3_实战案例",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/JV4-oPP0jjsBCZ4tW3Gy1g",
+      "tokens": 2944
+    },
+    {
+      "path": "wiki/raw/harness-engineering/3_实战案例/002-Harness-Engineering驾驭工程最佳实践深度解析.md",
+      "title": "Harness Engineering（驾驭工程）最佳实践深度解析",
+      "category": "3_实战案例",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/lKGozZDqlzwnQwyU3s3aOg",
+      "tokens": 931
+    },
+    {
+      "path": "wiki/raw/harness-engineering/3_实战案例/003-QQ音乐Harness-Engineering实践.md",
+      "title": "QQ音乐Harness Engineering实践",
+      "category": "3_实战案例",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/yw3DvqKBIV5fIZkSG12zdA",
+      "tokens": 3828
+    },
+    {
+      "path": "wiki/raw/harness-engineering/3_实战案例/004-Harness-Engineering耗时一周我是如何将应用的AI-Coding.md",
+      "title": "Harness Engineering：耗时一周，我是如何将应用的AI Coding率提升至90%的",
+      "category": "3_实战案例",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/rlIyIIZOXFObNIXbPI7gDg",
+      "tokens": 3544
+    },
+    {
+      "path": "wiki/raw/harness-engineering/3_实战案例/005-万字深度AI-智能体-Harness-Engineering-全架构与工程最佳实.md",
+      "title": "万字深度｜AI 智能体 Harness Engineering 全架构与工程最佳实践",
+      "category": "3_实战案例",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/mm_diqYGcEFcpAhuZiuTmw",
+      "tokens": 5854
+    },
+    {
+      "path": "wiki/raw/harness-engineering/3_实战案例/006-看完这篇彻底搞懂-Harness-Engineering概念原理架构最佳实践全解.md",
+      "title": "看完这篇，彻底搞懂 Harness Engineering：概念、原理、架构、最佳实践全解析",
+      "category": "3_实战案例",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/45A6xKJo3RE2A2WmCPrDAg",
+      "tokens": 1474
+    },
+    {
+      "path": "wiki/raw/harness-engineering/3_实战案例/007-傻子可懂的-Harness-Engineering-入门教程--项目实战一次搞懂.md",
+      "title": "傻子可懂的 Harness Engineering 入门教程 + 项目实战，一次搞懂 AI 编程工程化！",
+      "category": "3_实战案例",
+      "source": "scrapling-stealthy-fetch",
+      "host": "zhuanlan.zhihu.com",
+      "url": "https://zhuanlan.zhihu.com/p/2031711852749639764",
+      "tokens": 3510
+    },
+    {
+      "path": "wiki/raw/harness-engineering/3_实战案例/008-一文搞懂-Harness-Engineering六层架构上下文管理与一线团队实战.md",
+      "title": "一文搞懂 Harness Engineering：六层架构、上下文管理与一线团队实战",
+      "category": "3_实战案例",
+      "source": "scrapling-get",
+      "host": "javaguide.cn",
+      "url": "https://javaguide.cn/ai/agent/harness-engineering.html",
+      "tokens": 2992
+    },
+    {
+      "path": "wiki/raw/harness-engineering/3_实战案例/009-Harness-Engineering-实战模型是-AI-Agent-里最不重要.md",
+      "title": "Harness Engineering 实战：模型是 AI Agent 里最不重要的部分（60 天管线复盘）",
+      "category": "3_实战案例",
+      "source": "scrapling-get",
+      "host": "www.heyuan110.com",
+      "url": "https://www.heyuan110.com/zh/posts/ai/2026-03-30-harness-engineering-guide/",
+      "tokens": 2205
+    },
+    {
+      "path": "wiki/raw/harness-engineering/3_实战案例/010-驾驭工程Harness-Engineering实践落地案例剖析.md",
+      "title": "驾驭工程(Harness Engineering)实践落地案例剖析",
+      "category": "3_实战案例",
+      "source": "scrapling-get",
+      "host": "www.51cto.com",
+      "url": "https://www.51cto.com/aigc/11114.html",
+      "tokens": 2207
+    },
+    {
+      "path": "wiki/raw/harness-engineering/3_实战案例/011-你不知道的-Agent原理架构与工程实践.md",
+      "title": "你不知道的 Agent：原理、架构与工程实践",
+      "category": "3_实战案例",
+      "source": "scrapling-fetch",
+      "host": "developer.aliyun.com",
+      "url": "https://developer.aliyun.com/article/1732637",
+      "tokens": 5414
+    },
+    {
+      "path": "wiki/raw/harness-engineering/3_实战案例/012-万字干货Harness-Engineering如何工程化落地.md",
+      "title": "万字干货！Harness Engineering如何工程化落地？",
+      "category": "3_实战案例",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/77dyufF3MP8stHPS0BApNw",
+      "tokens": 7766
+    },
+    {
+      "path": "wiki/raw/harness-engineering/4_特定框架/001-来自字节跳动TRAE的Harness-Engineering指南.md",
+      "title": "来自字节跳动TRAE的Harness Engineering指南",
+      "category": "4_特定框架",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/xBNtHjseMomMA-aOQyOrJg",
+      "tokens": 2023
+    },
+    {
+      "path": "wiki/raw/harness-engineering/4_特定框架/002-全球排名前三复旦等开源AHE框架自进化Harness-Engineering让G.md",
+      "title": "全球排名前三！复旦等开源AHE框架，自进化Harness Engineering让GPT‑5.4再涨7个点",
+      "category": "4_特定框架",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/WfCxSuZHyyuUjVUYcNJc5g",
+      "tokens": 1367
+    },
+    {
+      "path": "wiki/raw/harness-engineering/4_特定框架/003-Harness-顶级架构DeerFlow-20-沙盒-Sandbox-架构设计源.md",
+      "title": "Harness 顶级架构：DeerFlow 2.0 沙盒 Sandbox 架构设计、源码深度解析（史上最深 、价值 逆天）",
+      "category": "4_特定框架",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/DyKv0rmmmSrk-Ao6wUvoeA",
+      "tokens": 4245
+    },
+    {
+      "path": "wiki/raw/harness-engineering/4_特定框架/004-DeerFlow-20-开源升级依托-Harness让-Agent-不再半途而废.md",
+      "title": "DeerFlow 2.0 开源升级：依托 Harness，让 Agent 不再\\\"半途而废\\",
+      "category": "4_特定框架",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/vQK6DpMTpXGX58z_djXnrg",
+      "tokens": 1219
+    },
+    {
+      "path": "wiki/raw/harness-engineering/4_特定框架/005-DeerFlow-20字节跳动开源的-Super-Agent-Harness-到.md",
+      "title": "DeerFlow 2.0：字节跳动开源的 Super Agent Harness 到底强在哪？",
+      "category": "4_特定框架",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/OBJa0RPEvVY0pHNC4SXkdA",
+      "tokens": 441
+    },
+    {
+      "path": "wiki/raw/harness-engineering/4_特定框架/006-精通-Harness架构-DeerFlow-20-的-lead_agent-任务.md",
+      "title": "精通 Harness架构 ：DeerFlow 2.0 的   lead_agent 任务总调度 架构设计与实现解析",
+      "category": "4_特定框架",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/oaVmRaFT9OCEYQRk711Qkg",
+      "tokens": 3793
+    },
+    {
+      "path": "wiki/raw/harness-engineering/4_特定框架/007-2小时速通-Harness-工程如何从零搭一套Claude-Code智能体系统.md",
+      "title": "2小时速通 Harness 工程：如何从零搭一套Claude Code智能体系统",
+      "category": "4_特定框架",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/WTD0TEKn0h_vjgNR1WGSxQ",
+      "tokens": 1084
+    },
+    {
+      "path": "wiki/raw/harness-engineering/4_特定框架/008-ClaudeCode-Harness-Engineering驾驭者工程的最佳实践.md",
+      "title": "ClaudeCode-Harness Engineering驾驭者工程的最佳实践者",
+      "category": "4_特定框架",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/nfYXMupTyRo_ujYd5AEYiQ",
+      "tokens": 3082
+    },
+    {
+      "path": "wiki/raw/harness-engineering/4_特定框架/009-深度解析-OpenClaw-在-Prompt--Context--Harness.md",
+      "title": "深度解析 OpenClaw 在 Prompt / Context / Harness 三个维度中的设计哲学与实践",
+      "category": "4_特定框架",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/JycTfNd7EnmWCnJK-QCf0Q",
+      "tokens": 5872
+    },
+    {
+      "path": "wiki/raw/harness-engineering/4_特定框架/010-深度解析-Claude-Code-在-Prompt--Context--Harn.md",
+      "title": "深度解析 Claude Code 在 Prompt / Context / Harness 的设计与实践",
+      "category": "4_特定框架",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/YgGW92VBP8s846yzIxjVWQ",
+      "tokens": 7631
+    },
+    {
+      "path": "wiki/raw/harness-engineering/4_特定框架/011-深度解析-Hermes-Agent-如何实现自进化及其-Prompt--Cont.md",
+      "title": "深度解析 Hermes Agent 如何实现“自进化”及其 Prompt / Context / Harness 的设计实践",
+      "category": "4_特定框架",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/2xFei8dMx99lc-iyrZZrww",
+      "tokens": 5247
+    },
+    {
+      "path": "wiki/raw/harness-engineering/5_面试_岗位/001-26年AI产品经理为什么必须掌握Harness-Engineering.md",
+      "title": "26年AI产品经理为什么必须掌握Harness Engineering？",
+      "category": "5_面试_岗位",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/XP8Vbp2mevYTs0bQNnoAzw",
+      "tokens": 1140
+    },
+    {
+      "path": "wiki/raw/harness-engineering/5_面试_岗位/002-鹅厂面试官你用过-Harness-Engineering-吗-我冷笑这不是-22.md",
+      "title": "鹅厂面试官：“你用过 Harness Engineering 吗？” 我冷笑：“这不是 22 年的技术么？” 他激动了：明天入职！",
+      "category": "5_面试_岗位",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/qdTXCvMA4yI9mTuQv8Zq6A",
+      "tokens": 1793
+    },
+    {
+      "path": "wiki/raw/harness-engineering/5_面试_岗位/003-鹅厂面试官你怎么看-Harness-Engineering-我就是给大模型套缰绳.md",
+      "title": "鹅厂面试官：“你怎么看 Harness Engineering？” 我：“就是给大模型套缰绳” 他拍桌：终于有人说明白了",
+      "category": "5_面试_岗位",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/9cKWyTcK-BORuyn1JK4Ysw",
+      "tokens": 4880
+    },
+    {
+      "path": "wiki/raw/harness-engineering/5_面试_岗位/004-面试官Harness-Engineering-到底是什么你的项目用了吗.md",
+      "title": "面试官：“Harness Engineering 到底是什么？你的项目用了吗？”",
+      "category": "5_面试_岗位",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/2ISTUyHIyFPwraUBEtmjgQ",
+      "tokens": 1932
+    },
+    {
+      "path": "wiki/raw/harness-engineering/5_面试_岗位/005-字节面试官拷打我是否了解Harness-Engineering我笑了LLM很强但.md",
+      "title": "字节面试官拷打我：“是否了解Harness Engineering？”，我笑了：“LLM很强，但如果不能拴住、监测、约束，都白搭”。面试官一直在点头。",
+      "category": "5_面试_岗位",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/PHHs1dcdBbilNGQ-YN_Nsw",
+      "tokens": 2984
+    },
+    {
+      "path": "wiki/raw/harness-engineering/6_概念对比/001-HarnessSDD终结AI编程的Vibe-Coding时代.md",
+      "title": "Harness+SDD：终结AI编程的Vibe Coding时代",
+      "category": "6_概念对比",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/tEp0IzNU3pOpFbevNjngVQ",
+      "tokens": 771
+    },
+    {
+      "path": "wiki/raw/harness-engineering/6_概念对比/002-告别氛围编程基于-Harness-治理和-SDD-的团队级-AI-研发范式演进与.md",
+      "title": "告别“氛围编程”：基于 Harness 治理和 SDD 的团队级 AI 研发范式演进与实践",
+      "category": "6_概念对比",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/-_IBJFuXpvoqMJxL9oaEJQ",
+      "tokens": 1475
+    },
+    {
+      "path": "wiki/raw/harness-engineering/6_概念对比/003-从-Prompt-Engineering-到-Context-Engineeri.md",
+      "title": "从 Prompt Engineering 到 Context Engineering",
+      "category": "6_概念对比",
+      "source": "scrapling-stealthy-fetch",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s?__biz=MzIzNjE2NTI3NQ==&mid=2247491129&idx=1&sn=451107b90247a2f8ae5aaacca3804328&scene=21#wechat_redirect",
+      "tokens": 6318
+    },
+    {
+      "path": "wiki/raw/harness-engineering/6_概念对比/004-Agent-趋势浅思原生化--CLI-化.md",
+      "title": "Agent 趋势浅思：原生化 & CLI 化",
+      "category": "6_概念对比",
+      "source": "scrapling-stealthy-fetch",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s?__biz=MzIzNjE2NTI3NQ==&mid=2247491501&idx=1&sn=8a27caa2edd9148a71699021da0c70e3&scene=21#wechat_redirect",
+      "tokens": 1212
+    },
+    {
+      "path": "wiki/raw/harness-engineering/6_概念对比/005-一文搞懂-AI-Agent-核心概念Agent-LoopContext-Engi.md",
+      "title": "一文搞懂 AI Agent 核心概念：Agent Loop、Context Engineering、Tools 注册",
+      "category": "6_概念对比",
+      "source": "scrapling-stealthy-fetch",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s?__biz=Mzg2OTA0Njk0OA==&mid=2247552979&idx=1&sn=d13c59f631a26d3e4ba35fe5d2fe06ff&scene=21#wechat_redirect",
+      "tokens": 1846
+    },
+    {
+      "path": "wiki/raw/harness-engineering/6_概念对比/006-万字详解-Agent-核心方式-ReActReflectionA2AAgenti.md",
+      "title": "万字详解 Agent 核心方式： ReAct、Reflection、A2A、Agentic Workflows",
+      "category": "6_概念对比",
+      "source": "scrapling-stealthy-fetch",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s?__biz=Mzg2OTA0Njk0OA==&mid=2247553026&idx=1&sn=158a1c17cc7ac0dabc39327764ac312f&scene=21#wechat_redirect",
+      "tokens": 1890
+    },
+    {
+      "path": "wiki/raw/harness-engineering/6_概念对比/007-一文讲透Agentic-Engineering与Harness-Engineer.md",
+      "title": "一文讲透Agentic Engineering与Harness Engineering",
+      "category": "6_概念对比",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s?search_click_id=1423096459390302536-1779540143776-6179472582&__biz=MzAxMjYyMzcwNA==&mid=2247492425&idx=1&sn=7e8972006e17ce5149ba041975b4b82e&chksm=9a703f7a09fee6a9ecf8b1204df1de3ca9937a8c778930a078227349a31bcbad119d10a06f41&scene=7&key=daf9bdc5abc4e8d08935bc80cd8b80a0594c8a5608e06df275cd281c08ad14c477185949036934cd8607a3aca0104b32755b4cdff0569ec17302327109bcc8b8fa31652ac501e9774a00d0288f6b4a3f047e9e78bd9ff6d8a126fcb4317406957e09454f34fc83ccf796a93747be1df7aaf5b7f3d658db073a6faa99b64aeebe&ascene=0&uin=NDE5NDI1NzYw&devicetype=UnifiedPCMac&version=f2641702&lang=zh_CN&countrycode=CN&exportkey=n_ChQIAhIQ8%2BYkeZ%2Bl3Pz1UGJUtZVNVxLdAQIE97dBBAEAAAAAAJuFL5EQYI4AAAAOpnltbLcz9gKNyK89dVj0rB21hDPHTftHKuJJ27Yh6wBUhb%2Bih0xfQaBhK8zyIH7zDn3X5HjBugkHGqbO1%2FSUwuZWBAB6VI5KU49RtQC3bCusnIkrj%2BjKgWi7KW%2BXxTd6aueGL9p6I0X94E6AD%2F3iq0dvLv4fvbLOpE8dj72b9SKDMuWhD1ZRIfk4lEkDdwmq4lKOq1NJmuWHQOgVwekAywOAeJSPWQ6EbN27OFZdI6huaAU10%2BI9oUyfoKxB%2BdE%2FYG0TBzSQ&acctmode=0&pass_ticket=CT8MT8X3zQOI7WsKW2jMixSigpBdntvzytTeaI1b1cofpOLvLb9LjUrNZG4f%2FSZx&wx_header=0",
+      "tokens": 863
+    },
+    {
+      "path": "wiki/raw/harness-engineering/6_概念对比/008-提示词工程上下文工程都过时了现在是-Harness-Engineering-的时.md",
+      "title": "提示词工程、上下文工程都过时了，现在是 Harness Engineering 的时代",
+      "category": "6_概念对比",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/mitKxUx9RIv8mo5T8eCHhg",
+      "tokens": 2001
+    },
+    {
+      "path": "wiki/raw/harness-engineering/7_行业趋势/001-一文带你看懂火爆全网的Harness-Engineering到底是个啥.md",
+      "title": "一文带你看懂，火爆全网的Harness Engineering到底是个啥。",
+      "category": "7_行业趋势",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/yI1rQHVwJqszdpadzAe_4A",
+      "tokens": 1568
+    },
+    {
+      "path": "wiki/raw/harness-engineering/7_行业趋势/002-Harness-Engineering-在硅谷彻底火了.md",
+      "title": "Harness Engineering 在硅谷彻底火了。",
+      "category": "7_行业趋势",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/S2x7pJ2RqLk9tQdqxpzQNQ",
+      "tokens": 862
+    },
+    {
+      "path": "wiki/raw/harness-engineering/7_行业趋势/003-Harness-Engineering在硅谷爆火一文带你搞懂.md",
+      "title": "Harness Engineering在硅谷爆火，一文带你搞懂！",
+      "category": "7_行业趋势",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/1-bPS2omne-tncLTPm5N7A",
+      "tokens": 757
+    },
+    {
+      "path": "wiki/raw/harness-engineering/7_行业趋势/004-一文带你弄懂-AI-圈爆火的新概念Harness-Engineering.md",
+      "title": "一文带你弄懂 AI 圈爆火的新概念：Harness Engineering",
+      "category": "7_行业趋势",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s/gs5ndvlMqM-Y4jg1_D2aFw",
+      "tokens": 3065
+    },
+    {
+      "path": "wiki/raw/harness-engineering/7_行业趋势/005-一文详解AI圈爆火概念Harness-Engineering决定智能体系统上限的.md",
+      "title": "一文详解AI圈爆火概念—Harness Engineering：决定智能体系统上限的关键因素",
+      "category": "7_行业趋势",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s?search_click_id=1423096459390302536-1779540114711-4583058051&__biz=Mzk3NTA2OTMxNQ==&mid=2247485987&idx=1&sn=f08efda3a65bf9d051a6e36a34844353&chksm=c5a6873409486ccc4195c3ab638536fa62bfdca000067fe47387099345528d054f725947cce9&scene=7&key=daf9bdc5abc4e8d0ce00269f3182ae38aeb96ca46bf09a5f6365c3cc4efc075c9634d4c9d9dac80934c1444dea93dd74c672493014de19a2c49ba59d7f667d83b4157ff5059f8ff3ed2caeb4f72339c78377f4cb00eacdafe29b938cb2e6e4318e5e64046b94caff1548f3c7fcb0d4e7c7fae1ca20b004b02e5b8b5b02932133&ascene=0&uin=NDE5NDI1NzYw&devicetype=UnifiedPCMac&version=f2641702&lang=zh_CN&countrycode=CN&exportkey=n_ChQIAhIQt1nJy1doZKTddWMPX%2BQawhLdAQIE97dBBAEAAAAAANnvE6uaW2YAAAAOpnltbLcz9gKNyK89dVj0i6t6ixbT4Muu74yx74HnF19ru1bRNLAwoc4ukm7%2FvcUzSZy8nnArP0q%2FScqh1JhEQBCNCCYG3QtyobG9xDuytixlMIwBEIh0mKg9qSZETV1yiReQAsKv3oBAub6MCLq7d7m75pkQow0KT5mOxJhnDtXaJiOQUMMRRag%2B9f7jBXxZnjNc%2BrwUd1VWeTpHH8iv3bbr3AwXd4mimqdzvibkwlRK0RiynZ488DeeqBmt746kwo%2FtSzWh&acctmode=0&pass_ticket=m6pq8kauP38rrQaKRqy0Svo6Jca18dDKYGM%2F3VR2bd%2Fru0x6KRLTpyM3YzoALy0X&wx_header=0",
+      "tokens": 1575
+    },
+    {
+      "path": "wiki/raw/harness-engineering/7_行业趋势/006-一篇文章告诉你最近爆火的Harness-Engineering究竟是什么.md",
+      "title": "一篇文章告诉你：最近爆火的Harness Engineering究竟是什么？",
+      "category": "7_行业趋势",
+      "source": "wechat",
+      "host": "mp.weixin.qq.com",
+      "url": "https://mp.weixin.qq.com/s?search_click_id=1423096459390302536-1779540147654-2505655115&__biz=MzkxNzU3MjM3Ng==&mid=2247489081&idx=1&sn=b581a64f36f24cafd66c42d4d41d7b19&chksm=c07c477bb1c5d0888dac295e490cb6d79297b3512211088bf08ab012bc62333b1d3fbaa58589&scene=7&key=daf9bdc5abc4e8d00ef10ecc586ac15181b70dbc2c3c039b073c78a2147be4a8151ce723dd83f8462fcdf33528fc6a48436de8546cdbc40fe2f8a60a0b124bbf7d549162e265acef40f8239ba6459f50c07399980d8d28e7f8e5427ace8e0fd963bded8b5dfb278d2a87629e01ab45f38752d4c866aabd1b772cc571fb6fd732&ascene=0&uin=NDE5NDI1NzYw&devicetype=UnifiedPCMac&version=f2641702&lang=zh_CN&countrycode=CN&exportkey=n_ChQIAhIQdBJXWDCSiSfitth0npcw7RLdAQIE97dBBAEAAAAAACJiOAQdso0AAAAOpnltbLcz9gKNyK89dVj0AMV%2FXe0gFMiOxnWf3t052JkZDei2fkZ0gOyrZfpGPjDPlOxFJkmCbIu2TuLD7Ucbxkic749Wwgryj%2BPUx%2F251bfdMwG9DFvLFEEwIfG6Hw5Vbm7ctzvRSDRIX6eItKtqS3rdoNMz1mu7aVhIVzNtztI5nRXMPvZ6C2Ou3W4ehPmI2iZVXl5NA2Q04FSNo2Br4dgR0lX7z8m%2BM5thLVk8VSQwPLvuBku%2BV9oJ4bRSGoJkksOmn8rr&acctmode=0&pass_ticket=wvS9g6YCxrauN9JL8bgtlan%2BTbCn7RVokrnoEXhJDCKOaEmfa8sRftmUiiD%2Bd6Pc&wx_header=0",
+      "tokens": 618
+    }
+  ]
+}

@@ -212,6 +212,16 @@ DeepSeek Harness 团队的真正机会不是"再做一个 Claude Code"，而是*
 
 ---
 
+## 附录 A:中文社区数据校验 (2026 Q1)
+
+> 基于 `wiki/raw/harness-engineering/` 63 篇中文社区文章 + `wiki/analysis/entity-scan.md`,本节用一手中文语料交叉验证本报告论点。详见战略备忘录 [community-divergence/report.md](../community-divergence/report.md)。
+
+**A.1 渐进式披露的中文社区共识**:Skills/MCP 的"按需加载"在中文 63 篇中 DF=22 (35%),TF=54——22 篇专门讨论这一调度策略。其中字节系 (DeerFlow / TRAE)、阿里、腾讯云开发者公众号都将其作为 Harness 工程化的一等公民。**这强支撑本报告 §3 关于"工具数量与调度成本取舍"的论点**——中文工程社区已有同向共识,DeepSeek 不需要从头教育,直接发布渐进式披露的 Skill 协议即可。
+
+**A.2 MCP 接受度数据**:中文社区 MCP DF=44%,Skills DF=65%。两个协议层在中文工程语境里已成熟到可以无解释引用。**对 DeepSeek 的启示**:不需要用一篇白皮书解释什么是 MCP/Skill,直接给出 DeepSeek-flavored 实现即可。教育成本已被 Anthropic + 中文社区共同付清。
+
+---
+
 ## 致谢与方法论
 
 数据来源: 26 个 Agent 产品的 wiki/compiled 数据集，基于 Karpathy LLM Wiki 模式 +

@@ -179,6 +179,16 @@ Context Engineering 的演进路径已经从「`.cursorrules` 的一行说明」
 
 ---
 
+## 附录 A:中文社区数据校验 (2026 Q1)
+
+> 基于 `wiki/raw/harness-engineering/` 63 篇中文社区文章 + `wiki/analysis/entity-scan.md`,本节用一手中文语料交叉验证本报告论点。详见战略备忘录 [community-divergence/report.md](../community-divergence/report.md)。
+
+**A.1 概念边界模糊**:中文社区"上下文窗口"DF=43 (68%) 与"上下文工程"DF=42 (67%) 几乎等同提及——绝大多数中文文章把"扩大窗口"和"工程化上下文"概念混用。这反映 Manus 一手博客 (*Lessons from Building Manus*) 的核心论点——**上下文工程 ≠ 长窗口**——在中文社区还没有完成传播。
+
+**A.2 对 DeepSeek 的隐藏含义**:中文文档需要主动消歧"context window (模型层属性)"和"context engineering (产品层方法)"。两个概念混用会让中国开发者只关心 KV-Cache 优化和窗口扩展,忽视 Manus 式的文件系统 + 渐进式披露策略——而后者才是真正的差异化空间。
+
+---
+
 ## 致谢与方法论
 
 数据来源: 26 个 Agent 产品的 wiki/compiled 数据集，基于 Karpathy LLM Wiki 模式 +

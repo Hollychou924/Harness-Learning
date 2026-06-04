@@ -1,0 +1,2466 @@
+{
+  "total_articles": 66,
+  "entities": {
+    "Harness Engineering": {
+      "tf": 827,
+      "df": 56,
+      "df_pct": 84.8,
+      "by_category": {
+        "1_概念入门": 144,
+        "2_深度解析": 149,
+        "3_实战案例": 244,
+        "4_特定框架": 92,
+        "5_面试_岗位": 75,
+        "6_概念对比": 38,
+        "7_行业趋势": 85
+      }
+    },
+    "Harness": {
+      "tf": 2279,
+      "df": 61,
+      "df_pct": 92.4,
+      "by_category": {
+        "1_概念入门": 356,
+        "2_深度解析": 469,
+        "3_实战案例": 780,
+        "4_特定框架": 186,
+        "5_面试_岗位": 270,
+        "6_概念对比": 73,
+        "7_行业趋势": 145
+      }
+    },
+    "Agent": {
+      "tf": 3114,
+      "df": 64,
+      "df_pct": 97.0,
+      "by_category": {
+        "1_概念入门": 339,
+        "2_深度解析": 782,
+        "3_实战案例": 963,
+        "4_特定框架": 381,
+        "5_面试_岗位": 323,
+        "6_概念对比": 244,
+        "7_行业趋势": 82
+      }
+    },
+    "AI Agent": {
+      "tf": 142,
+      "df": 39,
+      "df_pct": 59.1,
+      "by_category": {
+        "1_概念入门": 31,
+        "2_深度解析": 30,
+        "3_实战案例": 36,
+        "4_特定框架": 3,
+        "5_面试_岗位": 13,
+        "6_概念对比": 23,
+        "7_行业趋势": 6
+      }
+    },
+    "Coding Agent": {
+      "tf": 83,
+      "df": 22,
+      "df_pct": 33.3,
+      "by_category": {
+        "1_概念入门": 8,
+        "2_深度解析": 36,
+        "3_实战案例": 25,
+        "4_特定框架": 8,
+        "5_面试_岗位": 3,
+        "6_概念对比": 3
+      }
+    },
+    "Sub-agent": {
+      "tf": 218,
+      "df": 29,
+      "df_pct": 43.9,
+      "by_category": {
+        "1_概念入门": 11,
+        "2_深度解析": 37,
+        "3_实战案例": 59,
+        "4_特定框架": 100,
+        "5_面试_岗位": 5,
+        "6_概念对比": 6
+      }
+    },
+    "MCP": {
+      "tf": 259,
+      "df": 29,
+      "df_pct": 43.9,
+      "by_category": {
+        "1_概念入门": 9,
+        "2_深度解析": 78,
+        "3_实战案例": 71,
+        "4_特定框架": 19,
+        "5_面试_岗位": 13,
+        "6_概念对比": 69
+      }
+    },
+    "Skills": {
+      "tf": 502,
+      "df": 44,
+      "df_pct": 66.7,
+      "by_category": {
+        "1_概念入门": 40,
+        "2_深度解析": 25,
+        "3_实战案例": 162,
+        "4_特定框架": 90,
+        "5_面试_岗位": 20,
+        "6_概念对比": 159,
+        "7_行业趋势": 6
+      }
+    },
+    "Spec": {
+      "tf": 193,
+      "df": 13,
+      "df_pct": 19.7,
+      "by_category": {
+        "1_概念入门": 150,
+        "2_深度解析": 2,
+        "3_实战案例": 23,
+        "4_特定框架": 1,
+        "5_面试_岗位": 2,
+        "6_概念对比": 15
+      }
+    },
+    "SDD": {
+      "tf": 66,
+      "df": 8,
+      "df_pct": 12.1,
+      "by_category": {
+        "1_概念入门": 27,
+        "3_实战案例": 8,
+        "5_面试_岗位": 3,
+        "6_概念对比": 28
+      }
+    },
+    "Context Engineering": {
+      "tf": 276,
+      "df": 45,
+      "df_pct": 68.2,
+      "by_category": {
+        "1_概念入门": 20,
+        "2_深度解析": 58,
+        "3_实战案例": 45,
+        "4_特定框架": 34,
+        "5_面试_岗位": 46,
+        "6_概念对比": 38,
+        "7_行业趋势": 35
+      }
+    },
+    "Prompt Engineering": {
+      "tf": 189,
+      "df": 41,
+      "df_pct": 62.1,
+      "by_category": {
+        "1_概念入门": 19,
+        "2_深度解析": 26,
+        "3_实战案例": 22,
+        "4_特定框架": 36,
+        "5_面试_岗位": 31,
+        "6_概念对比": 16,
+        "7_行业趋势": 39
+      }
+    },
+    "Tool Use": {
+      "tf": 194,
+      "df": 41,
+      "df_pct": 62.1,
+      "by_category": {
+        "1_概念入门": 20,
+        "2_深度解析": 69,
+        "3_实战案例": 34,
+        "4_特定框架": 51,
+        "5_面试_岗位": 7,
+        "6_概念对比": 10,
+        "7_行业趋势": 3
+      }
+    },
+    "ReAct": {
+      "tf": 50,
+      "df": 17,
+      "df_pct": 25.8,
+      "by_category": {
+        "1_概念入门": 2,
+        "2_深度解析": 10,
+        "3_实战案例": 2,
+        "4_特定框架": 4,
+        "5_面试_岗位": 4,
+        "6_概念对比": 28
+      }
+    },
+    "Reflection": {
+      "tf": 49,
+      "df": 12,
+      "df_pct": 18.2,
+      "by_category": {
+        "2_深度解析": 18,
+        "3_实战案例": 1,
+        "4_特定框架": 11,
+        "5_面试_岗位": 3,
+        "6_概念对比": 16
+      }
+    },
+    "Vibe Coding": {
+      "tf": 39,
+      "df": 12,
+      "df_pct": 18.2,
+      "by_category": {
+        "2_深度解析": 1,
+        "3_实战案例": 9,
+        "4_特定框架": 1,
+        "5_面试_岗位": 7,
+        "6_概念对比": 20,
+        "7_行业趋势": 1
+      }
+    },
+    "Pair Programming": {
+      "tf": 0,
+      "df": 0,
+      "df_pct": 0.0,
+      "by_category": {}
+    },
+    "A2A": {
+      "tf": 24,
+      "df": 9,
+      "df_pct": 13.6,
+      "by_category": {
+        "1_概念入门": 1,
+        "2_深度解析": 10,
+        "5_面试_岗位": 1,
+        "6_概念对比": 11,
+        "7_行业趋势": 1
+      }
+    },
+    "Agentic Workflow": {
+      "tf": 10,
+      "df": 4,
+      "df_pct": 6.1,
+      "by_category": {
+        "2_深度解析": 1,
+        "4_特定框架": 1,
+        "5_面试_岗位": 1,
+        "6_概念对比": 7
+      }
+    },
+    "Agentic Engineering": {
+      "tf": 15,
+      "df": 4,
+      "df_pct": 6.1,
+      "by_category": {
+        "1_概念入门": 1,
+        "2_深度解析": 2,
+        "3_实战案例": 1,
+        "6_概念对比": 11
+      }
+    },
+    "AGENTS.md": {
+      "tf": 342,
+      "df": 31,
+      "df_pct": 47.0,
+      "by_category": {
+        "1_概念入门": 38,
+        "2_深度解析": 82,
+        "3_实战案例": 116,
+        "4_特定框架": 6,
+        "5_面试_岗位": 46,
+        "6_概念对比": 44,
+        "7_行业趋势": 10
+      }
+    },
+    "CLAUDE.md": {
+      "tf": 65,
+      "df": 16,
+      "df_pct": 24.2,
+      "by_category": {
+        "1_概念入门": 1,
+        "2_深度解析": 8,
+        "3_实战案例": 29,
+        "4_特定框架": 20,
+        "5_面试_岗位": 5,
+        "7_行业趋势": 2
+      }
+    },
+    "Claude Code": {
+      "tf": 269,
+      "df": 38,
+      "df_pct": 57.6,
+      "by_category": {
+        "1_概念入门": 32,
+        "2_深度解析": 41,
+        "3_实战案例": 30,
+        "4_特定框架": 150,
+        "5_面试_岗位": 8,
+        "6_概念对比": 6,
+        "7_行业趋势": 2
+      }
+    },
+    "Claude": {
+      "tf": 276,
+      "df": 36,
+      "df_pct": 54.5,
+      "by_category": {
+        "1_概念入门": 9,
+        "2_深度解析": 75,
+        "3_实战案例": 64,
+        "4_特定框架": 95,
+        "5_面试_岗位": 14,
+        "6_概念对比": 14,
+        "7_行业趋势": 5
+      }
+    },
+    "OpenClaw": {
+      "tf": 143,
+      "df": 21,
+      "df_pct": 31.8,
+      "by_category": {
+        "1_概念入门": 13,
+        "2_深度解析": 15,
+        "3_实战案例": 20,
+        "4_特定框架": 50,
+        "5_面试_岗位": 20,
+        "6_概念对比": 24,
+        "7_行业趋势": 1
+      }
+    },
+    "Cursor": {
+      "tf": 37,
+      "df": 21,
+      "df_pct": 31.8,
+      "by_category": {
+        "1_概念入门": 4,
+        "2_深度解析": 4,
+        "3_实战案例": 14,
+        "4_特定框架": 3,
+        "5_面试_岗位": 7,
+        "6_概念对比": 5
+      }
+    },
+    "Codex": {
+      "tf": 139,
+      "df": 35,
+      "df_pct": 53.0,
+      "by_category": {
+        "1_概念入门": 34,
+        "2_深度解析": 35,
+        "3_实战案例": 36,
+        "4_特定框架": 1,
+        "5_面试_岗位": 17,
+        "6_概念对比": 11,
+        "7_行业趋势": 5
+      }
+    },
+    "Hermes": {
+      "tf": 123,
+      "df": 8,
+      "df_pct": 12.1,
+      "by_category": {
+        "1_概念入门": 4,
+        "2_深度解析": 8,
+        "3_实战案例": 1,
+        "4_特定框架": 90,
+        "5_面试_岗位": 20
+      }
+    },
+    "Manus": {
+      "tf": 25,
+      "df": 10,
+      "df_pct": 15.2,
+      "by_category": {
+        "1_概念入门": 5,
+        "2_深度解析": 14,
+        "3_实战案例": 1,
+        "4_特定框架": 4,
+        "5_面试_岗位": 1
+      }
+    },
+    "TRAE": {
+      "tf": 5,
+      "df": 3,
+      "df_pct": 4.5,
+      "by_category": {
+        "2_深度解析": 1,
+        "4_特定框架": 1,
+        "5_面试_岗位": 3
+      }
+    },
+    "DeerFlow": {
+      "tf": 129,
+      "df": 5,
+      "df_pct": 7.6,
+      "by_category": {
+        "2_深度解析": 1,
+        "4_特定框架": 128
+      }
+    },
+    "AHE": {
+      "tf": 11,
+      "df": 1,
+      "df_pct": 1.5,
+      "by_category": {
+        "4_特定框架": 11
+      }
+    },
+    "Gemini": {
+      "tf": 36,
+      "df": 14,
+      "df_pct": 21.2,
+      "by_category": {
+        "1_概念入门": 2,
+        "2_深度解析": 7,
+        "3_实战案例": 10,
+        "4_特定框架": 6,
+        "6_概念对比": 11
+      }
+    },
+    "Devin": {
+      "tf": 10,
+      "df": 3,
+      "df_pct": 4.5,
+      "by_category": {
+        "3_实战案例": 2,
+        "5_面试_岗位": 8
+      }
+    },
+    "Replit": {
+      "tf": 1,
+      "df": 1,
+      "df_pct": 1.5,
+      "by_category": {
+        "1_概念入门": 1
+      }
+    },
+    "GitHub Copilot": {
+      "tf": 16,
+      "df": 7,
+      "df_pct": 10.6,
+      "by_category": {
+        "1_概念入门": 2,
+        "2_深度解析": 10,
+        "3_实战案例": 3,
+        "7_行业趋势": 1
+      }
+    },
+    "DeepSeek": {
+      "tf": 9,
+      "df": 7,
+      "df_pct": 10.6,
+      "by_category": {
+        "1_概念入门": 1,
+        "2_深度解析": 2,
+        "3_实战案例": 1,
+        "4_特定框架": 4,
+        "5_面试_岗位": 1
+      }
+    },
+    "GPT": {
+      "tf": 52,
+      "df": 20,
+      "df_pct": 30.3,
+      "by_category": {
+        "1_概念入门": 5,
+        "2_深度解析": 8,
+        "3_实战案例": 8,
+        "4_特定框架": 19,
+        "5_面试_岗位": 2,
+        "6_概念对比": 9,
+        "7_行业趋势": 1
+      }
+    },
+    "Aegis": {
+      "tf": 10,
+      "df": 2,
+      "df_pct": 3.0,
+      "by_category": {
+        "1_概念入门": 10
+      }
+    },
+    "Anthropic": {
+      "tf": 385,
+      "df": 37,
+      "df_pct": 56.1,
+      "by_category": {
+        "1_概念入门": 21,
+        "2_深度解析": 177,
+        "3_实战案例": 76,
+        "4_特定框架": 25,
+        "5_面试_岗位": 42,
+        "6_概念对比": 17,
+        "7_行业趋势": 27
+      }
+    },
+    "OpenAI": {
+      "tf": 415,
+      "df": 46,
+      "df_pct": 69.7,
+      "by_category": {
+        "1_概念入门": 54,
+        "2_深度解析": 140,
+        "3_实战案例": 89,
+        "4_特定框架": 10,
+        "5_面试_岗位": 53,
+        "6_概念对比": 37,
+        "7_行业趋势": 32
+      }
+    },
+    "Google": {
+      "tf": 31,
+      "df": 15,
+      "df_pct": 22.7,
+      "by_category": {
+        "1_概念入门": 2,
+        "2_深度解析": 14,
+        "3_实战案例": 3,
+        "4_特定框架": 2,
+        "6_概念对比": 9,
+        "7_行业趋势": 1
+      }
+    },
+    "Stripe": {
+      "tf": 73,
+      "df": 9,
+      "df_pct": 13.6,
+      "by_category": {
+        "2_深度解析": 31,
+        "3_实战案例": 28,
+        "5_面试_岗位": 4,
+        "6_概念对比": 10
+      }
+    },
+    "字节跳动": {
+      "tf": 20,
+      "df": 8,
+      "df_pct": 12.1,
+      "by_category": {
+        "1_概念入门": 5,
+        "2_深度解析": 1,
+        "3_实战案例": 2,
+        "4_特定框架": 12
+      }
+    },
+    "鹅厂/腾讯": {
+      "tf": 2,
+      "df": 1,
+      "df_pct": 1.5,
+      "by_category": {
+        "3_实战案例": 2
+      }
+    },
+    "阿里": {
+      "tf": 29,
+      "df": 5,
+      "df_pct": 7.6,
+      "by_category": {
+        "1_概念入门": 25,
+        "3_实战案例": 2,
+        "4_特定框架": 2
+      }
+    },
+    "复旦": {
+      "tf": 2,
+      "df": 1,
+      "df_pct": 1.5,
+      "by_category": {
+        "4_特定框架": 2
+      }
+    },
+    "Martin Fowler": {
+      "tf": 44,
+      "df": 11,
+      "df_pct": 16.7,
+      "by_category": {
+        "1_概念入门": 1,
+        "2_深度解析": 27,
+        "3_实战案例": 13,
+        "5_面试_岗位": 1,
+        "6_概念对比": 2
+      }
+    },
+    "Mitchell Hashimoto": {
+      "tf": 64,
+      "df": 18,
+      "df_pct": 27.3,
+      "by_category": {
+        "1_概念入门": 7,
+        "2_深度解析": 13,
+        "3_实战案例": 22,
+        "4_特定框架": 2,
+        "5_面试_岗位": 13,
+        "6_概念对比": 6,
+        "7_行业趋势": 1
+      }
+    },
+    "Sandbox/沙盒": {
+      "tf": 354,
+      "df": 34,
+      "df_pct": 51.5,
+      "by_category": {
+        "1_概念入门": 17,
+        "2_深度解析": 88,
+        "3_实战案例": 10,
+        "4_特定框架": 222,
+        "5_面试_岗位": 9,
+        "6_概念对比": 6,
+        "7_行业趋势": 2
+      }
+    },
+    "Workflow": {
+      "tf": 230,
+      "df": 43,
+      "df_pct": 65.2,
+      "by_category": {
+        "1_概念入门": 21,
+        "2_深度解析": 45,
+        "3_实战案例": 109,
+        "4_特定框架": 23,
+        "5_面试_岗位": 5,
+        "6_概念对比": 25,
+        "7_行业趋势": 2
+      }
+    },
+    "约束/Constraint": {
+      "tf": 642,
+      "df": 62,
+      "df_pct": 93.9,
+      "by_category": {
+        "1_概念入门": 125,
+        "2_深度解析": 110,
+        "3_实战案例": 211,
+        "4_特定框架": 65,
+        "5_面试_岗位": 54,
+        "6_概念对比": 35,
+        "7_行业趋势": 42
+      }
+    },
+    "反馈回路": {
+      "tf": 102,
+      "df": 29,
+      "df_pct": 43.9,
+      "by_category": {
+        "1_概念入门": 16,
+        "2_深度解析": 29,
+        "3_实战案例": 43,
+        "4_特定框架": 1,
+        "5_面试_岗位": 4,
+        "6_概念对比": 4,
+        "7_行业趋势": 5
+      }
+    },
+    "护城河/Moat": {
+      "tf": 21,
+      "df": 9,
+      "df_pct": 13.6,
+      "by_category": {
+        "1_概念入门": 9,
+        "2_深度解析": 2,
+        "3_实战案例": 8,
+        "4_特定框架": 1,
+        "6_概念对比": 1
+      }
+    },
+    "控制论": {
+      "tf": 34,
+      "df": 4,
+      "df_pct": 6.1,
+      "by_category": {
+        "1_概念入门": 28,
+        "3_实战案例": 3,
+        "7_行业趋势": 3
+      }
+    },
+    "上下文窗口": {
+      "tf": 200,
+      "df": 46,
+      "df_pct": 69.7,
+      "by_category": {
+        "1_概念入门": 19,
+        "2_深度解析": 68,
+        "3_实战案例": 32,
+        "4_特定框架": 35,
+        "5_面试_岗位": 24,
+        "6_概念对比": 11,
+        "7_行业趋势": 11
+      }
+    },
+    "评测/Eval": {
+      "tf": 137,
+      "df": 22,
+      "df_pct": 33.3,
+      "by_category": {
+        "1_概念入门": 21,
+        "2_深度解析": 43,
+        "3_实战案例": 41,
+        "4_特定框架": 19,
+        "5_面试_岗位": 10,
+        "6_概念对比": 1,
+        "7_行业趋势": 2
+      }
+    },
+    "Plan/规划": {
+      "tf": 38,
+      "df": 22,
+      "df_pct": 33.3,
+      "by_category": {
+        "1_概念入门": 2,
+        "2_深度解析": 17,
+        "3_实战案例": 3,
+        "4_特定框架": 8,
+        "5_面试_岗位": 2,
+        "6_概念对比": 3,
+        "7_行业趋势": 3
+      }
+    },
+    "渐进式披露": {
+      "tf": 58,
+      "df": 23,
+      "df_pct": 34.8,
+      "by_category": {
+        "1_概念入门": 5,
+        "2_深度解析": 17,
+        "3_实战案例": 7,
+        "4_特定框架": 6,
+        "5_面试_岗位": 11,
+        "6_概念对比": 6,
+        "7_行业趋势": 6
+      }
+    }
+  },
+  "articles": [
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/001-Harness-Engineering-的深度解读.md",
+      "category": "1_概念入门",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 6,
+        "Harness": 7,
+        "Agent": 6,
+        "Sub-agent": 1,
+        "Skills": 1,
+        "Context Engineering": 1,
+        "Tool Use": 4,
+        "Claude Code": 3,
+        "OpenClaw": 1,
+        "Hermes": 2,
+        "Sandbox/沙盒": 1,
+        "Workflow": 9,
+        "约束/Constraint": 1,
+        "上下文窗口": 4,
+        "评测/Eval": 7,
+        "渐进式披露": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/002-Harness-Engineering是让-AI-Agent-真正跑稳的那套系统.md",
+      "category": "1_概念入门",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 10,
+        "Harness": 33,
+        "Agent": 41,
+        "AI Agent": 3,
+        "Coding Agent": 2,
+        "Context Engineering": 6,
+        "Prompt Engineering": 5,
+        "Tool Use": 3,
+        "AGENTS.md": 4,
+        "Codex": 4,
+        "Anthropic": 1,
+        "OpenAI": 6,
+        "Mitchell Hashimoto": 2,
+        "Workflow": 2,
+        "约束/Constraint": 16,
+        "上下文窗口": 2,
+        "渐进式披露": 2
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/003-从玩具到生产力用真实项目讲透-AI-Agent-的-Harness-Engine.md",
+      "category": "1_概念入门",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 5,
+        "Harness": 56,
+        "Agent": 26,
+        "AI Agent": 5,
+        "Sub-agent": 1,
+        "Skills": 3,
+        "Spec": 18,
+        "SDD": 9,
+        "ReAct": 1,
+        "Claude": 1,
+        "Codex": 2,
+        "Aegis": 5,
+        "Anthropic": 3,
+        "OpenAI": 4,
+        "字节跳动": 2,
+        "Sandbox/沙盒": 6,
+        "约束/Constraint": 11
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/004-Harness-Engineering个体进化到组织涌现.md",
+      "category": "1_概念入门",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 4,
+        "Harness": 2,
+        "Agent": 1,
+        "AI Agent": 1,
+        "Sub-agent": 1,
+        "Context Engineering": 1,
+        "Prompt Engineering": 1,
+        "Claude Code": 1,
+        "Claude": 1,
+        "DeepSeek": 1,
+        "GPT": 1,
+        "Mitchell Hashimoto": 2,
+        "Workflow": 2,
+        "约束/Constraint": 2
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/005-为溪--陈龙Harness-Engineering驾驭AI的工程体系和智能组织.md",
+      "category": "1_概念入门",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 16,
+        "Harness": 3,
+        "Agent": 1,
+        "AGENTS.md": 4,
+        "Claude Code": 13,
+        "Codex": 1,
+        "Gemini": 1,
+        "GPT": 1,
+        "OpenAI": 4,
+        "Workflow": 2,
+        "约束/Constraint": 4,
+        "上下文窗口": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/006-从-提问-到-驾驭2026-年最值得工程师深挖的新技能Harness-Engin.md",
+      "category": "1_概念入门",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 8,
+        "Harness": 29,
+        "Agent": 21,
+        "AI Agent": 1,
+        "MCP": 5,
+        "Skills": 7,
+        "Context Engineering": 1,
+        "Tool Use": 4,
+        "Claude Code": 6,
+        "Claude": 3,
+        "OpenClaw": 1,
+        "Codex": 11,
+        "Manus": 1,
+        "GPT": 2,
+        "Anthropic": 4,
+        "OpenAI": 6,
+        "Sandbox/沙盒": 3,
+        "Workflow": 1,
+        "约束/Constraint": 1,
+        "反馈回路": 1,
+        "上下文窗口": 3
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/007-Spec让-AI-在实现前真正理解问题.md",
+      "category": "1_概念入门",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 5,
+        "Harness": 7,
+        "Agent": 67,
+        "AI Agent": 3,
+        "Spec": 114,
+        "SDD": 7,
+        "Workflow": 1,
+        "约束/Constraint": 15
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/008-一文讲透Harness-Engineering即控制论.md",
+      "category": "1_概念入门",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 15,
+        "Harness": 12,
+        "Agent": 6,
+        "Context Engineering": 1,
+        "Prompt Engineering": 2,
+        "AGENTS.md": 4,
+        "Codex": 4,
+        "OpenAI": 4,
+        "约束/Constraint": 7,
+        "反馈回路": 7,
+        "控制论": 28,
+        "渐进式披露": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/009-一文讲透Harness-Engineering.md",
+      "category": "1_概念入门",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 13,
+        "Harness": 48,
+        "Agent": 53,
+        "AI Agent": 3,
+        "Coding Agent": 3,
+        "Sub-agent": 2,
+        "MCP": 1,
+        "Context Engineering": 1,
+        "Prompt Engineering": 2,
+        "Tool Use": 2,
+        "A2A": 1,
+        "Agentic Engineering": 1,
+        "AGENTS.md": 4,
+        "Claude Code": 2,
+        "Claude": 2,
+        "Codex": 2,
+        "Manus": 4,
+        "Gemini": 1,
+        "Replit": 1,
+        "GPT": 1,
+        "Anthropic": 1,
+        "OpenAI": 7,
+        "Google": 2,
+        "Mitchell Hashimoto": 3,
+        "Workflow": 2,
+        "约束/Constraint": 14,
+        "反馈回路": 1,
+        "护城河/Moat": 3,
+        "上下文窗口": 2,
+        "评测/Eval": 2,
+        "渐进式披露": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/010-两家大厂加九个博主Harness-Engineering-到底是什么这篇全景图帮.md",
+      "category": "1_概念入门",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 9,
+        "Harness": 28,
+        "Agent": 25,
+        "AI Agent": 1,
+        "Context Engineering": 4,
+        "Prompt Engineering": 2,
+        "Tool Use": 1,
+        "AGENTS.md": 2,
+        "CLAUDE.md": 1,
+        "Claude": 1,
+        "Codex": 1,
+        "Anthropic": 8,
+        "OpenAI": 9,
+        "Martin Fowler": 1,
+        "Sandbox/沙盒": 1,
+        "约束/Constraint": 4,
+        "上下文窗口": 1,
+        "Plan/规划": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/011-从玩具到生产力用真实项目讲透-AI-Agent-的-Harness-Engine.md",
+      "category": "1_概念入门",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 5,
+        "Harness": 57,
+        "Agent": 26,
+        "AI Agent": 5,
+        "Sub-agent": 1,
+        "Skills": 3,
+        "Spec": 18,
+        "SDD": 11,
+        "ReAct": 1,
+        "Claude": 1,
+        "Codex": 2,
+        "Aegis": 5,
+        "Anthropic": 4,
+        "OpenAI": 5,
+        "字节跳动": 3,
+        "阿里": 1,
+        "Sandbox/沙盒": 6,
+        "约束/Constraint": 10
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/012-4-Real-Cases--Harness-Engineering-is-Bec.md",
+      "category": "1_概念入门",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 17,
+        "Harness": 34,
+        "Agent": 48,
+        "AI Agent": 8,
+        "Coding Agent": 3,
+        "Sub-agent": 5,
+        "MCP": 3,
+        "Skills": 10,
+        "Context Engineering": 5,
+        "Prompt Engineering": 4,
+        "Claude Code": 3,
+        "OpenClaw": 11,
+        "Cursor": 1,
+        "Codex": 3,
+        "Hermes": 2,
+        "OpenAI": 5,
+        "阿里": 24,
+        "约束/Constraint": 2,
+        "反馈回路": 6,
+        "护城河/Moat": 5,
+        "上下文窗口": 5,
+        "Plan/规划": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/013-Agent工程化逻辑跑通运行只是起点复用观测与评测才是关键.md",
+      "category": "1_概念入门",
+      "title": "",
+      "entities": {
+        "AI Agent": 1,
+        "Skills": 3,
+        "Tool Use": 6,
+        "Claude Code": 1,
+        "约束/Constraint": 3,
+        "评测/Eval": 11
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/014-Harness-EngineeringAI-能在真正出事会炸的后端系统里写代码吗.md",
+      "category": "1_概念入门",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 13,
+        "Harness": 14,
+        "Agent": 6,
+        "Skills": 13,
+        "Codex": 1,
+        "GitHub Copilot": 2,
+        "OpenAI": 1,
+        "约束/Constraint": 18,
+        "护城河/Moat": 1,
+        "上下文窗口": 1,
+        "评测/Eval": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/1_概念入门/015-别让AI瞎猜了用Harness-Engineering-终结无限返工.md",
+      "category": "1_概念入门",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 18,
+        "Harness": 26,
+        "Agent": 12,
+        "Prompt Engineering": 3,
+        "AGENTS.md": 20,
+        "Claude Code": 3,
+        "Cursor": 3,
+        "Codex": 3,
+        "OpenAI": 3,
+        "Workflow": 2,
+        "约束/Constraint": 17,
+        "反馈回路": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/2_深度解析/001-智体Harness工程综述上.md",
+      "category": "2_深度解析",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 13,
+        "Harness": 23,
+        "Agent": 48,
+        "AI Agent": 1,
+        "Coding Agent": 2,
+        "Sub-agent": 3,
+        "MCP": 10,
+        "Context Engineering": 13,
+        "Prompt Engineering": 9,
+        "Tool Use": 5,
+        "ReAct": 2,
+        "Reflection": 6,
+        "A2A": 7,
+        "Agentic Workflow": 1,
+        "AGENTS.md": 2,
+        "CLAUDE.md": 1,
+        "Claude Code": 5,
+        "Claude": 6,
+        "Codex": 4,
+        "Manus": 5,
+        "DeerFlow": 1,
+        "Gemini": 2,
+        "GPT": 2,
+        "Anthropic": 28,
+        "OpenAI": 19,
+        "Google": 3,
+        "字节跳动": 1,
+        "Sandbox/沙盒": 49,
+        "Workflow": 13,
+        "约束/Constraint": 16,
+        "反馈回路": 1,
+        "上下文窗口": 19,
+        "评测/Eval": 18,
+        "Plan/规划": 3,
+        "渐进式披露": 6
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/2_深度解析/002-智体Harness工程综述下.md",
+      "category": "2_深度解析",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 3,
+        "Harness": 26,
+        "Agent": 20,
+        "Coding Agent": 1,
+        "MCP": 9,
+        "Prompt Engineering": 1,
+        "Tool Use": 21,
+        "Reflection": 3,
+        "A2A": 1,
+        "Claude": 1,
+        "Cursor": 1,
+        "Codex": 3,
+        "Gemini": 3,
+        "GPT": 1,
+        "Anthropic": 23,
+        "OpenAI": 3,
+        "Sandbox/沙盒": 14,
+        "Workflow": 3,
+        "约束/Constraint": 21,
+        "反馈回路": 2,
+        "上下文窗口": 3,
+        "评测/Eval": 11
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/2_深度解析/003-Harness-Engineering-深度解析.md",
+      "category": "2_深度解析",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 25,
+        "Harness": 77,
+        "Agent": 106,
+        "Coding Agent": 1,
+        "MCP": 2,
+        "Skills": 2,
+        "Context Engineering": 3,
+        "Prompt Engineering": 3,
+        "Tool Use": 1,
+        "ReAct": 1,
+        "AGENTS.md": 18,
+        "CLAUDE.md": 1,
+        "Claude Code": 3,
+        "Claude": 4,
+        "Cursor": 1,
+        "Codex": 9,
+        "Gemini": 1,
+        "GitHub Copilot": 4,
+        "GPT": 2,
+        "Anthropic": 33,
+        "OpenAI": 23,
+        "Google": 2,
+        "Sandbox/沙盒": 3,
+        "Workflow": 2,
+        "约束/Constraint": 4,
+        "反馈回路": 4,
+        "上下文窗口": 6,
+        "Plan/规划": 6,
+        "渐进式披露": 4
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/2_深度解析/004-Agent-开发工程化深度解析从-Tool-Calling-到-HarnessM.md",
+      "category": "2_深度解析",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 3,
+        "Harness": 23,
+        "Agent": 58,
+        "AI Agent": 1,
+        "Coding Agent": 4,
+        "Sub-agent": 9,
+        "MCP": 10,
+        "Skills": 18,
+        "Tool Use": 12,
+        "CLAUDE.md": 1,
+        "Claude Code": 9,
+        "Claude": 4,
+        "OpenClaw": 9,
+        "Hermes": 6,
+        "Anthropic": 1,
+        "Sandbox/沙盒": 4,
+        "约束/Constraint": 3,
+        "上下文窗口": 2,
+        "评测/Eval": 3,
+        "Plan/规划": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/2_深度解析/005-深度解析Harness-Engineering.md",
+      "category": "2_深度解析",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 21,
+        "Harness": 82,
+        "Agent": 124,
+        "AI Agent": 5,
+        "Coding Agent": 1,
+        "MCP": 23,
+        "Spec": 1,
+        "Context Engineering": 7,
+        "Prompt Engineering": 4,
+        "Tool Use": 4,
+        "A2A": 2,
+        "AGENTS.md": 6,
+        "Claude Code": 2,
+        "Claude": 5,
+        "OpenClaw": 1,
+        "Cursor": 2,
+        "Codex": 5,
+        "Manus": 2,
+        "Gemini": 1,
+        "GitHub Copilot": 2,
+        "DeepSeek": 2,
+        "GPT": 3,
+        "Anthropic": 24,
+        "OpenAI": 15,
+        "Google": 5,
+        "Mitchell Hashimoto": 1,
+        "Sandbox/沙盒": 1,
+        "Workflow": 1,
+        "约束/Constraint": 6,
+        "反馈回路": 4,
+        "护城河/Moat": 2,
+        "上下文窗口": 5,
+        "评测/Eval": 2,
+        "Plan/规划": 4
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/2_深度解析/006-万字干货理解-Harness-Engineering看这一篇就够了.md",
+      "category": "2_深度解析",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 22,
+        "Harness": 57,
+        "Agent": 41,
+        "AI Agent": 5,
+        "Skills": 1,
+        "Spec": 1,
+        "Context Engineering": 3,
+        "Prompt Engineering": 4,
+        "Tool Use": 2,
+        "ReAct": 1,
+        "Reflection": 9,
+        "Vibe Coding": 1,
+        "TRAE": 1,
+        "OpenAI": 2,
+        "Mitchell Hashimoto": 2,
+        "Sandbox/沙盒": 10,
+        "Workflow": 1,
+        "约束/Constraint": 10,
+        "上下文窗口": 1,
+        "评测/Eval": 4,
+        "Plan/规划": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/2_深度解析/007-62页论文Harness-Engineering最新综述与模型协同训练是更强Ag.md",
+      "category": "2_深度解析",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 9,
+        "Harness": 5,
+        "Agent": 8,
+        "Coding Agent": 1,
+        "Skills": 1,
+        "Context Engineering": 5,
+        "Prompt Engineering": 1,
+        "Tool Use": 5,
+        "Claude Code": 2,
+        "OpenClaw": 1,
+        "Hermes": 2,
+        "Sandbox/沙盒": 2,
+        "Workflow": 11,
+        "约束/Constraint": 3,
+        "上下文窗口": 3,
+        "评测/Eval": 3,
+        "Plan/规划": 1,
+        "渐进式披露": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/2_深度解析/008-万字讲透Agent-Harness的十二大模块.md",
+      "category": "2_深度解析",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 1,
+        "Harness": 28,
+        "Agent": 47,
+        "Coding Agent": 2,
+        "Sub-agent": 17,
+        "MCP": 4,
+        "Skills": 3,
+        "Context Engineering": 3,
+        "Prompt Engineering": 2,
+        "Tool Use": 17,
+        "ReAct": 6,
+        "CLAUDE.md": 1,
+        "Claude Code": 14,
+        "Claude": 3,
+        "OpenClaw": 2,
+        "Codex": 6,
+        "Manus": 1,
+        "Anthropic": 14,
+        "OpenAI": 12,
+        "Stripe": 1,
+        "Martin Fowler": 1,
+        "Sandbox/沙盒": 5,
+        "Workflow": 2,
+        "约束/Constraint": 1,
+        "上下文窗口": 11,
+        "Plan/规划": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/2_深度解析/009-Harness-Engineering-深度解析AI-Agent-时代的工程范式.md",
+      "category": "2_深度解析",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 52,
+        "Harness": 148,
+        "Agent": 330,
+        "AI Agent": 18,
+        "Coding Agent": 24,
+        "Sub-agent": 8,
+        "MCP": 20,
+        "Context Engineering": 24,
+        "Prompt Engineering": 2,
+        "Tool Use": 2,
+        "Agentic Engineering": 2,
+        "AGENTS.md": 56,
+        "CLAUDE.md": 4,
+        "Claude Code": 6,
+        "Claude": 52,
+        "OpenClaw": 2,
+        "Codex": 8,
+        "Manus": 6,
+        "GitHub Copilot": 4,
+        "Anthropic": 54,
+        "OpenAI": 66,
+        "Google": 4,
+        "Stripe": 30,
+        "Martin Fowler": 26,
+        "Mitchell Hashimoto": 10,
+        "Workflow": 12,
+        "约束/Constraint": 46,
+        "反馈回路": 18,
+        "上下文窗口": 18,
+        "评测/Eval": 2,
+        "渐进式披露": 6
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/3_实战案例/001-Harness不是目的知识才是护城河--一个AI工程交付团队的知识沉淀实践.md",
+      "category": "3_实战案例",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 11,
+        "Harness": 23,
+        "Agent": 49,
+        "Skills": 2,
+        "Context Engineering": 2,
+        "CLAUDE.md": 1,
+        "Claude Code": 2,
+        "Claude": 1,
+        "Cursor": 1,
+        "Codex": 2,
+        "Gemini": 1,
+        "Anthropic": 2,
+        "OpenAI": 1,
+        "Workflow": 51,
+        "约束/Constraint": 3,
+        "护城河/Moat": 3,
+        "渐进式披露": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/3_实战案例/002-Harness-Engineering驾驭工程最佳实践深度解析.md",
+      "category": "3_实战案例",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 11,
+        "Harness": 17,
+        "Agent": 41,
+        "AI Agent": 4,
+        "Context Engineering": 4,
+        "Prompt Engineering": 1,
+        "Tool Use": 2,
+        "AGENTS.md": 8,
+        "Codex": 3,
+        "Anthropic": 2,
+        "OpenAI": 3,
+        "Google": 1,
+        "Martin Fowler": 2,
+        "Mitchell Hashimoto": 4,
+        "Workflow": 3,
+        "约束/Constraint": 12,
+        "反馈回路": 7,
+        "上下文窗口": 2
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/3_实战案例/003-QQ音乐Harness-Engineering实践.md",
+      "category": "3_实战案例",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 37,
+        "Harness": 56,
+        "Agent": 19,
+        "Skills": 20,
+        "Spec": 2,
+        "Context Engineering": 3,
+        "Vibe Coding": 6,
+        "AGENTS.md": 8,
+        "Claude Code": 8,
+        "Claude": 1,
+        "Cursor": 3,
+        "Codex": 5,
+        "Gemini": 6,
+        "Anthropic": 1,
+        "鹅厂/腾讯": 2,
+        "Sandbox/沙盒": 1,
+        "Workflow": 1,
+        "约束/Constraint": 25,
+        "反馈回路": 1,
+        "上下文窗口": 1,
+        "渐进式披露": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/3_实战案例/004-Harness-Engineering耗时一周我是如何将应用的AI-Coding.md",
+      "category": "3_实战案例",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 13,
+        "Harness": 71,
+        "Agent": 108,
+        "AI Agent": 2,
+        "Coding Agent": 5,
+        "MCP": 6,
+        "Skills": 26,
+        "Spec": 7,
+        "Context Engineering": 2,
+        "Prompt Engineering": 2,
+        "Reflection": 1,
+        "AGENTS.md": 4,
+        "Claude Code": 1,
+        "Cursor": 1,
+        "Codex": 2,
+        "GitHub Copilot": 1,
+        "Anthropic": 21,
+        "OpenAI": 11,
+        "Mitchell Hashimoto": 4,
+        "Workflow": 5,
+        "约束/Constraint": 20,
+        "反馈回路": 2,
+        "上下文窗口": 6,
+        "Plan/规划": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/3_实战案例/005-万字深度AI-智能体-Harness-Engineering-全架构与工程最佳实.md",
+      "category": "3_实战案例",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 37,
+        "Harness": 165,
+        "Agent": 180,
+        "AI Agent": 12,
+        "Coding Agent": 14,
+        "MCP": 16,
+        "Skills": 5,
+        "Context Engineering": 9,
+        "Prompt Engineering": 5,
+        "Tool Use": 4,
+        "AGENTS.md": 34,
+        "CLAUDE.md": 8,
+        "Claude Code": 3,
+        "Claude": 18,
+        "Cursor": 2,
+        "Codex": 10,
+        "Gemini": 2,
+        "GitHub Copilot": 2,
+        "GPT": 3,
+        "Anthropic": 15,
+        "OpenAI": 18,
+        "Google": 1,
+        "Stripe": 11,
+        "Martin Fowler": 3,
+        "Mitchell Hashimoto": 8,
+        "Sandbox/沙盒": 5,
+        "Workflow": 4,
+        "约束/Constraint": 46,
+        "反馈回路": 12,
+        "护城河/Moat": 1,
+        "控制论": 3,
+        "上下文窗口": 11,
+        "渐进式披露": 2
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/3_实战案例/006-看完这篇彻底搞懂-Harness-Engineering概念原理架构最佳实践全解.md",
+      "category": "3_实战案例",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 24,
+        "Harness": 44,
+        "Agent": 39,
+        "Coding Agent": 2,
+        "Context Engineering": 2,
+        "Prompt Engineering": 1,
+        "Tool Use": 1,
+        "AGENTS.md": 10,
+        "Codex": 3,
+        "OpenAI": 10,
+        "Martin Fowler": 4,
+        "Mitchell Hashimoto": 4,
+        "约束/Constraint": 8,
+        "反馈回路": 3
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/3_实战案例/007-傻子可懂的-Harness-Engineering-入门教程--项目实战一次搞懂.md",
+      "category": "3_实战案例",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 8,
+        "Harness": 90,
+        "Agent": 10,
+        "Sub-agent": 8,
+        "MCP": 12,
+        "Skills": 10,
+        "Spec": 6,
+        "SDD": 6,
+        "Context Engineering": 4,
+        "Prompt Engineering": 4,
+        "Tool Use": 4,
+        "Vibe Coding": 2,
+        "AGENTS.md": 24,
+        "Cursor": 2,
+        "OpenAI": 8,
+        "Stripe": 2,
+        "Workflow": 8,
+        "约束/Constraint": 12,
+        "评测/Eval": 2
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/3_实战案例/008-一文搞懂-Harness-Engineering六层架构上下文管理与一线团队实战.md",
+      "category": "3_实战案例",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 7,
+        "Harness": 100,
+        "Agent": 131,
+        "AI Agent": 5,
+        "Coding Agent": 1,
+        "MCP": 10,
+        "Skills": 6,
+        "Context Engineering": 6,
+        "Prompt Engineering": 3,
+        "Tool Use": 4,
+        "AGENTS.md": 22,
+        "Claude Code": 4,
+        "Claude": 3,
+        "Cursor": 1,
+        "Codex": 1,
+        "Manus": 1,
+        "Anthropic": 22,
+        "OpenAI": 21,
+        "Google": 1,
+        "Stripe": 11,
+        "Martin Fowler": 1,
+        "Mitchell Hashimoto": 2,
+        "Sandbox/沙盒": 4,
+        "Workflow": 4,
+        "约束/Constraint": 18,
+        "反馈回路": 7,
+        "上下文窗口": 2,
+        "评测/Eval": 1,
+        "Plan/规划": 2,
+        "渐进式披露": 3
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/3_实战案例/009-Harness-Engineering-实战模型是-AI-Agent-里最不重要.md",
+      "category": "3_实战案例",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 17,
+        "Harness": 80,
+        "Agent": 71,
+        "AI Agent": 5,
+        "Sub-agent": 19,
+        "MCP": 1,
+        "Skills": 13,
+        "Context Engineering": 6,
+        "Prompt Engineering": 3,
+        "Tool Use": 1,
+        "ReAct": 1,
+        "AGENTS.md": 2,
+        "CLAUDE.md": 19,
+        "Claude Code": 9,
+        "Claude": 27,
+        "Codex": 3,
+        "Gemini": 1,
+        "Devin": 2,
+        "GPT": 1,
+        "OpenAI": 4,
+        "Stripe": 4,
+        "字节跳动": 2,
+        "Martin Fowler": 2,
+        "Workflow": 2,
+        "约束/Constraint": 19,
+        "反馈回路": 5,
+        "上下文窗口": 4
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/3_实战案例/010-驾驭工程Harness-Engineering实践落地案例剖析.md",
+      "category": "3_实战案例",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 64,
+        "Harness": 56,
+        "Agent": 49,
+        "AI Agent": 4,
+        "Sub-agent": 7,
+        "Skills": 4,
+        "SDD": 2,
+        "Context Engineering": 3,
+        "Prompt Engineering": 3,
+        "Tool Use": 2,
+        "Vibe Coding": 1,
+        "Agentic Engineering": 1,
+        "Claude Code": 3,
+        "Claude": 4,
+        "OpenClaw": 4,
+        "Codex": 3,
+        "Hermes": 1,
+        "DeepSeek": 1,
+        "GPT": 4,
+        "OpenAI": 4,
+        "阿里": 1,
+        "Martin Fowler": 1,
+        "约束/Constraint": 5,
+        "反馈回路": 4,
+        "护城河/Moat": 4,
+        "上下文窗口": 3
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/3_实战案例/011-你不知道的-Agent原理架构与工程实践.md",
+      "category": "3_实战案例",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 1,
+        "Harness": 12,
+        "Agent": 168,
+        "AI Agent": 4,
+        "Coding Agent": 3,
+        "Sub-agent": 13,
+        "MCP": 8,
+        "Skills": 41,
+        "Context Engineering": 4,
+        "Tool Use": 16,
+        "ReAct": 1,
+        "AGENTS.md": 4,
+        "CLAUDE.md": 1,
+        "Claude": 10,
+        "OpenClaw": 14,
+        "Cursor": 2,
+        "Codex": 4,
+        "Anthropic": 13,
+        "OpenAI": 9,
+        "阿里": 1,
+        "Workflow": 5,
+        "约束/Constraint": 14,
+        "上下文窗口": 3,
+        "评测/Eval": 38
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/3_实战案例/012-万字干货Harness-Engineering如何工程化落地.md",
+      "category": "3_实战案例",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 14,
+        "Harness": 66,
+        "Agent": 98,
+        "Sub-agent": 12,
+        "MCP": 18,
+        "Skills": 35,
+        "Spec": 8,
+        "OpenClaw": 2,
+        "Cursor": 2,
+        "Workflow": 26,
+        "约束/Constraint": 29,
+        "反馈回路": 2
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/4_特定框架/001-来自字节跳动TRAE的Harness-Engineering指南.md",
+      "category": "4_特定框架",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 22,
+        "Harness": 50,
+        "Agent": 1,
+        "AI Agent": 1,
+        "Spec": 1,
+        "Context Engineering": 1,
+        "Prompt Engineering": 2,
+        "Tool Use": 1,
+        "ReAct": 1,
+        "Reflection": 6,
+        "Vibe Coding": 1,
+        "OpenAI": 1,
+        "Mitchell Hashimoto": 2,
+        "Sandbox/沙盒": 9,
+        "Workflow": 3,
+        "约束/Constraint": 9,
+        "反馈回路": 1,
+        "上下文窗口": 2,
+        "评测/Eval": 3,
+        "Plan/规划": 3
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/4_特定框架/002-全球排名前三复旦等开源AHE框架自进化Harness-Engineering让G.md",
+      "category": "4_特定框架",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 9,
+        "Harness": 43,
+        "Agent": 38,
+        "Coding Agent": 5,
+        "Sub-agent": 4,
+        "Skills": 4,
+        "OpenClaw": 1,
+        "Codex": 1,
+        "Hermes": 1,
+        "AHE": 11,
+        "Gemini": 1,
+        "DeepSeek": 1,
+        "GPT": 6,
+        "Anthropic": 1,
+        "OpenAI": 2,
+        "复旦": 2,
+        "Sandbox/沙盒": 1,
+        "Workflow": 1,
+        "约束/Constraint": 1,
+        "上下文窗口": 1,
+        "评测/Eval": 10,
+        "渐进式披露": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/4_特定框架/003-Harness-顶级架构DeerFlow-20-沙盒-Sandbox-架构设计源.md",
+      "category": "4_特定框架",
+      "title": "",
+      "entities": {
+        "Harness": 12,
+        "Agent": 81,
+        "Sub-agent": 6,
+        "Skills": 15,
+        "Prompt Engineering": 1,
+        "Tool Use": 11,
+        "Claude": 2,
+        "Manus": 2,
+        "DeerFlow": 40,
+        "字节跳动": 5,
+        "Sandbox/沙盒": 160,
+        "约束/Constraint": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/4_特定框架/004-DeerFlow-20-开源升级依托-Harness让-Agent-不再半途而废.md",
+      "category": "4_特定框架",
+      "title": "",
+      "entities": {
+        "Harness": 10,
+        "Agent": 45,
+        "AI Agent": 1,
+        "Sub-agent": 10,
+        "Skills": 13,
+        "Context Engineering": 3,
+        "Tool Use": 2,
+        "Claude Code": 1,
+        "OpenClaw": 1,
+        "TRAE": 1,
+        "DeerFlow": 35,
+        "字节跳动": 1,
+        "Sandbox/沙盒": 7,
+        "Workflow": 2,
+        "上下文窗口": 2,
+        "Plan/规划": 2
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/4_特定框架/005-DeerFlow-20字节跳动开源的-Super-Agent-Harness-到.md",
+      "category": "4_特定框架",
+      "title": "",
+      "entities": {
+        "Harness": 1,
+        "Agent": 14,
+        "Sub-agent": 10,
+        "Skills": 6,
+        "Claude Code": 9,
+        "Claude": 5,
+        "Cursor": 1,
+        "DeerFlow": 17,
+        "DeepSeek": 1,
+        "GPT": 1,
+        "字节跳动": 3,
+        "Sandbox/沙盒": 11,
+        "Workflow": 2,
+        "Plan/规划": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/4_特定框架/006-精通-Harness架构-DeerFlow-20-的-lead_agent-任务.md",
+      "category": "4_特定框架",
+      "title": "",
+      "entities": {
+        "Harness": 12,
+        "Agent": 34,
+        "Sub-agent": 23,
+        "Tool Use": 2,
+        "Manus": 2,
+        "DeerFlow": 36,
+        "DeepSeek": 2,
+        "OpenAI": 4,
+        "字节跳动": 3,
+        "Sandbox/沙盒": 9,
+        "Workflow": 2,
+        "约束/Constraint": 4,
+        "护城河/Moat": 1,
+        "上下文窗口": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/4_特定框架/007-2小时速通-Harness-工程如何从零搭一套Claude-Code智能体系统.md",
+      "category": "4_特定框架",
+      "title": "",
+      "entities": {
+        "Harness": 9,
+        "Agent": 18,
+        "Sub-agent": 8,
+        "Skills": 4,
+        "Tool Use": 1,
+        "Claude Code": 1,
+        "Claude": 1,
+        "Workflow": 1,
+        "约束/Constraint": 1,
+        "上下文窗口": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/4_特定框架/008-ClaudeCode-Harness-Engineering驾驭者工程的最佳实践.md",
+      "category": "4_特定框架",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 16,
+        "Harness": 19,
+        "Agent": 4,
+        "Sub-agent": 4,
+        "MCP": 13,
+        "Skills": 2,
+        "Context Engineering": 1,
+        "Tool Use": 4,
+        "CLAUDE.md": 5,
+        "Claude Code": 40,
+        "Claude": 42,
+        "Anthropic": 15,
+        "Google": 1,
+        "Sandbox/沙盒": 4,
+        "Workflow": 8,
+        "约束/Constraint": 4,
+        "上下文窗口": 5,
+        "渐进式披露": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/4_特定框架/009-深度解析-OpenClaw-在-Prompt--Context--Harness.md",
+      "category": "4_特定框架",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 21,
+        "Harness": 13,
+        "Agent": 13,
+        "AI Agent": 1,
+        "Sub-agent": 5,
+        "Skills": 18,
+        "Context Engineering": 12,
+        "Prompt Engineering": 13,
+        "Tool Use": 6,
+        "ReAct": 2,
+        "Reflection": 4,
+        "Agentic Workflow": 1,
+        "AGENTS.md": 6,
+        "Claude Code": 1,
+        "Claude": 4,
+        "OpenClaw": 14,
+        "GPT": 1,
+        "Anthropic": 2,
+        "OpenAI": 2,
+        "阿里": 2,
+        "Sandbox/沙盒": 11,
+        "约束/Constraint": 25,
+        "上下文窗口": 12,
+        "Plan/规划": 1,
+        "渐进式披露": 4
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/4_特定框架/010-深度解析-Claude-Code-在-Prompt--Context--Harn.md",
+      "category": "4_特定框架",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 17,
+        "Harness": 12,
+        "Agent": 56,
+        "Coding Agent": 3,
+        "Sub-agent": 14,
+        "MCP": 6,
+        "Skills": 10,
+        "Context Engineering": 11,
+        "Prompt Engineering": 12,
+        "Tool Use": 14,
+        "CLAUDE.md": 14,
+        "Claude Code": 80,
+        "Claude": 36,
+        "OpenClaw": 4,
+        "Anthropic": 3,
+        "Sandbox/沙盒": 9,
+        "Workflow": 2,
+        "约束/Constraint": 15,
+        "上下文窗口": 8,
+        "Plan/规划": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/4_特定框架/011-深度解析-Hermes-Agent-如何实现自进化及其-Prompt--Cont.md",
+      "category": "4_特定框架",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 7,
+        "Harness": 5,
+        "Agent": 77,
+        "Sub-agent": 16,
+        "Skills": 18,
+        "Context Engineering": 6,
+        "Prompt Engineering": 8,
+        "Tool Use": 10,
+        "ReAct": 1,
+        "Reflection": 1,
+        "CLAUDE.md": 1,
+        "Claude Code": 18,
+        "Claude": 5,
+        "OpenClaw": 30,
+        "Cursor": 2,
+        "Hermes": 89,
+        "Gemini": 5,
+        "GPT": 11,
+        "Anthropic": 4,
+        "OpenAI": 1,
+        "Google": 1,
+        "Sandbox/沙盒": 1,
+        "Workflow": 2,
+        "约束/Constraint": 5,
+        "上下文窗口": 3,
+        "评测/Eval": 6
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/5_面试_岗位/001-26年AI产品经理为什么必须掌握Harness-Engineering.md",
+      "category": "5_面试_岗位",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 13,
+        "Harness": 11,
+        "Agent": 6,
+        "AI Agent": 1,
+        "Context Engineering": 3,
+        "Prompt Engineering": 2,
+        "Vibe Coding": 6,
+        "AGENTS.md": 2,
+        "DeepSeek": 1,
+        "GPT": 1,
+        "Sandbox/沙盒": 3,
+        "约束/Constraint": 9,
+        "上下文窗口": 1,
+        "渐进式披露": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/5_面试_岗位/002-鹅厂面试官你用过-Harness-Engineering-吗-我冷笑这不是-22.md",
+      "category": "5_面试_岗位",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 4,
+        "Harness": 44,
+        "Agent": 6,
+        "Sub-agent": 4,
+        "MCP": 5,
+        "Skills": 6,
+        "Spec": 2,
+        "SDD": 3,
+        "Context Engineering": 2,
+        "Prompt Engineering": 2,
+        "Tool Use": 2,
+        "Vibe Coding": 1,
+        "AGENTS.md": 12,
+        "Cursor": 1,
+        "OpenAI": 3,
+        "Stripe": 1,
+        "Workflow": 4,
+        "约束/Constraint": 6,
+        "评测/Eval": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/5_面试_岗位/003-鹅厂面试官你怎么看-Harness-Engineering-我就是给大模型套缰绳.md",
+      "category": "5_面试_岗位",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 22,
+        "Harness": 68,
+        "Agent": 141,
+        "AI Agent": 3,
+        "Coding Agent": 2,
+        "MCP": 1,
+        "Skills": 3,
+        "Context Engineering": 18,
+        "Prompt Engineering": 17,
+        "ReAct": 2,
+        "Reflection": 2,
+        "AGENTS.md": 8,
+        "CLAUDE.md": 3,
+        "Claude Code": 4,
+        "Claude": 10,
+        "OpenClaw": 1,
+        "Cursor": 4,
+        "Codex": 11,
+        "TRAE": 3,
+        "Devin": 4,
+        "GPT": 1,
+        "Anthropic": 19,
+        "OpenAI": 27,
+        "Mitchell Hashimoto": 5,
+        "约束/Constraint": 14,
+        "上下文窗口": 13,
+        "评测/Eval": 6,
+        "Plan/规划": 1,
+        "渐进式披露": 3
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/5_面试_岗位/004-面试官Harness-Engineering-到底是什么你的项目用了吗.md",
+      "category": "5_面试_岗位",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 10,
+        "Harness": 66,
+        "Agent": 61,
+        "AI Agent": 7,
+        "Coding Agent": 1,
+        "MCP": 6,
+        "Skills": 3,
+        "Context Engineering": 8,
+        "Prompt Engineering": 3,
+        "Tool Use": 5,
+        "ReAct": 1,
+        "Reflection": 1,
+        "A2A": 1,
+        "Agentic Workflow": 1,
+        "AGENTS.md": 12,
+        "Claude Code": 2,
+        "Codex": 1,
+        "Manus": 1,
+        "Anthropic": 7,
+        "OpenAI": 8,
+        "Stripe": 3,
+        "Martin Fowler": 1,
+        "Mitchell Hashimoto": 2,
+        "Sandbox/沙盒": 5,
+        "约束/Constraint": 12,
+        "反馈回路": 4,
+        "上下文窗口": 3,
+        "渐进式披露": 3
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/5_面试_岗位/005-字节面试官拷打我是否了解Harness-Engineering我笑了LLM很强但.md",
+      "category": "5_面试_岗位",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 26,
+        "Harness": 81,
+        "Agent": 109,
+        "AI Agent": 2,
+        "Sub-agent": 1,
+        "MCP": 1,
+        "Skills": 8,
+        "Context Engineering": 15,
+        "Prompt Engineering": 7,
+        "ReAct": 1,
+        "AGENTS.md": 12,
+        "CLAUDE.md": 2,
+        "Claude Code": 2,
+        "Claude": 4,
+        "OpenClaw": 19,
+        "Cursor": 2,
+        "Codex": 5,
+        "Hermes": 20,
+        "Devin": 4,
+        "Anthropic": 16,
+        "OpenAI": 15,
+        "Mitchell Hashimoto": 6,
+        "Sandbox/沙盒": 1,
+        "Workflow": 1,
+        "约束/Constraint": 13,
+        "上下文窗口": 7,
+        "评测/Eval": 3,
+        "Plan/规划": 1,
+        "渐进式披露": 4
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/6_概念对比/001-HarnessSDD终结AI编程的Vibe-Coding时代.md",
+      "category": "6_概念对比",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 3,
+        "Harness": 12,
+        "Agent": 2,
+        "AI Agent": 2,
+        "Sub-agent": 1,
+        "Skills": 1,
+        "Spec": 5,
+        "SDD": 13,
+        "Vibe Coding": 6,
+        "Anthropic": 2,
+        "Sandbox/沙盒": 1,
+        "约束/Constraint": 4,
+        "反馈回路": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/6_概念对比/002-告别氛围编程基于-Harness-治理和-SDD-的团队级-AI-研发范式演进与.md",
+      "category": "6_概念对比",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 7,
+        "Harness": 13,
+        "Agent": 10,
+        "AI Agent": 2,
+        "MCP": 2,
+        "Skills": 6,
+        "Spec": 10,
+        "SDD": 15,
+        "Context Engineering": 4,
+        "Prompt Engineering": 2,
+        "Vibe Coding": 8,
+        "Sandbox/沙盒": 1,
+        "Workflow": 1,
+        "约束/Constraint": 5,
+        "反馈回路": 1,
+        "上下文窗口": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/6_概念对比/003-从-Prompt-Engineering-到-Context-Engineeri.md",
+      "category": "6_概念对比",
+      "title": "",
+      "entities": {
+        "Agent": 17,
+        "AI Agent": 3,
+        "Coding Agent": 1,
+        "MCP": 45,
+        "Skills": 130,
+        "Context Engineering": 1,
+        "Prompt Engineering": 2,
+        "Tool Use": 2,
+        "ReAct": 1,
+        "Reflection": 1,
+        "Vibe Coding": 2,
+        "A2A": 1,
+        "AGENTS.md": 24,
+        "Claude Code": 2,
+        "Claude": 9,
+        "Cursor": 3,
+        "Codex": 7,
+        "Gemini": 10,
+        "GPT": 8,
+        "Anthropic": 10,
+        "OpenAI": 10,
+        "Google": 5,
+        "Sandbox/沙盒": 1,
+        "Workflow": 10,
+        "约束/Constraint": 5,
+        "上下文窗口": 5,
+        "渐进式披露": 5
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/6_概念对比/004-Agent-趋势浅思原生化--CLI-化.md",
+      "category": "6_概念对比",
+      "title": "",
+      "entities": {
+        "Agent": 21,
+        "AI Agent": 1,
+        "MCP": 4,
+        "Skills": 3,
+        "Tool Use": 1,
+        "A2A": 1,
+        "Claude": 3,
+        "OpenClaw": 19,
+        "Anthropic": 1,
+        "OpenAI": 2,
+        "Google": 2,
+        "Workflow": 1,
+        "约束/Constraint": 1,
+        "护城河/Moat": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/6_概念对比/005-一文搞懂-AI-Agent-核心概念Agent-LoopContext-Engi.md",
+      "category": "6_概念对比",
+      "title": "",
+      "entities": {
+        "Agent": 51,
+        "AI Agent": 8,
+        "MCP": 13,
+        "Skills": 10,
+        "Context Engineering": 17,
+        "Tool Use": 4,
+        "ReAct": 1,
+        "Reflection": 1,
+        "AGENTS.md": 2,
+        "Claude Code": 1,
+        "Claude": 1,
+        "Cursor": 1,
+        "Gemini": 1,
+        "Anthropic": 3,
+        "OpenAI": 5,
+        "Google": 1,
+        "Sandbox/沙盒": 3,
+        "Workflow": 7,
+        "约束/Constraint": 6,
+        "上下文窗口": 3,
+        "Plan/规划": 2
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/6_概念对比/006-万字详解-Agent-核心方式-ReActReflectionA2AAgenti.md",
+      "category": "6_概念对比",
+      "title": "",
+      "entities": {
+        "Agent": 50,
+        "AI Agent": 3,
+        "Sub-agent": 5,
+        "Skills": 9,
+        "Tool Use": 2,
+        "ReAct": 26,
+        "Reflection": 14,
+        "A2A": 9,
+        "Agentic Workflow": 7,
+        "GPT": 1,
+        "Workflow": 6,
+        "Plan/规划": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/6_概念对比/007-一文讲透Agentic-Engineering与Harness-Engineer.md",
+      "category": "6_概念对比",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 12,
+        "Harness": 17,
+        "Agent": 22,
+        "AI Agent": 3,
+        "MCP": 1,
+        "Context Engineering": 3,
+        "Prompt Engineering": 3,
+        "Tool Use": 1,
+        "Vibe Coding": 4,
+        "Agentic Engineering": 11,
+        "AGENTS.md": 2,
+        "Claude Code": 2,
+        "Claude": 1,
+        "Mitchell Hashimoto": 3,
+        "约束/Constraint": 5
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/6_概念对比/008-提示词工程上下文工程都过时了现在是-Harness-Engineering-的时.md",
+      "category": "6_概念对比",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 16,
+        "Harness": 31,
+        "Agent": 71,
+        "AI Agent": 1,
+        "Coding Agent": 2,
+        "MCP": 4,
+        "Context Engineering": 13,
+        "Prompt Engineering": 9,
+        "AGENTS.md": 16,
+        "Claude Code": 1,
+        "OpenClaw": 5,
+        "Cursor": 1,
+        "Codex": 4,
+        "Anthropic": 1,
+        "OpenAI": 20,
+        "Google": 1,
+        "Stripe": 10,
+        "Martin Fowler": 2,
+        "Mitchell Hashimoto": 3,
+        "约束/Constraint": 9,
+        "反馈回路": 2,
+        "上下文窗口": 2,
+        "评测/Eval": 1,
+        "渐进式披露": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/7_行业趋势/001-一文带你看懂火爆全网的Harness-Engineering到底是个啥.md",
+      "category": "7_行业趋势",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 19,
+        "Harness": 11,
+        "Agent": 2,
+        "AI Agent": 4,
+        "Skills": 1,
+        "Context Engineering": 11,
+        "Prompt Engineering": 10,
+        "CLAUDE.md": 2,
+        "Claude Code": 1,
+        "Claude": 2,
+        "约束/Constraint": 12,
+        "反馈回路": 1,
+        "控制论": 2,
+        "上下文窗口": 4
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/7_行业趋势/002-Harness-Engineering-在硅谷彻底火了.md",
+      "category": "7_行业趋势",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 8,
+        "Harness": 15,
+        "Agent": 8,
+        "A2A": 1,
+        "GitHub Copilot": 1,
+        "OpenAI": 1,
+        "Google": 1,
+        "Workflow": 2,
+        "反馈回路": 1,
+        "评测/Eval": 2
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/7_行业趋势/003-Harness-Engineering在硅谷爆火一文带你搞懂.md",
+      "category": "7_行业趋势",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 4,
+        "Harness": 15,
+        "Agent": 6,
+        "AGENTS.md": 4,
+        "Claude": 1,
+        "Codex": 2,
+        "GPT": 1,
+        "Anthropic": 7,
+        "OpenAI": 14,
+        "Mitchell Hashimoto": 1,
+        "Sandbox/沙盒": 2,
+        "约束/Constraint": 1,
+        "反馈回路": 1,
+        "上下文窗口": 1
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/7_行业趋势/004-一文带你弄懂-AI-圈爆火的新概念Harness-Engineering.md",
+      "category": "7_行业趋势",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 13,
+        "Harness": 64,
+        "Agent": 42,
+        "Skills": 3,
+        "Context Engineering": 16,
+        "Prompt Engineering": 12,
+        "Tool Use": 2,
+        "AGENTS.md": 6,
+        "Claude": 2,
+        "Codex": 3,
+        "Anthropic": 12,
+        "OpenAI": 9,
+        "约束/Constraint": 16,
+        "反馈回路": 1,
+        "上下文窗口": 4,
+        "Plan/规划": 2,
+        "渐进式披露": 4
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/7_行业趋势/005-一文详解AI圈爆火概念Harness-Engineering决定智能体系统上限的.md",
+      "category": "7_行业趋势",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 21,
+        "Harness": 29,
+        "Agent": 24,
+        "AI Agent": 2,
+        "Skills": 2,
+        "Context Engineering": 8,
+        "Prompt Engineering": 8,
+        "Tool Use": 1,
+        "Claude Code": 1,
+        "Anthropic": 6,
+        "OpenAI": 7,
+        "约束/Constraint": 8,
+        "上下文窗口": 2,
+        "Plan/规划": 1,
+        "渐进式披露": 2
+      }
+    },
+    {
+      "path": "wiki/raw/harness-engineering/7_行业趋势/006-一篇文章告诉你最近爆火的Harness-Engineering究竟是什么.md",
+      "category": "7_行业趋势",
+      "title": "",
+      "entities": {
+        "Harness Engineering": 20,
+        "Harness": 11,
+        "Prompt Engineering": 9,
+        "Vibe Coding": 1,
+        "OpenClaw": 1,
+        "Anthropic": 2,
+        "OpenAI": 1,
+        "约束/Constraint": 5,
+        "反馈回路": 1,
+        "控制论": 1
+      }
+    }
+  ]
+}

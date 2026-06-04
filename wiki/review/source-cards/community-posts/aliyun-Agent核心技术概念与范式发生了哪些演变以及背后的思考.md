@@ -1,0 +1,55 @@
+---
+id: source-card-community-aliyun-Agent核心技术概念与范式发生了哪些演变以及背后的思考
+type: source-card
+status: triaged
+source: wiki/raw/community-posts/aliyun-cloud-developer/2026-05-22-Agent核心技术概念与范式发生了哪些演变以及背后的思考.md
+updated: 2026-05-26
+---
+
+# 阿里云开发者文章卡 · Agent核心技术概念与范式发生了哪些演变以及背后的思考
+
+## 原文信息
+
+- 来源: 阿里云开发者 微信公众号
+- 作者: 飞樰
+- 发布时间: 2026/05/22 08:30:00
+- URL: https://mp.weixin.qq.com/s/11Krmb5KYmCHDQ4zN9O4uQ
+- 原文: [raw](../../../raw/community-posts/aliyun-cloud-developer/2026-05-22-Agent核心技术概念与范式发生了哪些演变以及背后的思考.md)
+
+## 关键线索
+
+| 线索 | 命中次数 |
+|---|---:|
+| Agent/智能体 | 136 |
+| Memory/记忆 | 56 |
+| MCP/工具 | 25 |
+| Prompt/提示词 | 25 |
+| Skills/技能 | 24 |
+| 上下文/Context | 19 |
+| 多智能体/编排 | 14 |
+| OpenClaw/Claude/Hermes | 12 |
+| Harness/驾驭 | 4 |
+| 评测/反馈 | 4 |
+| 阿里/通义/百炼 | 4 |
+| Spec/规约 | 1 |
+
+## 内容结构
+
+- 无明显标题结构
+
+## 触发器判定
+
+- 触发器: 阿里云开发者社区材料,围绕 Agent 工程、通义/百炼/Lingma 实践、Harness、Multi-Agent、Memory、Skills、Spec 等主题。
+- 当前状态: triaged, 已进入阿里云开发者合集账本；核心结论由合集 topic 汇总并指向 Harness、Skills、Memory、评测等概念页。
+
+## 已沉淀去向
+
+- [topics/aliyun-cloud-developer-agent-collection.md](../../../topics/aliyun-cloud-developer-agent-collection.md)
+- [concepts/harness-engineering.md](../../../concepts/harness-engineering.md)
+- [concepts/progressive-disclosure.md](../../../concepts/progressive-disclosure.md)
+- [concepts/spec-driven-agent-development.md](../../../concepts/spec-driven-agent-development.md)
+- [topics/agent-evaluation-system.md](../../../topics/agent-evaluation-system.md)
+
+## 待升级 / 待复核
+
+- 进入概念页或竞品报告写作时按本文核验证据粒度。

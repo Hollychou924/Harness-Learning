@@ -196,6 +196,24 @@ Codex 的 LICENSE 处理是值得参考的样本（[github.com/openai/codex](htt
 
 ---
 
+## 附录 A:中文社区数据校验 (2026 Q1)
+
+> 基于 `wiki/raw/harness-engineering/` 63 篇中文社区文章 + `wiki/analysis/entity-scan.md`,本节用一手中文语料交叉验证本报告论点。详见战略备忘录 [community-divergence/report.md](../community-divergence/report.md)。
+
+**A.1 国产 Harness 开源案例**:中文社区已有四条独立产品/项目线,可补强本报告的国际产品对比:
+
+| 国产玩家 | 文章数 (DF) | 性质 | 本报告该如何补充 |
+|---|---:|---|---|
+| **字节 DeerFlow 2.0** | 5 (TF=129) | 公开开源框架,文章深度高 | §3 "完全开源路径"加该案例,与 Hermes 同列 |
+| **字节 TRAE** | 3 (TF=5) | 产品介绍为主,数据稀薄 | §2 "三种开源策略"作为商业开源代表 |
+| **复旦 AHE** | 1 | 学术框架,工程影响弱 | §4 "学术贡献" 注脚 |
+| **Aegis (个人项目)** | 2 (TF=10) | 工程师内部踩坑实录 | 反例:个人项目的开源风险 |
+| **QQ 音乐 Harness 实践** | 1 深度专文 | 大厂私有实践 | §5 "未开源的私有 Harness" 案例 |
+
+**A.2 对 DeepSeek 的开源策略启示**:中文社区已习惯"框架 (DeerFlow) + 产品 (TRAE) + 实践 (QQ 音乐)" 三层叙事,DeepSeek 应当对应有 SDK / 产品 / 标杆案例三件套,而非只发布单一仓库。
+
+---
+
 ## 致谢与方法论
 
 数据来源: 26 个 Agent 产品的 wiki/compiled 数据集，基于 Karpathy LLM Wiki 模式 +

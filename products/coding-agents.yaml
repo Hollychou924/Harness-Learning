@@ -44,3 +44,19 @@ products:
     homepage: https://manus.im
     docs_root: https://docs.manus.im
     keywords: ["manus", "Manus", "Manus AI"]
+
+  - id: codebuddy
+    name: CodeBuddy
+    category: coding
+    priority: P1
+    homepage: https://www.codebuddy.ai
+    docs_root: https://www.codebuddy.cn/docs
+    keywords: ["codebuddy", "CodeBuddy", "CodeBuddy Code", "WorkBuddy", "腾讯CodeBuddy"]
+
+  - id: qoder
+    name: Qoder
+    category: coding
+    priority: P1
+    homepage: https://qoder.com
+    docs_root: https://qoder.com
+    keywords: ["qoder", "Qoder", "Qoder CLI", "QoderWork", "Quest"]

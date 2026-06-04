@@ -1,0 +1,113 @@
+{
+  "E1": {
+    "product_id": "qoder",
+    "dimension_id": "E1",
+    "value": "完整 Shell + 权限模式",
+    "evidence_urls": [
+      "https://mp.weixin.qq.com/s/7q45FEBb1M7JUWiwo0tnSg",
+      "https://mp.weixin.qq.com/s/MQujvCjIEV5ESVmCHN0ARA"
+    ],
+    "evaluator": "human:zhouhao-via-codex-2026-05-25",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-25T13:20:00Z",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "E4": {
+    "product_id": "qoder",
+    "dimension_id": "E4",
+    "value": "原生 + Marketplace",
+    "evidence_urls": [
+      "https://mp.weixin.qq.com/s/76aGWyhuhAEWZxZCVTeoUg",
+      "https://mp.weixin.qq.com/s/Q49JcYhaP_fnX-b7Pww4Bw"
+    ],
+    "evaluator": "human:zhouhao-via-codex-2026-05-25",
+    "confidence": "INFERRED",
+    "last_verified": "2026-05-25T13:20:00Z",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "E5": {
+    "product_id": "qoder",
+    "dimension_id": "E5",
+    "value": 3,
+    "evidence_urls": [
+      "https://mp.weixin.qq.com/s/Y9Wz88D-jjCM9cmh9-zXwQ",
+      "https://mp.weixin.qq.com/s/76aGWyhuhAEWZxZCVTeoUg",
+      "https://mp.weixin.qq.com/s/pYt7ww6L7_BbxMzXVqWynA",
+      "https://mp.weixin.qq.com/s/TQtJYIzvp0e-rP9_n8WdAQ"
+    ],
+    "evaluator": "human:zhouhao-via-codex-2026-05-25",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-25T13:20:00Z",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "E6": {
+    "product_id": "qoder",
+    "dimension_id": "E6",
+    "value": 3,
+    "evidence_urls": [
+      "https://mp.weixin.qq.com/s/76aGWyhuhAEWZxZCVTeoUg",
+      "https://mp.weixin.qq.com/s/rx9yNaCJcBh9a_8dOedOlw",
+      "https://mp.weixin.qq.com/s/YIzCnByYLsYuWDclLdYR8Q"
+    ],
+    "evaluator": "human:zhouhao-via-codex-2026-05-25",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-25T13:20:00Z",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "F1": {
+    "product_id": "qoder",
+    "dimension_id": "F1",
+    "value": "Repo Wiki, Memory, Rules, Knowledge Cards, Skills, Hooks, Commands",
+    "evidence_urls": [
+      "https://mp.weixin.qq.com/s/uPexQ8p0YkF_BX_63J6WFA",
+      "https://mp.weixin.qq.com/s/G7iY_sa3e6FI64ZreZlZpg",
+      "https://mp.weixin.qq.com/s/Y9Wz88D-jjCM9cmh9-zXwQ"
+    ],
+    "evaluator": "human:zhouhao-via-codex-2026-05-25",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-25T13:20:00Z",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "F3": {
+    "product_id": "qoder",
+    "dimension_id": "F3",
+    "value": 3,
+    "evidence_urls": [
+      "https://mp.weixin.qq.com/s/uPexQ8p0YkF_BX_63J6WFA",
+      "https://mp.weixin.qq.com/s/G7iY_sa3e6FI64ZreZlZpg",
+      "https://mp.weixin.qq.com/s/76aGWyhuhAEWZxZCVTeoUg",
+      "https://mp.weixin.qq.com/s/MS-1iU5YMS43Pt9LKl2pTQ"
+    ],
+    "evaluator": "human:zhouhao-via-codex-2026-05-25",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-25T13:20:00Z",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "M3": {
+    "product_id": "qoder",
+    "dimension_id": "M3",
+    "value": 2,
+    "evidence_urls": [
+      "https://mp.weixin.qq.com/s/76aGWyhuhAEWZxZCVTeoUg",
+      "https://mp.weixin.qq.com/s/pYt7ww6L7_BbxMzXVqWynA"
+    ],
+    "evaluator": "human:zhouhao-via-codex-2026-05-25",
+    "confidence": "INFERRED",
+    "last_verified": "2026-05-25T13:20:00Z",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  }
+}

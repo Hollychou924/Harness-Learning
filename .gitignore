@@ -9,3 +9,9 @@ node_modules/
 *.log
 wiki/raw/*/
 !wiki/raw/.gitkeep
+
+# 本地工具配置(不上传)
+.obsidian/
+.claude/
+.claudian/
+.pytest_cache/

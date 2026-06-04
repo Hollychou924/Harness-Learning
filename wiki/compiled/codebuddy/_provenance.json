@@ -1,0 +1,107 @@
+{
+  "E1": {
+    "product_id": "codebuddy",
+    "dimension_id": "E1",
+    "value": "完整 Shell + 权限模式",
+    "evidence_urls": [
+      "https://mp.weixin.qq.com/s/bBbyPh7ENDgduvKOa3NSHg",
+      "https://mp.weixin.qq.com/s/_Am4oTfCT4L1kjLeNuvm_Q"
+    ],
+    "evaluator": "human:zhouhao-via-codex-2026-05-25",
+    "confidence": "INFERRED",
+    "last_verified": "2026-05-25T12:50:00Z",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "E4": {
+    "product_id": "codebuddy",
+    "dimension_id": "E4",
+    "value": "原生 + Marketplace",
+    "evidence_urls": [
+      "https://mp.weixin.qq.com/s/0Gc8Thmhfn8Eu7l4CkCqKA",
+      "https://mp.weixin.qq.com/s/_TC4LtRWFT_8I7EpXsLOOg"
+    ],
+    "evaluator": "human:zhouhao-via-codex-2026-05-25",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-25T12:50:00Z",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "E5": {
+    "product_id": "codebuddy",
+    "dimension_id": "E5",
+    "value": 3,
+    "evidence_urls": [
+      "https://mp.weixin.qq.com/s/bBbyPh7ENDgduvKOa3NSHg",
+      "https://mp.weixin.qq.com/s/vY7-ouX0AVwlwZS-ABfXkg",
+      "https://mp.weixin.qq.com/s/ySG8pEtGseB0aFgeM-0hIw"
+    ],
+    "evaluator": "human:zhouhao-via-codex-2026-05-25",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-25T12:50:00Z",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "E6": {
+    "product_id": "codebuddy",
+    "dimension_id": "E6",
+    "value": 2,
+    "evidence_urls": [
+      "https://mp.weixin.qq.com/s/OswD2kNBTflnDMLOhCZhKQ",
+      "https://mp.weixin.qq.com/s/-F6-4CPEnFCtRN9VzRdWzg"
+    ],
+    "evaluator": "human:zhouhao-via-codex-2026-05-25",
+    "confidence": "INFERRED",
+    "last_verified": "2026-05-25T12:50:00Z",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "F1": {
+    "product_id": "codebuddy",
+    "dimension_id": "F1",
+    "value": ".codebuddy/skills, .codebuddy/commands, .codebuddy/settings.json, Rules, Memory",
+    "evidence_urls": [
+      "https://mp.weixin.qq.com/s/bBbyPh7ENDgduvKOa3NSHg",
+      "https://mp.weixin.qq.com/s/vY7-ouX0AVwlwZS-ABfXkg",
+      "https://mp.weixin.qq.com/s/drLgTdwqz6cM9FhKiGhgpg"
+    ],
+    "evaluator": "human:zhouhao-via-codex-2026-05-25",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-25T12:50:00Z",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "F3": {
+    "product_id": "codebuddy",
+    "dimension_id": "F3",
+    "value": 2,
+    "evidence_urls": [
+      "https://mp.weixin.qq.com/s/iJloC3RKtu2iQdNk2uDRfA"
+    ],
+    "evaluator": "human:zhouhao-via-codex-2026-05-25",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-25T12:50:00Z",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  },
+  "M3": {
+    "product_id": "codebuddy",
+    "dimension_id": "M3",
+    "value": 3,
+    "evidence_urls": [
+      "https://mp.weixin.qq.com/s/iJloC3RKtu2iQdNk2uDRfA"
+    ],
+    "evaluator": "human:zhouhao-via-codex-2026-05-25",
+    "confidence": "EXTRACTED",
+    "last_verified": "2026-05-25T12:50:00Z",
+    "review_status": null,
+    "review_decision_at": null,
+    "reviewer": null
+  }
+}
