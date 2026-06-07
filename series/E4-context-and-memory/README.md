@@ -19,6 +19,7 @@
 
 **上半场 · 上下文窗口怎么装**
 1. **Q1:一次对话,Agent 到底带着哪些东西?** — 全章地图,讲成 Context Stack(分层+稳定性+风险):system prompt、rules、tools、messages、repo、memory、tool results。拆镇文图 §2+§6A。
+   - **1.1 增补(2026-06-07,原 E5 Q4 挪入)**:AGENTS.md/CLAUDE.md 怎么写才真起作用、为什么写了 Agent 不遵守——做目录不做百科(100 行内)、Prompt 是分层宪法不是人格台词、CLAUDE.md(经验收编)vs AGENTS.md(制度挂载)。
 2. **Q2:上下文不是越多越好,怎么决定"带什么、不带什么"?**(新增) — 压缩是泄压手段,选择才是第一性问题。context selection / ranking / priority;Cursor glob 触发、渐进式披露、RAG→Grep 让 Agent 自己选。
 3. **Q3:上下文快满了,压缩谁、保留谁、丢弃谁?** — 三层分类(常驻/按需召回/可丢弃)。腾讯实测:正确卸载省 61% Token、成功率 +52%。
 4. **Q4:四级 compact 怎么触发?为什么要留 Compact Buffer?** — 讲成 checkpoint 泄压链(不是摘要):MicroCompact→Snip→AutoCompact→Reactive,buffer 是给压缩留执行空间的安全余量。
@@ -74,4 +75,5 @@
 - [ ] 四级 compact 是否给了"哪种场景触发哪一级"判断表,且讲成 checkpoint 不是摘要
 - [ ] cache 是否讲成 prompt 架构 + 给了 cache×compact 冲突
 - [ ] 记忆是否讲成生命周期(写入/召回/更新/隔离/遗忘/防投毒)
+- [ ] AGENTS.md/CLAUDE.md 是否讲清"做目录不做百科 + 分层宪法"(为什么写了不遵守)
 - [ ] 拔高是否把上下文与记忆呼应回 E1 双核(信息操作系统)
