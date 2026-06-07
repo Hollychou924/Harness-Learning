@@ -1,43 +1,60 @@
-# E1｜重新理解 Agent + 桌面端 Agent 全景图
+# E1｜什么是 Harness:从认知到能力模型
 
-> 状态:✍️ 草稿中 · 字数目标:6000-8000(开门炮可放宽)
-> 定位:全系列的**地图与指南针** + 求职信号弹。立论 + 框架为主,9 款产品只做速览,深度对比留给后续各章。
+> 状态:✍️ 大纲已重排(按 6 问) · 字数目标:6000-8000(开门炮可放宽)
+> 定位:全系列的地图与指南针 + 求职信号弹。立论 + 框架为主,9 款产品只做速览。
 
-## 本章要回答的真实问题
+## 本章要回答的真实问题(2026-06 按周浩定稿重排)
 
-1. **Q1:同一个任务,该用 Claude Code 直接跑、还是自建一套 Agent 系统?** — 场景:团队启动 Agent 项目的第一个决策。现成产品 Harness 固定,自建才能做业务定制——界限在哪?
-2. **Q2:我的业务该接 API 模式、桌面端 Agent、还是 IDE 插件?怎么分析?** — 场景:选型不是看品牌,是看"任务需要 Agent 触达什么工具/文件/渠道/权限"。
-3. **Q3:跟老板讲"Agent 化改造",ROI 怎么算才诚实?** — 场景:阿里 25%→90% 是成功路径,腾讯 4 亿 token 5 教训是踩坑路径,放一起才是诚实估算。
-4. **Q4:Demo 跑得好、放真实项目就翻车,鸿沟在哪?** — 场景:"Demo 易、泛化难";"Agent 知识边界=代码库文件边界";"有监控但监控没用更危险"。
-5. **Q5:做 Agent 产品,PM 的工作方式和传统软件有什么本质不同?** — 场景:从"写 PRD"变成"设计 Agent 能在什么边界里可靠干活"。
+1. **Q1:什么是 Harness?它怎么一步步演变出来的?** — 三层框架 + 5 阶段演进。
+2. **Q2:为什么需要 Harness?它有多重要?** — 阿里成功路径 + 腾讯踩坑成本,顺带把 ROI 讲诚实。
+3. **Q3:Harness 一共有哪些模块/组件?** — 五大组件(=E2-E6 目录)+ ETCLOVG 七层。
+4. **Q4:怎么判断一个产品的 Harness 做得好不好?** — 把七层变成一张打分表(先给尺子)。
+5. **Q5:市面上哪些产品的 Harness 做得好?** — 9 款一句话定位速览(再用尺子量)。
+6. **Q6:Harness 时代对 AIPM 的能力模型提出什么要求?** — 收敛到架构设计 + 评估双核闭环。
 
-## 镇文之图
-
-这张「上下文生命周期 + KV Cache 分层」架构图(见 `assets/`)是 E1 证明 **"Harness 不是框架,是 Agent 的操作系统"** 的核心论据——E1 放**简化版**,E4 放完整版,首尾呼应。
+> 顺序说明:Q4 判断标准刻意放在 Q5 产品速览之前,先给尺子再量产品,最像专业测评。
 
 ## 章节骨架(详见 outline.md)
 
-1. PM 钩子:为什么用了最强模型,效果还不如对手
-2. 三次范式跃迁:Prompt → Context → Harness
-3. Harness = Agent 的操作系统(用简化版架构图)
-4. **五大组件框架**(= E2-E6 目录):编排 / 工具 / 上下文与记忆 / 能力组织 / 安全
-5. 桌面端 Agent 全景**速览表**(9 款一句话定位,不深挖)
-6. Harness Engineer 能力模型 + PM 与工程师对话清单
+0. 钩子:用了最强模型,效果还不如对手
+1. 什么是 Harness + 5 阶段发展轨迹
+2. 为什么需要 + 有多重要(阿里/腾讯 + ROI)
+3. 有哪些模块:五大组件 + ETCLOVG 七层(镇文图)
+4. 怎么判断好不好:七层打分表
+5. 9 款产品速览(配判断标准现场点评)
+6. AIPM 双核能力模型(架构设计 + 评估)+ 收尾清单
 
 ## 支撑素材(wiki 映射)
 
 | 问题 | wiki 素材 |
 |------|----------|
-| Q1/Q2/Q5 | `concepts/prompt-context-harness.md`、`concepts/harness-engineering.md` |
-| Q3 | `topics/aliyun-cloud-developer-agent-collection.md`、`topics/tencent-cloud-developer-agent-harness-collection.md` |
-| Q4 | `lessons/prompt-only-agent-is-not-production.md` |
-| 9 款速览 | `entities/*.md`(claude-code/cursor/codex/hermes-agent/manus/openclaw/qoder)、`comparisons/*.md`、`timelines/agent-harness-design-evolution.md` |
+| Q1 | `concepts/prompt-context-harness.md`、`timelines/agent-harness-design-evolution.md` |
+| Q2 | `lessons/prompt-only-agent-is-not-production.md`、`topics/aliyun-*`、`topics/tencent-*` |
+| Q3 | `concepts/harness-engineering.md`、`concepts/etclovg-agent-harness-taxonomy.md` |
+| Q4 | `concepts/etclovg-agent-harness-taxonomy.md`(转打分表) |
+| Q5 | `entities/*.md`(含新补 github-copilot/opencode/claude-cowork)、`comparisons/*.md` |
+| Q6 | 周浩定稿的双核能力模型(架构设计 + 评估)+ `concepts/harness-engineering.md` PM 用法 |
 
-## 素材缺口(待补)
+## 本轮已补的产品档案(2026-06-06 联网深搜)
 
-- JD 列的 9 款里,**缺 Cowork / OpenCode / GitHub Copilot 的产品档案**(wiki 现有 7 个,且含 JD 外的 codebuddy/qoder)。E1 速览可先用一句话定位顶上,深度档案后补。
+- ✅ `entities/github-copilot.md` — 补全到 Agent、Cloud agent、防火墙 allowlist、提示注入缓解、自动化收敛、签名提交审计
+- ✅ `entities/opencode.md` — 客户端-服务端分离 + OpenAPI、主/子 Agent 双层、allow/ask/deny 权限、provider policies、兼容 .claude/.agents skills
+- ✅ `entities/claude-cowork.md` — Claude Code 能力迁移到知识工作、计划-确认-执行、定时任务、Skills 复用、企业管控
+
+## 待你填的一手观察(求职作品集灵魂,不代写)
+
+- [ ] 第 0 节:第一次意识到"问题不在 prompt、在 harness"的真实场景
+- [ ] 第 2 节:现成产品 Harness 卡住你的具体经历
+- [ ] 第 5 节:2-3 款高强度用过的产品,各一句最意外/最难受的点
+- [ ] 第 6 节:对 DeepSeek 的一句留白
+
+## 素材缺口 / 待复核
+
+- ⚠️ Manus 暂无独立档案,速览先一句话顶。
+- ⚠️ 新档案的官方 URL 易变,引用具体配置/步骤前以官方最新文档为准。
 
 ## 收尾检查清单(草稿待填)
 
-- [ ] 五大组件框架是否能让读者拿去拆解任意一款产品
-- [ ] 9 款速览是否每款都有一句"原创定位",而非综述
+- [ ] 五大组件 + 七层打分表是否能让读者拿去拆/打分任意一款产品
+- [ ] 9 款速览是否每款都有一句原创定位,而非综述
+- [ ] 双核能力模型是否落到"工程师/数据科学家/模型研究员都替代不了 AIPM"的论证

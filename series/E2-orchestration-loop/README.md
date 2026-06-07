@@ -1,34 +1,75 @@
-# E2｜编排循环:任务怎么"跑起来"又不跑飞
+# E2｜Agent 循环与编排:任务怎么"跑起来"又不跑飞
 
-> 状态:🥚 未开始 · 字数目标:3000-5000
-> JD 锚点:Agent Loop / Reasoning / Planning
+> 状态:✍️ 大纲已重排(两幕式 7 问 + 拔高) · 字数目标:6000-7500(补了 Agent Loop,可放宽)
+> JD 锚点:Agent Loop / Reasoning / Planning / Orchestration
+> 定位:全系列第一篇"硬核模块章"。E1 给了 ETCLOVG 七层地图,E2 拎出贯穿 E/T/L 的"主循环"——先讲单个 Agent 的循环怎么设计(微观),再讲多步骤/多 Agent 怎么编排不跑飞(宏观)。
 
-## 本章要回答的真实问题
+## 本章要回答的真实问题(2026-06-07 两幕式重组)
 
-1. **Q1:Agent 一直循环调工具但没进展,死循环了,怎么预防和逃出?** — 场景:腾讯 4 亿 token Day 1 多层保护全触发却像多米诺全倒。答案:四道硬闸(max_steps/max_tokens/max_duration/max_tool_calls)由 Harness 统一管控,不能让 Agent 自己判断是否继续。
-2. **Q2:任务跑到一半崩了,怎么从断点续跑而不是从头重来?** — 场景:长任务 Agent 最常见、教程最少覆盖。"状态属于主业务" + 线程持久化 + checkpoint。
-3. **Q3:多个 Agent 并行,代码/数据互相踩踏,怎么隔离?** — 场景:Worker 并行用 Git Worktree 解决互踩;原则=并行 Agent 不共享可写状态。
-4. **Q4:让 Agent 自决下一步,还是外部系统指定?边界在哪?** — 场景:"让 Agent 出主意,让 Harness 拿决定";Planner 输出声明式计划而非命令式调用。
-5. **Q5:Watchdog 说"一切正常",任务其实早卡死,怎么设计才能真发现?** — 场景:68 次巡检全说正常,实际卡死 11.6 小时。监控要看"是否有效推进",不是"进程是否活着"。
+> 重组说明:周浩列了 20+ 编排相关问题,经抓大放小、剔重叠后,先补回"Agent Loop 怎么设计"(整个系列原本没人讲),再收敛为两幕式 7 问。被踢到后续章节的见文末"边界划分"。
 
-## 章节骨架
+**第一幕 · 循环:单个 Agent 怎么转(微观)**
 
-1. PM 钩子:Agent 卡住的 5 种常见死法
-2. TAO 循环:Think-Act-Observe
-3. 竞品锚点:Anthropic 笨循环 vs Cursor Agent Mode
-4. 关键决策点:终止条件 / 超时 / 重试 / 回滚
-5. 实战:100 行伪代码理解最小循环
+1. **Q1:什么是 Agent 循环?它和编排、和工具调用是什么关系?** — 定位+本质。循环=单个 Agent"想—做—看—再想"的圈;编排=多个步骤/Agent 之间的调度;工具调用=圈里"做"的那一下。
+2. **Q2:一个 Agent 的主循环具体怎么设计?** — 核心微观节,正面回答 JD"Agent Loop"。TAO(Think→Act→Observe→回灌再 Think)+ 三件事:循环何时该停(停止条件)、工具结果怎么回灌进下一轮、单步怎么不跑偏。
+3. **Q3:让 AI 边做边想,还是先出计划再执行?** — 循环的第一个分叉:ReAct(边想边做)vs Plan-and-Execute(先规划),怎么选、怎么混用;声明式计划 vs 命令式调用。
+
+**第二幕 · 编排:多个怎么协同不跑飞(宏观)**
+
+4. **Q4:多个 Agent 一起跑,顺序怎么排、互相踩了怎么隔离、结果冲突谁拍板?** — 前提是任务已拆好(拆几个见 E5)。Git Worktree 隔离 + 并行不共享可写状态 + Lead/Gatekeeper 裁决。
+5. **Q5:怎么让 Agent 跑起来又不跑飞?——四道硬闸 + 谁来踩刹车** — 全章高潮。死循环、四道硬闸(步数/token/时长/工具调用,给可抄配置)、"让 Agent 出主意、Harness 拿决定"、该重试 vs 该熔断。
+6. **Q6:崩了怎么不从头再来?断点续跑 + 让用户看得见、不焦虑** — 缓冲节,PM 出彩处。技术面(状态持久化/checkpoint/续跑)+ 产品面(任务卡片/计划可见/决策点/流式进度)。
+7. **Q7:怎么用编排省钱?什么才算好的编排?** — 控成本(便宜模型干粗活、贵模型干关键决策;3-10 倍 token、92% 被低成本模型吃掉)+ 一张轻量自查表;深度评估指标指向 E8。
+
+> **拔高(收尾)**:Agent 循环与编排对 PM 意味着什么——呼应 E1 双核:架构设计能力=设计"谁出主意、谁拿决定、出事谁兜底"的调度结构;评估能力=用"是否有效推进"而非"进程是否活着"量好坏。
+
+## 阅读体验设计(4 个手法)
+
+1. **镜头推拉**:第一幕把镜头怼近看单个 Agent 怎么转,第二幕拉远看多 Agent 怎么调度。读者跟镜头走不乱。
+2. **一根主线案例串到底**:腾讯 4 亿 token"6 个 Agent 连写 4 天"事故贯穿全章,每节从它身上拆一块,有代入感。
+3. **每节固定节奏**:真实场景 → 反面踩坑 → 怎么破 → 一句可迁移判断(承接 E1)。
+4. **难度爬坡 + 中途喘气**:最硬的 Q5(失控/硬闸)放中间高潮,后接 Q6(用户体验)缓冲,末尾拔高升华。
+
+## 贯穿全章的主线案例
+
+腾讯某团队让 6 个 Agent 连写 4 天代码、烧掉 4 亿 token,Q4-Q7 都能在这个案例里找到血淋淋的负样本:多米诺式失控、68 次假阳性监控、卡死 11.6 小时、监控误杀正在干活的 Agent、92% token 被低成本模型吃掉、80% 代码是"胶水"。
+
+## 章节骨架(详见 outline.md)
+
+0. 钩子:跑起来只要一个 while 循环,不跑飞才是真功夫
+1. 【一幕】什么是 Agent 循环(定位+本质,区分编排/工具调用)
+2. 【一幕】主循环怎么设计:TAO + 停止条件 + 结果回灌 + 单步防跑偏
+3. 【一幕】边做边想 vs 先出计划
+4. 【二幕】多 Agent 协调、隔离、冲突裁决
+5. 【二幕】不跑飞:四道硬闸 + 谁踩刹车
+6. 【二幕】能恢复且用户安心:断点续跑 + 降低焦虑
+7. 【二幕】划算且算得清:控成本 + 好编排自查表
+8. 拔高 + 下期预告
 
 ## 支撑素材(wiki 映射)
 
-| 问题 | wiki 素材 |
-|------|----------|
-| Q1/Q5 | `topics/tencent-cloud-developer-agent-harness-collection.md`(4 亿 token 案例) |
-| Q2/Q4 | `concepts/quest-mode-agent-development.md`、`topics/agentway-harness-books.md`(原则 3) |
-| Q3 | `topics/tencent-cloud-developer-agent-harness-collection.md`(Multi-Agent 4 天) |
-| 竞品对比 | `entities/codex.md`、`entities/cursor.md`、`comparisons/agent-runtime-architecture-openclaw-claude-code-hermes.md` |
+| 问题 | wiki 素材 | 关键证据 |
+|------|----------|---------|
+| 全章主线 | `raw/community-posts/tencent-cloud-developer/2026-04-08-4亿token...md` | 多米诺、68 次假阳性、11.6h、误杀、92% token、80% 胶水代码 |
+| Q1/Q2 | `entities/codex.md`(智能体循环)、`topics/tencent-*`(Agent 本质=while 循环+工具调用)、`concepts/harness-engineering.md` | TAO、停止条件、工具结果回填 |
+| Q3 | `concepts/quest-mode-agent-development.md`、`topics/agentway-harness-books.md` | 计划 vs 边做边想、声明式计划 |
+| Q4 | `topics/tencent-*`(Worktree、Lead/Worker)、`entities/claude-code.md` | 并行不共享可写状态、冲突裁决 |
+| Q5 | `topics/tencent-*`(4 亿 token Day1) | 四道硬闸、多米诺、Agent 自决 vs Harness 管控 |
+| Q6 | `concepts/quest-mode-agent-development.md`、`entities/codex.md`(线程持久化) | checkpoint、任务卡片/计划/决策点、流式进度 |
+| Q7 | `topics/tencent-*`、`topics/agent-evaluation-system.md` | 多 Agent 3-10 倍 token、过程指标、好编排自查 |
+
+## 边界划分(这些问题踢到后续章节,E2 不展开)
+
+- 读/写文件分阶段、命令审批、自动 vs 人工确认 → **E6 安全与权限**
+- 工具失败重试几次、哪些工具可并行、工具输出如何回流 → **E3 工具系统与 MCP**
+- 哪些输出进长期记忆/只保留本轮、每个 Agent 看到什么上下文、KV cache 命中 → **E4 上下文与记忆**
+- 哪些任务值得拆 Agent、拆成几个、Skill 怎么改 → **E5 能力的组织**
+- 编排好坏的完整量化评估体系 → **E8 评估**(E2 只给轻量自查表)
 
 ## 收尾检查清单(草稿待填)
 
+- [ ] Q2 是否真正讲清了"单个 Agent 主循环怎么设计"(停止条件/结果回灌/单步防跑偏),而不只是画个圈
 - [ ] 四道硬闸是否给出了可直接抄的配置范围
 - [ ] 是否区分了"该重试"和"该熔断"
+- [ ] Q6 是否同时讲到技术恢复和用户体验(PM 加分项)
+- [ ] 拔高点是否把"循环与编排"明确呼应回 E1 的双核能力
