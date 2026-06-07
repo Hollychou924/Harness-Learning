@@ -48,3 +48,18 @@
 - [ ] Q3 协调者职责边界、冲突裁决、决策权归属是否讲清
 - [ ] Q4 隔离是否和 E2"跑不飞"区分清楚
 - [ ] 拔高是否呼应 E1"多 Agent 协作架构"
+
+## v2 升级(2026-06-07,吸收外部 review,均已核实官方文档)
+
+draft-v2 相对 v1 的增强:
+1. **Dynamic Workflows 从 1.1 提升为"第四种协作形态"并列**:Q1 改成四形态分层表(单/子Agent/AgentTeam/DynamicWorkflow)+ 三个比喻(标签页/项目组/项目经理写成脚本)。
+2. **新增"任务怎么拆"**:六种拆法(模块/文件/阶段/角色/假设/方案)+ 各自风险。
+3. **新增"结果怎么收回来"**:交付协议(conclusion/evidence/files/risks/confidence)+ fan-out/fan-in + **冲突按证据裁决不按投票** + 独立验证收口。灵魂句:多 Agent 难点不是把任务分出去,是把结果收回来。
+4. **补角色工具权限隔离**:Explorer 只读/Worker 可写/Reviewer 评论不改/Gatekeeper 把关。
+5. **补"怎么证明值得"**:baseline 对比表(成功率/耗时/成本/质量/人工介入/冲突率),指向 E8。
+6. **加多 Agent 决策树**:单→子Agent→AgentTeam→DynamicWorkflow→不拆,打穿全章。
+7. **修正 token 口径**:3-10 倍改为"实践常见值",官方表述为"随活跃 teammate 线性增长/显著增加";补官方"3-5 起步、边际递减"。
+
+已核实并入 raw(本地):Anthropic agent-teams 文档(teammates 可互通/token线性/3-5起步)、workflows 文档(无fs/shell访问/16并发1000总/ultracode)。
+
+> draft-v1 保留留痕;draft-v2 为当前主稿。
