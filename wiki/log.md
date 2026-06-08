@@ -24,3 +24,4 @@
 ## [2026-05-26 14:00 UTC] community-ingest | Agent 评估补充 5 WeChat posts (SnowThink/玄姐/LangChain/单元测试/毛毛Post) -> 并入 deep-dive 第 E 类
 ## [2026-05-26 16:00 UTC] book-ingest | AGENTWAY Harness Books 2 PDFs (88+54p) -> raw/books + Harness 十条原则 + Claude Code vs Codex 设计哲学 topic
 ## [2026-05-28 06:00 UTC] paper-community-ingest | Agent Harness Engineering Survey + 22 WeChat posts -> raw + source-cards + ETCLOVG concept + supplement topic
+## [2026-06-08 02:50 UTC] memory-ingest | OpenAI Dreaming 官方发布页 + 4 篇中文解读(APPSO/智东西/AINLP/AGIPlayer) -> raw/official-posts/openai + raw/community-posts/chatgpt-memory-dreaming + concepts/memory-synthesis-dreaming;并更新 E4(Q6 记忆生命周期案例)/E7(偏好固化受治理)/E8(记忆系统量化范本)初稿

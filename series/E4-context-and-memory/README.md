@@ -54,12 +54,14 @@
 | Q4 | 镇文图 §5(四级链)、`topics/tencent-*`(OpenClaw 上下文压缩) | MicroCompact/Snip/AutoCompact/Reactive 程度与动作 |
 | Q5 | `reports/portfolio/cache-strategy/report.md`(五产品横评) | 命中率 85-92%、盈亏 2-3 turn、10 倍成本差、Manus 三原则、Cursor 隐形 miss、cache×compact 冲突 |
 | Q6 | `topics/aliyun-*`(Tair/Mem0/Tablestore 三层、淘宝闪购)、`topics/aws-*`(记忆投毒 OWASP ASI)、OWASP Agent Memory Guard(已核实)、Anthropic CC memory(已核实) | 记忆生命周期、投毒防护、自写记忆门控 |
+| Q6(新增案例) | `concepts/memory-synthesis-dreaming.md`、`raw/official-posts/openai/2026-06-04-dreaming-*`、`raw/community-posts/chatgpt-memory-dreaming/*`(APPSO/智东西/AINLP/AGIPlayer) | ChatGPT Dreaming 三代演进、三项评测(9.4%→75.1%)、记忆摘要可纠错、staleness 作废、删除≠真删 |
 
 ## 已核实的外部出处(2026-06-07 联网)
 
 - ✅ OWASP Agent Memory Guard(owasp.org/www-project-agent-memory-guard):定义 memory poisoning = 持久记忆被污染 → 失准/数据外泄。可引用。
 - ✅ Anthropic Claude Code memory(code.claude.com/docs/.../memory):CLAUDE.md(人写持久指令)vs Auto memory(Claude 自写,需 workspace trust 门控、MEMORY.md entrypoint);并明确"Instructions seem lost after /compact"痛点。可引用。
 - ⚠️ OpenAI Prompt Caching 官方页 403(地区受限),用 wiki cache-strategy 报告已有引用,不引打不开的页。
+- ✅ OpenAI Dreaming 发布页(openai.com/index/chatgpt-memory-dreaming/,2026-06-04,已抓取入库):三类评测目标(carry forward / follow preferences / stay current)、saved memories→Dreaming V0→V3 演进、算力降约 5x;评测百分比据 APPSO/智东西中文解读交叉确认。可引用。
 
 ## 边界划分(踢到后续章节,E4 不展开)
 
