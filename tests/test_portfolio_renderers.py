@@ -1,4 +1,4 @@
-"""Tests for `render.portfolio_md_renderer` and `render.portfolio_pptx_renderer`.
+"""Tests for `pipeline.renderers.portfolio_md_renderer` and `pipeline.renderers.portfolio_pptx_renderer`.
 
 The portfolio renderers wrap LLM-produced long-form markdown (`body_md`) with:
   - Markdown: title + jd_keyword + author + audience metadata header, plus a
@@ -10,8 +10,8 @@ Both renderers must handle empty `body_md` gracefully (no template crash) so a
 half-finished LLM output does not block the rest of the pipeline.
 """
 
-from render.portfolio_md_renderer import render_portfolio_md
-from render.portfolio_pptx_renderer import render_portfolio_marp
+from pipeline.renderers.portfolio_md_renderer import render_portfolio_md
+from pipeline.renderers.portfolio_pptx_renderer import render_portfolio_marp
 
 
 # ---------------------------------------------------------------------------

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-from packages.ai_agent_research.changelog_entry import ChangelogEntry, SignalSource
+from pipeline.core.ai_agent_research.changelog_entry import ChangelogEntry, SignalSource
 
 
 def test_minimal_entry():

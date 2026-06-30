@@ -1,7 +1,7 @@
 import pytest
 from pytest_httpx import HTTPXMock
 import httpx
-from adapters.layer3_notify.feishu_bot import push_changelog_card
+from pipeline.sources.layer3_notify.feishu_bot import push_changelog_card
 
 
 @pytest.mark.asyncio
@@ -17,7 +17,7 @@ async def test_push_card(httpx_mock: HTTPXMock, monkeypatch):
             product_name="Claude Code",
             score=0.85,
             entry_count=3,
-            report_url="file://wiki/changelog/claude-code/2026-05-23.md",
+            report_url="file://research/changelog/claude-code/2026-05-23.md",
         )
     assert ok is True
 

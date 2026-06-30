@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- 蓝色圆角背景 -->
+    <path
+        android:fillColor="#0084FF"
+        android:pathData="M4,0h16c2.2,0 4,1.8 4,4v16c0,2.2 -1.8,4 -4,4H4c-2.2,0 -4,-1.8 -4,-4V4C0,1.8 1.8,0 4,0z"/>
+    <!-- 知字简化 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M5,7h6v1.5H6.5v3H11v1.5H6.5v3H11V17.5H5z"/>
+    <!-- 乎字简化 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M13,7h6l-1.5,4h-1.5l1,-2.5H15v3h4v1.5h-4v4h-2z"/>
+</vector>

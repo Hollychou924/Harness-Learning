@@ -1,7 +1,7 @@
 """Seed realistic provenance data for 3 P0 products (claude-code / cursor / codex).
 
-Run once to populate wiki/compiled/{product}/_provenance.json so wiki compare
-shows real values. Replace UNVERIFIED placeholders that appear when wiki/compiled
+Run once to populate research/compiled/{product}/_provenance.json so wiki compare
+shows real values. Replace UNVERIFIED placeholders that appear when research/compiled
 is empty (e.g. when Path A docs sync is blocked by geofence).
 
 This is demo data based on documented public knowledge of each product.
@@ -11,9 +11,9 @@ are reachable.
 from datetime import datetime, timezone
 from pathlib import Path
 
-from packages.llm_wiki.paths import WikiLayout, init_wiki
-from packages.llm_wiki.provenance import write_provenance
-from packages.schemas.evaluation import Confidence, ProductEvaluation
+from pipeline.core.llm_wiki.paths import WikiLayout, init_wiki
+from pipeline.core.llm_wiki.provenance import write_provenance
+from pipeline.core.schemas.evaluation import Confidence, ProductEvaluation
 
 NOW = datetime.now(timezone.utc)
 

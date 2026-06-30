@@ -1,4 +1,4 @@
-"""Tests for `render.md_renderer.render_markdown`.
+"""Tests for `pipeline.renderers.md_renderer.render_markdown`.
 
 The renderer turns a `ComparisonMatrix` into a Markdown report consumed by
 humans (and feishu wiki sync downstream). Tests focus on:
@@ -12,11 +12,11 @@ from datetime import datetime
 
 import pytest
 
-from packages.competitive_analysis.matrix_builder import ComparisonMatrix
-from packages.schemas.dimension import Dimension
-from packages.schemas.evaluation import Confidence, ProductEvaluation
-from packages.schemas.product import Product
-from render.md_renderer import render_markdown
+from pipeline.core.competitive_analysis.matrix_builder import ComparisonMatrix
+from pipeline.core.schemas.dimension import Dimension
+from pipeline.core.schemas.evaluation import Confidence, ProductEvaluation
+from pipeline.core.schemas.product import Product
+from pipeline.renderers.md_renderer import render_markdown
 
 
 def _build_test_matrix() -> ComparisonMatrix:

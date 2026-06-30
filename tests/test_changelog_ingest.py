@@ -1,10 +1,10 @@
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-from packages.ai_agent_research.changelog_entry import ChangelogEntry, SignalSource
-from packages.ai_agent_research.changelog_ingest import write_changelog_report
-from packages.llm_wiki.ingest import StubLLM
-from packages.llm_wiki.paths import WikiLayout, init_wiki
+from pipeline.core.ai_agent_research.changelog_entry import ChangelogEntry, SignalSource
+from pipeline.core.ai_agent_research.changelog_ingest import write_changelog_report
+from pipeline.core.llm_wiki.ingest import StubLLM
+from pipeline.core.llm_wiki.paths import WikiLayout, init_wiki
 
 
 def _entry(title: str, url: str = "https://x.test/a") -> ChangelogEntry:

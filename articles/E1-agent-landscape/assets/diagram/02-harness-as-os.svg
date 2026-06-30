@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 740">
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+    </pattern>
+    <marker id="arrow-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee"/>
+    </marker>
+    <marker id="arrow-emerald" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#34d399"/>
+    </marker>
+    <marker id="arrow-rose" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#fb7185"/>
+    </marker>
+    <marker id="arrow-amber" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#fbbf24"/>
+    </marker>
+    <marker id="arrow-slate" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
+    </marker>
+  </defs>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap');
+    text { font-family: 'JetBrains Mono', 'Noto Sans SC', 'PingFang SC', monospace; }
+  </style>
+
+  <rect width="960" height="740" fill="#0f172a"/>
+  <rect width="960" height="740" fill="url(#grid)"/>
+
+  <!-- Title -->
+  <text x="480" y="40" fill="white" font-size="16" font-weight="700" text-anchor="middle">Harness as OS — Agent 运行主干架构</text>
+
+  <!-- Governance + Execution region (top constraint) -->
+  <rect x="30" y="250" width="900" height="100" rx="10" fill="none" stroke="#fb7185" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="45" y="268" fill="#fb7185" font-size="9" font-weight="600">G 治理安全 · E 执行环境（权限 · 沙箱 · 审批 · 防注入）</text>
+
+  <!-- Observability region (right) -->
+  <rect x="720" y="130" width="210" height="300" rx="10" fill="none" stroke="#94a3b8" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="735" y="148" fill="#94a3b8" font-size="9" font-weight="600">O 可观测</text>
+  <text x="735" y="164" fill="#64748b" font-size="8">轨迹 · 日志</text>
+  <text x="735" y="178" fill="#64748b" font-size="8">成本 · 失败原因</text>
+
+  <!-- Lifecycle region (left) -->
+  <rect x="30" y="130" width="180" height="80" rx="10" fill="none" stroke="#fbbf24" stroke-width="1" stroke-dasharray="6,3"/>
+  <text x="45" y="148" fill="#fbbf24" font-size="9" font-weight="600">L 生命周期</text>
+  <text x="45" y="164" fill="#94a3b8" font-size="8">计划 · 检查点 · 接管</text>
+
+  <!-- Core loop components -->
+  <!-- User Input -->
+  <rect x="340" y="100" width="160" height="55" rx="6" fill="#0f172a"/>
+  <rect x="340" y="100" width="160" height="55" rx="6" fill="rgba(59,130,246,0.3)" stroke="#60a5fa" stroke-width="1.5"/>
+  <text x="420" y="125" fill="white" font-size="11" font-weight="600" text-anchor="middle">用户输入</text>
+  <text x="420" y="141" fill="#94a3b8" font-size="9" text-anchor="middle">任务 / 指令</text>
+
+  <!-- Arrow: User Input → Context Assembly -->
+  <line x1="420" y1="155" x2="420" y2="185" stroke="#60a5fa" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+
+  <!-- Context Assembly C -->
+  <rect x="290" y="190" width="260" height="70" rx="6" fill="#0f172a"/>
+  <rect x="290" y="190" width="260" height="70" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="2"/>
+  <text x="420" y="218" fill="white" font-size="12" font-weight="600" text-anchor="middle">C 上下文组装</text>
+  <text x="420" y="238" fill="#94a3b8" font-size="9" text-anchor="middle">规则注入 + 记忆召回 + 材料加载 + 压缩缓存</text>
+
+  <!-- Arrow: Context → Model -->
+  <line x1="420" y1="260" x2="420" y2="290" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+
+  <!-- Model Inference -->
+  <rect x="290" y="295" width="260" height="55" rx="6" fill="#0f172a"/>
+  <rect x="290" y="295" width="260" height="55" rx="6" fill="rgba(76,29,149,0.3)" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="420" y="320" fill="white" font-size="11" font-weight="600" text-anchor="middle">模型推理</text>
+  <text x="420" y="336" fill="#94a3b8" font-size="9" text-anchor="middle">Think → Decide → Generate</text>
+
+  <!-- Arrow: Model → Tools -->
+  <line x1="420" y1="350" x2="420" y2="380" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+
+  <!-- Tool Calling T -->
+  <rect x="290" y="385" width="260" height="55" rx="6" fill="#0f172a"/>
+  <rect x="290" y="385" width="260" height="55" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+  <text x="420" y="410" fill="white" font-size="11" font-weight="600" text-anchor="middle">T 工具调用 / 文件操作</text>
+  <text x="420" y="426" fill="#94a3b8" font-size="9" text-anchor="middle">MCP · API · Shell · File I/O</text>
+
+  <!-- G+E constraint arrow to Tools -->
+  <line x1="230" y1="305" x2="285" y2="405" stroke="#fb7185" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="215" y="365" fill="#fb7185" font-size="8">约束</text>
+
+  <!-- O monitoring arrow to Model -->
+  <path d="M 715 280 L 555 320" fill="none" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="595" y="295" fill="#94a3b8" font-size="8">记录</text>
+
+  <!-- L driving arrow to Context -->
+  <path d="M 215 170 L 285 215" fill="none" stroke="#fbbf24" stroke-width="1" stroke-dasharray="4,3"/>
+  <text x="210" y="200" fill="#fbbf24" font-size="8">驱动</text>
+
+  <!-- Return: Tools → Memory -->
+  <path d="M 555 412 L 600 412 L 600 225 L 555 225" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-emerald)"/>
+  <text x="615" y="320" fill="#34d399" font-size="8" transform="rotate(90,615,320)">结果回写记忆 C</text>
+
+  <!-- Bottom: Core Loop label -->
+  <rect x="330" y="480" width="180" height="30" rx="4" fill="none" stroke="#334155" stroke-width="1"/>
+  <text x="420" y="500" fill="#64748b" font-size="9" text-anchor="middle">主循环：Think → Act → Observe</text>
+
+  <!-- Legend -->
+  <rect x="30" y="540" width="900" height="90" rx="6" fill="none" stroke="#334155" stroke-width="1"/>
+  <text x="50" y="560" fill="#94a3b8" font-size="9" font-weight="600">七层模块在循环中的位置</text>
+  <text x="50" y="578" fill="#94a3b8" font-size="8">• C 上下文 = 内存（组装 / 压缩 / 缓存）  • T 工具 = 系统调用  • E 执行环境 = 进程沙箱</text>
+  <text x="50" y="594" fill="#94a3b8" font-size="8">• G 治理 = 权限系统  • O 可观测 = 系统日志  • L 生命周期 = 进程调度（计划 / 检查点 / 接管）</text>
+  <text x="50" y="614" fill="#64748b" font-size="8">完整版上下文生命周期 + 缓存分层 → 见 E4《上下文与记忆》</text>
+</svg>

@@ -3,8 +3,8 @@ import httpx
 import pytest
 from pytest_httpx import HTTPXMock
 
-from adapters.layer1_radar.trendradar import fetch_trendradar_signals
-from packages.ai_agent_research.changelog_entry import SignalSource
+from pipeline.sources.layer1_radar.trendradar import fetch_trendradar_signals
+from pipeline.core.ai_agent_research.changelog_entry import SignalSource
 
 FAKE_TRENDRADAR = {
     "items": [

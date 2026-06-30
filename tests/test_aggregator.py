@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 
-from packages.ai_agent_research.aggregator import SignalAggregator
-from packages.ai_agent_research.changelog_entry import ChangelogEntry, SignalSource
-from packages.schemas.product import Product
+from pipeline.core.ai_agent_research.aggregator import SignalAggregator
+from pipeline.core.ai_agent_research.changelog_entry import ChangelogEntry, SignalSource
+from pipeline.core.schemas.product import Product
 
 
 def _entry(

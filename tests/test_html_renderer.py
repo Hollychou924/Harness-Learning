@@ -1,4 +1,4 @@
-"""Tests for `render.html_renderer.render_html`.
+"""Tests for `pipeline.renderers.html_renderer.render_html`.
 
 The HTML renderer turns a `ComparisonMatrix` into a self-contained HTML
 document with embedded CSS (no external assets). Tests focus on:
@@ -13,11 +13,11 @@ from datetime import datetime
 
 import pytest
 
-from packages.competitive_analysis.matrix_builder import ComparisonMatrix
-from packages.schemas.dimension import Dimension
-from packages.schemas.evaluation import Confidence, ProductEvaluation
-from packages.schemas.product import Product
-from render.html_renderer import render_html
+from pipeline.core.competitive_analysis.matrix_builder import ComparisonMatrix
+from pipeline.core.schemas.dimension import Dimension
+from pipeline.core.schemas.evaluation import Confidence, ProductEvaluation
+from pipeline.core.schemas.product import Product
+from pipeline.renderers.html_renderer import render_html
 
 
 def _build_test_matrix() -> ComparisonMatrix:

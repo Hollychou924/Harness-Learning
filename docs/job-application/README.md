@@ -6,6 +6,12 @@
 
 每篇都给出 DeepSeek Harness 团队的具体产品决策建议。
 
+## 重点补充材料
+
+| 主题 | 对应 JD 能力 | 材料 |
+|---|---|---|
+| Agent Harness 指标体系 | 定义与衡量“Agent 是否真的帮助用户” | [agent-harness-metrics.md](./agent-harness-metrics.md) |
+
 ## 报告索引
 
 | # | 主题 | JD 关键词 | 报告 | Deck |

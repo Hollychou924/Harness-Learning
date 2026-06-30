@@ -3,15 +3,15 @@ from pathlib import Path
 
 import pytest
 
-from packages.competitive_analysis.matrix_builder import (
+from pipeline.core.competitive_analysis.matrix_builder import (
     ComparisonMatrix,
     build_matrix,
 )
-from packages.llm_wiki.paths import WikiLayout, init_wiki
-from packages.llm_wiki.provenance import write_provenance
-from packages.schemas.dimension import Dimension
-from packages.schemas.evaluation import Confidence, ProductEvaluation
-from packages.schemas.product import Product
+from pipeline.core.llm_wiki.paths import WikiLayout, init_wiki
+from pipeline.core.llm_wiki.provenance import write_provenance
+from pipeline.core.schemas.dimension import Dimension
+from pipeline.core.schemas.evaluation import Confidence, ProductEvaluation
+from pipeline.core.schemas.product import Product
 
 
 def _make_eval(pid: str, did: str, value: int) -> ProductEvaluation:

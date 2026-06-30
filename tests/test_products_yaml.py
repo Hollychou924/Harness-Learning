@@ -1,10 +1,10 @@
 from pathlib import Path
 import yaml
-from packages.schemas.product import Product
-from packages.schemas.dimension import Dimension
+from pipeline.core.schemas.product import Product
+from pipeline.core.schemas.dimension import Dimension
 
 def test_load_5_p0_products(project_root: Path):
-    raw = yaml.safe_load((project_root / "products" / "coding-agents.yaml").read_text())
+    raw = yaml.safe_load((project_root / "pipeline" / "products" / "coding-agents.yaml").read_text())
     products = [Product(**p) for p in raw["products"]]
 
     assert len(products) >= 5
@@ -16,7 +16,7 @@ def test_load_5_p0_products(project_root: Path):
     assert claude.priority == "P0"
 
 def test_dimensions_yaml_loads(project_root: Path):
-    raw = yaml.safe_load((project_root / "wiki" / "schema" / "coding-agent-dims.yaml").read_text())
+    raw = yaml.safe_load((project_root / "research" / "schema" / "coding-agent-dims.yaml").read_text())
     dims = [Dimension(**d) for d in raw["dimensions"]]
 
     # E + F groups MVP — at least 5 dimensions

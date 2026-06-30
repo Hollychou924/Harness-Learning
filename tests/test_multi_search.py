@@ -4,7 +4,7 @@ import httpx
 import pytest
 from pytest_httpx import HTTPXMock
 
-from adapters.layer2_search.multi_search import verify_url_via_search
+from pipeline.sources.layer2_search.multi_search import verify_url_via_search
 
 DDG_URL_RE = re.compile(r"^https://html\.duckduckgo\.com/html.*")
 

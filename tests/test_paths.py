@@ -1,5 +1,5 @@
 from pathlib import Path
-from packages.llm_wiki.paths import init_wiki, WikiLayout
+from pipeline.core.llm_wiki.paths import init_wiki, WikiLayout
 
 def test_init_creates_full_directory_tree(tmp_wiki: Path):
     init_wiki(tmp_wiki)

@@ -1,10 +1,10 @@
 """Tests for the portfolio theme prompt registry."""
 
-from packages.competitive_analysis.portfolio.prompts import (
+from pipeline.core.competitive_analysis.portfolio.prompts import (
     ThemePromptSpec,
     get_theme_prompt,
 )
-from packages.competitive_analysis.portfolio.theme import ReportTheme
+from pipeline.core.competitive_analysis.portfolio.theme import ReportTheme
 
 
 def test_all_themes_have_prompts() -> None:

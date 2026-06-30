@@ -1,5 +1,5 @@
 from pathlib import Path
-from packages.llm_wiki.cache import SourceCache, content_hash
+from pipeline.core.llm_wiki.cache import SourceCache, content_hash
 
 def test_content_hash_deterministic():
     assert content_hash(b"hello") == content_hash(b"hello")

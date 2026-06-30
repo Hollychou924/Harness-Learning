@@ -8,7 +8,7 @@
 // batch_key: 1_概念入门 / 2_深度解析 / 3_实战案例 / 4_特定框架 / 5_面试_岗位 / 6_概念对比 / 7_行业趋势 / all
 //
 // 读取 /tmp/harness-batches.json,按批次抽取并保存到
-// wiki/raw/harness-engineering/<batch_dir>/<idx>-<slug>.md
+// research/raw/harness-engineering/<batch_dir>/<idx>-<slug>.md
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync } from "node:fs";
 import { join, dirname } from "node:path";

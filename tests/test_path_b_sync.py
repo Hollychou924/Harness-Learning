@@ -8,12 +8,12 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from packages.ai_agent_research.changelog_entry import ChangelogEntry, SignalSource
-from packages.ai_agent_research.path_b_sync import sync_path_b
-from packages.ai_agent_research.scorer import StubKeywordScorer
-from packages.llm_wiki.ingest import StubLLM
-from packages.llm_wiki.paths import WikiLayout, init_wiki
-from packages.schemas.product import Product
+from pipeline.core.ai_agent_research.changelog_entry import ChangelogEntry, SignalSource
+from pipeline.core.ai_agent_research.path_b_sync import sync_path_b
+from pipeline.core.ai_agent_research.scorer import StubKeywordScorer
+from pipeline.core.llm_wiki.ingest import StubLLM
+from pipeline.core.llm_wiki.paths import WikiLayout, init_wiki
+from pipeline.core.schemas.product import Product
 
 
 def _claude() -> Product:
@@ -52,19 +52,19 @@ def test_path_b_high_score_writes_changelog(tmp_wiki: Path) -> None:
 
     with (
         patch(
-            "packages.ai_agent_research.path_b_sync.fetch_aihot_signals",
+            "pipeline.core.ai_agent_research.path_b_sync.fetch_aihot_signals",
             new=AsyncMock(return_value=fake_aihot_signals),
         ),
         patch(
-            "packages.ai_agent_research.path_b_sync.fetch_wechat_signals",
+            "pipeline.core.ai_agent_research.path_b_sync.fetch_wechat_signals",
             new=MagicMock(return_value=fake_wechat_signals),
         ),
         patch(
-            "packages.ai_agent_research.path_b_sync.fetch_trendradar_signals",
+            "pipeline.core.ai_agent_research.path_b_sync.fetch_trendradar_signals",
             new=AsyncMock(return_value=fake_trendradar_signals),
         ),
         patch(
-            "packages.ai_agent_research.path_b_sync.verify_url_via_search",
+            "pipeline.core.ai_agent_research.path_b_sync.verify_url_via_search",
             new=AsyncMock(return_value=True),
         ),
     ):
@@ -101,15 +101,15 @@ def test_path_b_low_score_skips_report(tmp_wiki: Path) -> None:
 
     with (
         patch(
-            "packages.ai_agent_research.path_b_sync.fetch_aihot_signals",
+            "pipeline.core.ai_agent_research.path_b_sync.fetch_aihot_signals",
             new=AsyncMock(return_value=[]),
         ),
         patch(
-            "packages.ai_agent_research.path_b_sync.fetch_wechat_signals",
+            "pipeline.core.ai_agent_research.path_b_sync.fetch_wechat_signals",
             new=MagicMock(return_value=fake_wechat_signals),
         ),
         patch(
-            "packages.ai_agent_research.path_b_sync.fetch_trendradar_signals",
+            "pipeline.core.ai_agent_research.path_b_sync.fetch_trendradar_signals",
             new=AsyncMock(return_value=[]),
         ),
     ):

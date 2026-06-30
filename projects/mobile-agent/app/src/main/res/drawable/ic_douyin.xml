@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- 圆角黑色背景 -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M4,0h16c2.2,0 4,1.8 4,4v16c0,2.2 -1.8,4 -4,4H4c-2.2,0 -4,-1.8 -4,-4V4C0,1.8 1.8,0 4,0z"/>
+    <!-- 音符形状 - 青色偏移 -->
+    <path
+        android:fillColor="#25F4EE"
+        android:pathData="M16.5,5.5v9c0,2.2 -1.8,4 -4,4s-4,-1.8 -4,-4s1.8,-4 4,-4c0.7,0 1.4,0.2 2,0.5V5.5H16.5z"/>
+    <!-- 音符形状 - 粉红色 -->
+    <path
+        android:fillColor="#FE2C55"
+        android:pathData="M17.5,4.5v9c0,2.2 -1.8,4 -4,4s-4,-1.8 -4,-4s1.8,-4 4,-4c0.7,0 1.4,0.2 2,0.5V4.5H17.5z"/>
+</vector>

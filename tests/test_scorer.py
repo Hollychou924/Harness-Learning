@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
-from packages.ai_agent_research.changelog_entry import ChangelogEntry, SignalSource
-from packages.ai_agent_research.scorer import (
+from pipeline.core.ai_agent_research.changelog_entry import ChangelogEntry, SignalSource
+from pipeline.core.ai_agent_research.scorer import (
     SourceWeights,
     StubKeywordScorer,
     compute_importance,

@@ -1,147 +1,121 @@
-# AI Agent Competitive Analysis
+# AI Agent 研究与实践工作台
 
-26 个 AI Agent 产品(14 通用 + 12 编码)的竞品分析自动化管道。基于 Karpathy LLM Wiki 模式 + JD 校准的双类目维度库。
+这个仓库是一个人（周浩）用来研究 AI Agent、并亲手实践做 Agent 的工作台。它不是单一项目，而是三件事放在一起，互相喂料：
 
-**Status:** Phase 5 in progress (harness 工程知识深化 + 7 个产品编译 + 7 篇作品集报告)
+- **看别人怎么做** → 竞品分析知识库（26 款 Agent 产品的资料库）
+- **想清楚为什么这么做** → Harness 方法论文章系列（9 篇深度文章）
+- **自己动手做** → 桌面端 Agent 实践项目（小蓝鲸桌面 Agent）
 
-## Spec & Plan
+三件事的关系：先看竞品学到设计 → 写文章把设计想透 → 自己做一遍验证设计。
 
-- Design spec: `docs/superpowers/specs/2026-05-23-ai-agent-competitive-analysis-design.md`
-- Phase 1 plan: `docs/superpowers/plans/2026-05-24-phase1-mvp.md`
-- Phase 2 plan: `docs/superpowers/plans/2026-05-24-phase2-changelog-incremental.md`
-- Phase 3 plan: `docs/superpowers/plans/2026-05-24-phase3-comparison-engine.md`
-- Phase 4 plan: `docs/superpowers/plans/2026-05-24-phase4-pm-portfolio.md`
-- **应聘材料索引:** `docs/job-application/README.md`
+---
 
-## Phase 1 MVP coverage
+## 一句话导航：我要找的东西在哪
 
-- ✅ Pydantic schemas (Product / Dimension / ProductEvaluation w/ 4-level Confidence)
-- ✅ Wiki layout (Karpathy 三件套 + topics/concepts + review)
-- ✅ L0 adapters (GitHub Releases / RSS / docs sitemap)
-- ✅ Two-step CoT ingest engine
-- ✅ SHA256 incremental cache
-- ✅ Async Review queue
-- ✅ Path A end-to-end sync
-- ✅ 9 slash commands CLI
+| 我想… | 去这个文件夹 |
+|---|---|
+| 看 26 款 Agent 产品的资料和评测 | `research/` |
+| 看 Agent 设计的方法论文章 | `articles/` |
+| 看自己做桌面 Agent 的设计文档 | `projects/desktop-agent/docs/` |
+| 看自己以前做的手机 Agent 源码 | `projects/mobile-agent/` |
+| 看竞品分析管道的代码（采集/对比/报告） | `pipeline/` |
+| 看怎么跑这些代码 | 本文件「快速开始」 |
+| 看应聘 DeepSeek 的材料 | `docs/job-application/` |
 
-Phase 1.1 hardening: atomic file writes (tempfile + os.replace), RSS timezone-aware parsing, IngestEngine error handling.
+---
 
-## Phase 2 coverage
+## 目录结构（扫一眼就懂版）
 
-- ✅ ChangelogEntry schema with 7-source enum (tz-aware validator)
-- ✅ Signal aggregator (dedup by URL + product association by keyword)
-- ✅ L1 adapters: AIHOT / wechat-article-search / TrendRadar
-- ✅ L2 adapter: multi-search-engine (DDG MVP cross-verifier)
-- ✅ 3-factor importance scorer (signal count × 0.4 + source weight × 0.3 + LLM relevance × 0.3)
-- ✅ Per-product daily changelog reports (`wiki/changelog/{product}/{date}.md`)
-- ✅ Path B end-to-end orchestrator (sync_path_b)
-- ✅ Feishu bot push for high-score changes (Layer 3 notify)
-- ✅ CLI: `wiki path-b` + `wiki notify` (11 commands total)
-- ✅ GitHub Actions daily cron at UTC 00:00 (北京 08:00)
+```
+ai-agent-competitive-analysis/
+│
+├── 📚 research/        竞品知识库——26款Agent产品的资料都在这
+├── ✍️ articles/        文章系列——9篇"AI产品经理读懂Harness"
+├── 🛠️ projects/        实践项目——自己动手做Agent
+│   ├── desktop-agent/    小蓝鲸桌面Agent(开发中)
+│   ├── mobile-agent/     手机端Agent(参考用)
+│   └── reference/        内部参考仓库(只看不提交)
+│
+├── ⚙️ pipeline/        竞品分析管道的全部代码
+│   ├── core/             核心逻辑(知识中枢/追踪/对比)
+│   ├── sources/          数据采集器(4层:官方/雷达/搜索/通知)
+│   ├── renderers/        输出渲染(MD/HTML/PPT/飞书)
+│   ├── cli/              命令行入口
+│   └── products/         产品清单配置
+│
+├── 📝 docs/            项目自身的规划/运维/应聘材料
+├── 🧪 tests/           测试
+├── 📋 scripts/         脚本工具
+└── 📄 README.md        你正在看的这个
+```
 
-## Phase 4 coverage
+每个一级目录里都有自己的 `README.md`，点进去一句话说清装什么。
 
-- ✅ ReportTheme enum (6 JD-aligned themes) + PortfolioReportRequest schema
-- ✅ 6 主题 prompts (Harness Engineering / Context Engineering / Tool Ecosystem / Cache / Open Source / Co-evolution)
-- ✅ PortfolioReportEngine (wiki facts + theme prompt → free-form LLM long-form essay)
-- ✅ DeepSeek-style portfolio renderers (markdown + Marp deck with 蓝绿色 palette)
-- ✅ LLMClient.complete(prompt) protocol — bypasses dimension-card hardcoding
-- ✅ 11-dim schema expansion (J5 cache + N1-N5 community + M1-M5 co-evolution)
-- ✅ CLI: `wiki portfolio --theme <slug>` / `--all` (12 commands total)
-- ✅ 6 篇真实 LLM 长文报告产出（130-225 行 MD + 150-250 行 deck），3 个 P0 产品 (claude-code/cursor/codex)
-- ✅ 应聘材料归档: `docs/job-application/`
+---
 
-## Phase 5 coverage (in progress)
+## 📚 research/ — 竞品知识库
 
-- ✅ 产品编译扩展至 7 个：原 5 P0 + `codebuddy` + `qoder`(国产编码 agent)
-- ✅ 第 7 篇作品集报告 `community-divergence`(社区分化主题,含 deck)
-- ✅ harness 工程知识深化:6 篇 concepts(`harness-engineering` / `progressive-disclosure` / `prompt-context-harness` / `spec-driven-agent-development` / `quest-mode-agent-development` / `etclovg-agent-harness-taxonomy`)
-- ✅ 7 个产品 entities + 10 篇 topics(agent-evaluation 系列、阿里/腾讯/AWS 云厂商 agent collection、harness 社区综合)
-- ✅ 3 篇深度 comparisons(openclaw/claude-code/hermes 运行时架构、codebuddy/qoder 国产对比)
-- ✅ analysis 产物:`entity-scan`(实体频率)+ `term-frequency`(术语词频)+ `harness-collection-insights`
-- ✅ 知识沉淀:`lessons/`(prompt-only agent 不可生产化)+ `timelines/`(harness 设计演进)+ `_framework/`(wiki 综合 SOP)
-- ✅ ingest 审计:15 篇 `review/ingest-coverage/` + 8 张 `review/source-cards/`
-- ✅ 5 个新 ingest/分析脚本(含 2 个 `.mjs` harness collection ingester)
+26 款 AI Agent 产品（14 通用 + 12 编码）的资料库。详见 `research/README.md`。
 
-## Phase 3 coverage
+关键子目录：`entities/`（产品档案）、`compiled/`（评测卡）、`raw/`（原始素材）、`topics/`（主题研究）、`reports/`（生成的报告）。
 
-- ✅ ComparisonRequest schema (baseline + compare list + dim filter + format enum)
-- ✅ WikiQuery layer (reads `_provenance.json` per product, optional dim filter)
-- ✅ CrossSourceVerifier (L2 fallback with UNVERIFIED placeholders for missing evals)
-- ✅ ComparisonMatrix builder (dim × product grid with verifier-filled cells)
-- ✅ Markdown renderer (Jinja2 template with table + per-dim detail)
-- ✅ HTML renderer (self-contained single file with embedded CSS + confidence badges)
-- ✅ PPTX renderer (Marp-flavored markdown → optional `marp` CLI subprocess)
-- ✅ Feishu wiki sync (single-direction MVP via `feishu` skill subprocess)
-- ✅ Path C end-to-end orchestrator (`sync_path_c` writes to `wiki/reports/on-demand/`)
-- ✅ CLI: `wiki compare` real impl with `--formats`, `--dims`, `--feishu-parent`
-- ✅ Smoke verified: 141 tests passing; `wiki compare claude-code cursor` produces md+html
+## ✍️ articles/ — Harness 方法论文章
 
-## Quick start
+《AI 产品经理读懂 Harness》9 篇系列。详见 `articles/README.md`。
+
+## 🛠️ projects/ — 实践项目
+
+详见 `projects/README.md`。`desktop-agent/docs/` 里有 8 份开工前契约文档（架构反思/设计基线/技术选型/数据契约/权限规则/验收规格/评测基线/跨端协议）。
+
+## ⚙️ pipeline/ — 竞品管道代码
+
+详见 `pipeline/README.md`。
+
+---
+
+## 快速开始（竞品管道部分）
 
 ```bash
-# Install
+# 安装
 uv sync --all-extras
 
-# Init wiki
+# 初始化知识库
 uv run wiki init
 
-# Run all tests
+# 跑测试
 uv run pytest
 
-# Phase 1: Compile P0 products via Path A
+# 编译 P0 产品（Path A）
 uv run wiki compile --only claude-code,cursor,codex,hermes,manus
 
-# Phase 2: Run daily changelog incremental (Path B)
+# 每日变更增量（Path B）
 uv run wiki path-b --threshold 0.5
 uv run wiki notify
 
-# Phase 3: On-demand comparison report (Path C)
+# 按需对比报告（Path C）
 uv run wiki compare claude-code cursor --formats markdown,html
-uv run wiki compare claude-code cursor codex --dims E5,F3 --formats markdown,html,pptx
-# Output: wiki/reports/on-demand/{baseline}-vs-{compare}-{timestamp}/comparison.{md,html,pptx}
 
-# Phase 4: PM portfolio reports (DeepSeek 应聘作品)
+# PM 作品集报告（Phase 4）
 uv run wiki portfolio --theme harness-design --products claude-code,cursor,codex
-uv run wiki portfolio --all --products claude-code,cursor,codex
-# Output: wiki/reports/portfolio/{theme}/report.md + deck.marp.md
 ```
 
-## Architecture
+---
 
-See spec §3-§10. Key modules:
+## 三块产出的当前状态
 
-- `packages/llm_wiki/` — 知识中枢 (Karpathy wiki + ingest engine)
-- `packages/docs_link_collector/` — 文档雷达
-- `packages/ai_agent_research/` — 动态追踪器 (Phase 2)
-  - `changelog_entry.py` — ChangelogEntry schema
-  - `aggregator.py` — SignalAggregator (dedup + product association)
-  - `scorer.py` — 3-factor importance scoring
-  - `changelog_ingest.py` — per-product daily report writer
-  - `path_b_sync.py` — Path B orchestration
-- `packages/competitive_analysis/` — 对比输出引擎 (Phase 3)
-  - `comparison_request.py` — ComparisonRequest schema + OutputFormat enum
-  - `wiki_query.py` — WikiQuery (provenance reader)
-  - `verifier.py` — CrossSourceVerifier (L2 fallback for missing evals)
-  - `matrix_builder.py` — ComparisonMatrix builder (dim × product)
-  - `path_c_sync.py` — Path C orchestrator (build matrix → render → write)
-- `render/` — 渲染层 (Phase 3)
-  - `md_renderer.py` — Jinja2 markdown comparison report
-  - `html_renderer.py` — self-contained HTML with embedded CSS
-  - `pptx_renderer.py` — Marp-flavored markdown + optional `marp` CLI → PPTX
-  - `feishu_sync.py` — single-direction sync to 飞书 Wiki via skill subprocess
-- `adapters/`:
-  - `layer0_official/` — GitHub Releases / RSS / docs sitemap (Phase 1)
-  - `layer1_radar/` — AIHOT / wechat-article-search / TrendRadar (Phase 2)
-  - `layer2_search/` — multi-search-engine cross-verification (Phase 2)
-  - `layer3_notify/` — Feishu bot webhook (Phase 2)
+| 模块 | 状态 |
+|---|---|
+| 竞品知识库（research + pipeline） | Phase 5 进行中（7 产品编译 + 7 篇报告 + harness 知识深化） |
+| Harness 文章系列（articles） | 9 章大纲完成，写作中 |
+| 小蓝鲸桌面 Agent（projects/desktop-agent） | 开工前 8 份契约文档就绪，待编码 |
 
-## Roadmap
+---
 
-| Phase | 时长 | 目标 | Status |
-|---|---|---|---|
-| 1 | 2 周 | MVP — 5 P0 产品端到端跑通 Path A | ✅ Complete |
-| 2 | 1 周 | Path B 增量链 + L1/L2 数据源 | ✅ Complete |
-| 3 | 2 周 | Path C 对比引擎 + 渲染层 | ✅ Complete |
-| 4 | 1 天 | 6 篇 PM 作品集报告 + DeepSeek 风 PPT | ✅ Complete |
-| 5 | 持续 | harness 工程知识深化 + codebuddy/qoder 编译 + 社区综合 (concepts/entities/topics/comparisons) | 🚧 In progress |
+## 给陌生 AI 的说明
+
+如果你是接手这个仓库的 AI 助手：
+1. 先读本 README 理解三块结构，再看各目录的 `README.md`。
+2. 涉及桌面 Agent 开发，必读 `projects/desktop-agent/docs/` 全部文档，按技术选型约束干活。
+3. `projects/reference/` 仅供分析，不得复制其源码进 `projects/desktop-agent/`。
+4. `projects/mobile-agent/` 是已验证的参考实现，设计思路可借鉴。
+5. AGENTS.md（若在子目录）的指令在该目录范围内生效。

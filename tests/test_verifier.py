@@ -3,10 +3,10 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from packages.schemas.dimension import Dimension
-from packages.schemas.evaluation import Confidence, ProductEvaluation
-from packages.schemas.product import Product
-from packages.competitive_analysis.verifier import CrossSourceVerifier
+from pipeline.core.schemas.dimension import Dimension
+from pipeline.core.schemas.evaluation import Confidence, ProductEvaluation
+from pipeline.core.schemas.product import Product
+from pipeline.core.competitive_analysis.verifier import CrossSourceVerifier
 
 
 def _claude() -> Product:
@@ -38,7 +38,7 @@ async def test_verify_falls_back_to_l2_when_wiki_misses() -> None:
     """When wiki has no eval, verifier reaches out to L2."""
     verifier = CrossSourceVerifier()
     with patch(
-        "packages.competitive_analysis.verifier.verify_url_via_search",
+        "pipeline.core.competitive_analysis.verifier.verify_url_via_search",
         new=AsyncMock(return_value=True),
     ):
         result = await verifier.verify(
@@ -80,7 +80,7 @@ async def test_verify_marks_unverified_when_l2_misses() -> None:
     """When L2 also can't confirm, mark UNVERIFIED placeholder."""
     verifier = CrossSourceVerifier()
     with patch(
-        "packages.competitive_analysis.verifier.verify_url_via_search",
+        "pipeline.core.competitive_analysis.verifier.verify_url_via_search",
         new=AsyncMock(return_value=False),
     ):
         result = await verifier.verify(

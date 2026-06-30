@@ -7,8 +7,14 @@ node_modules/
 .env
 .env.local
 *.log
-wiki/raw/*/
-!wiki/raw/.gitkeep
+
+# 原始素材库（只本地保留，不上传）
+research/raw/*/
+!research/raw/.gitkeep
+
+# 外部文档站抓取的临时图片素材（不上传）
+codex_docs_sidebar_images/
+zcode_docs_sidebar_images/
 
 # 本地工具配置(不上传)
 .obsidian/

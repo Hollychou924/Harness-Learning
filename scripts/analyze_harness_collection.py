@@ -1,9 +1,9 @@
 """
-对 wiki/raw/harness-engineering/ 下正文做词频/实体/共现统计。
+对 research/raw/harness-engineering/ 下正文做词频/实体/共现统计。
 
 输出:
-  wiki/analysis/term-frequency.json  机器友好的统计数据
-  wiki/analysis/term-frequency.md     人类友好的 markdown 报告
+  research/analysis/term-frequency.json  机器友好的统计数据
+  research/analysis/term-frequency.md     人类友好的 markdown 报告
 """
 import json
 import re

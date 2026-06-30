@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- 红色圆角背景 -->
+    <path
+        android:fillColor="#E4393C"
+        android:pathData="M4,0h16c2.2,0 4,1.8 4,4v16c0,2.2 -1.8,4 -4,4H4c-2.2,0 -4,-1.8 -4,-4V4C0,1.8 1.8,0 4,0z"/>
+    <!-- Joy狗头 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,4c4,0 7,3 7,6.5v4c0,3.5 -3,6.5 -7,6.5s-7,-3 -7,-6.5v-4C5,7 8,4 12,4z"/>
+    <!-- 眼睛 -->
+    <path
+        android:fillColor="#E4393C"
+        android:pathData="M9,11a1.2,1.2 0,1 1,0 2.4,1.2 1.2,0 0,1 0,-2.4z"/>
+    <path
+        android:fillColor="#E4393C"
+        android:pathData="M15,11a1.2,1.2 0,1 1,0 2.4,1.2 1.2,0 0,1 0,-2.4z"/>
+    <!-- 鼻子 -->
+    <path
+        android:fillColor="#E4393C"
+        android:pathData="M11,15a1.5,1 0,1 1,2 0,1.5 1,0 0,1 -2,0z"/>
+</vector>

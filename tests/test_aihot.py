@@ -5,8 +5,8 @@ import httpx
 import pytest
 from pytest_httpx import HTTPXMock
 
-from adapters.layer1_radar.aihot import fetch_aihot_signals
-from packages.ai_agent_research.changelog_entry import SignalSource
+from pipeline.sources.layer1_radar.aihot import fetch_aihot_signals
+from pipeline.core.ai_agent_research.changelog_entry import SignalSource
 
 AIHOT_URL_RE = re.compile(r"^https://aihot\.virxact\.com/api/public/items.*")
 

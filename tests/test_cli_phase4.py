@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from cli.main import app
+from pipeline.cli.main import app
 
 runner = CliRunner()
 
@@ -159,7 +159,7 @@ def test_portfolio_real_run_writes_md_and_marp(
     async def fake_generate(self, request):  # noqa: ANN001 - signature mirrors engine
         return canned_body
 
-    from packages.competitive_analysis.portfolio.engine import PortfolioReportEngine
+    from pipeline.core.competitive_analysis.portfolio.engine import PortfolioReportEngine
 
     monkeypatch.setattr(PortfolioReportEngine, "generate", fake_generate)
 

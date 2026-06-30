@@ -1,10 +1,10 @@
 from datetime import datetime
 from pathlib import Path
 
-from packages.competitive_analysis.wiki_query import WikiQuery
-from packages.llm_wiki.paths import WikiLayout, init_wiki
-from packages.llm_wiki.provenance import write_provenance
-from packages.schemas.evaluation import Confidence, ProductEvaluation
+from pipeline.core.competitive_analysis.wiki_query import WikiQuery
+from pipeline.core.llm_wiki.paths import WikiLayout, init_wiki
+from pipeline.core.llm_wiki.provenance import write_provenance
+from pipeline.core.schemas.evaluation import Confidence, ProductEvaluation
 
 
 def _make_eval(product_id: str, dim_id: str) -> ProductEvaluation:

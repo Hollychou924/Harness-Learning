@@ -1,5 +1,5 @@
 from typer.testing import CliRunner
-from cli.main import app
+from pipeline.cli.main import app
 
 runner = CliRunner()
 
@@ -22,6 +22,6 @@ def test_path_b_dry_run_succeeds(tmp_path, monkeypatch):
     result = runner.invoke(app, [
         "path-b", "--dry-run",
         "--root", str(tmp_path / "wiki"),
-        "--products-file", "products/coding-agents.yaml",
+        "--products-file", "pipeline/products/coding-agents.yaml",
     ])
     assert result.exit_code == 0

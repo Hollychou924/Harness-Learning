@@ -1,0 +1,1747 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>内容加载中</title>
+    <style>
+        :root {
+            --xiaomi-orange: #FF6700;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #ffffff;
+            color: #1f2937;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        #app {
+            min-height: 100vh;
+            width: 100vw;
+            box-sizing: border-box;
+            overflow-x: hidden;
+            padding: 0 24px;
+            /* 移除顶部padding，只保留左右padding */
+            padding-top: 0;
+            /* 确保顶部没有空白 */
+        }
+
+        /* Hide scrollbar for clean look */
+        ::-webkit-scrollbar {
+            width: 0px;
+            background: transparent;
+        }
+
+        /* Skeleton (deprecated): completely disabled */
+        .skeleton-container {
+            display: none !important;
+        }
+
+        /* Loading overlay (shown only before stream starts) */
+        /* WebView 内部 loading：禁用（改用 Compose 全屏 loading） */
+        #page-loading {
+            position: fixed;
+            /* NOTE: avoid `inset:0` for WebView compatibility */
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            /* 水平居中 */
+            justify-content: center;
+            /* 垂直居中 */
+            background: #ffffff;
+            z-index: 9999;
+        }
+
+        /* 始终隐藏，避免出现“顶部第二个 loading” */
+        #page-loading,
+        #page-loading.is-hidden {
+            display: none !important;
+        }
+
+        /* A fixed-size stage to center the visual mass of the animation (important) */
+        .loading-stage {
+            width: 96px;
+            height: 96px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .loading-stage .loading {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .loading-text {
+            margin-top: 12px;
+            font-size: 14px;
+            line-height: 20px;
+            color: #6b7280;
+            /* 灰色辅助文案 */
+            letter-spacing: 0.2px;
+            user-select: none;
+        }
+
+        /* Ball Fusion Loading Animation */
+        .loading,
+        .loading>div {
+            position: relative;
+            box-sizing: border-box;
+        }
+
+        .loading {
+            display: block;
+            font-size: 0;
+            color: var(--xiaomi-orange);
+            width: 16px;
+            height: 16px;
+        }
+
+        .loading>div {
+            display: inline-block;
+            float: none;
+            background-color: currentColor;
+            border: 0 solid currentColor;
+        }
+
+        .loading>div {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border-radius: 100%;
+            transform: translate(-50%, -50%);
+            animation: ball-fussion-ball1 1s 0s ease infinite;
+        }
+
+        .loading>div:nth-child(1) {
+            top: 0;
+            left: 50%;
+            z-index: 1;
+        }
+
+        .loading>div:nth-child(2) {
+            top: 50%;
+            left: 100%;
+            z-index: 2;
+            animation-name: ball-fussion-ball2;
+        }
+
+        .loading>div:nth-child(3) {
+            top: 100%;
+            left: 50%;
+            z-index: 1;
+            animation-name: ball-fussion-ball3;
+        }
+
+        .loading>div:nth-child(4) {
+            top: 50%;
+            left: 0;
+            z-index: 2;
+            animation-name: ball-fussion-ball4;
+        }
+
+        @keyframes ball-fussion-ball2 {
+            0% {
+                opacity: 0.35;
+            }
+
+            50% {
+                top: 200%;
+                left: 200%;
+                opacity: 1;
+            }
+
+            100% {
+                top: 100%;
+                left: 50%;
+                z-index: 1;
+                opacity: 0.35;
+            }
+        }
+
+        @keyframes ball-fussion-ball1 {
+            0% {
+                opacity: 0.35;
+            }
+
+            50% {
+                top: -100%;
+                left: 200%;
+                opacity: 1;
+            }
+
+            100% {
+                top: 50%;
+                left: 100%;
+                z-index: 2;
+                opacity: 0.35;
+            }
+        }
+
+        @keyframes ball-fussion-ball3 {
+            0% {
+                opacity: 0.35;
+            }
+
+            50% {
+                top: 200%;
+                left: -100%;
+                opacity: 1;
+            }
+
+            100% {
+                top: 50%;
+                left: 0;
+                z-index: 2;
+                opacity: 0.35;
+            }
+        }
+
+        @keyframes ball-fussion-ball4 {
+            0% {
+                opacity: 0.35;
+            }
+
+            50% {
+                top: -100%;
+                left: -100%;
+                opacity: 1;
+            }
+
+            100% {
+                top: 0;
+                left: 50%;
+                z-index: 1;
+                opacity: 0.35;
+            }
+        }
+
+        .sk-bar {
+            background: #e5e7eb;
+            border-radius: 4px;
+            margin-bottom: 12px;
+            animation: shimmer 1.5s infinite linear;
+            min-height: 14px;
+            /* 确保最小高度 */
+        }
+
+        .sk-bar.dark {
+            background: #d1d5db;
+            /* Darker gray for headings */
+        }
+
+        .sk-rect {
+            background: #e5e7eb;
+            border-radius: 12px;
+            animation: shimmer 1.5s infinite linear;
+            min-height: 100px;
+            /* 确保最小高度 */
+        }
+
+        .sk-circle {
+            background: #d1d5db;
+            border-radius: 50%;
+            animation: shimmer 1.5s infinite linear;
+            min-width: 32px;
+            /* 确保最小宽度 */
+            min-height: 32px;
+            /* 确保最小高度 */
+        }
+
+        /* Flex row for icons */
+        .sk-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 24px 0;
+        }
+
+        @keyframes shimmer {
+            0% {
+                opacity: 0.6;
+            }
+
+            50% {
+                opacity: 0.4;
+            }
+
+            100% {
+                opacity: 0.6;
+            }
+        }
+
+        /* Typography Optimization */
+        h1 {
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+            margin-bottom: 16px !important;
+            color: #000;
+        }
+
+        /* Global Style Overrides for Generated Content */
+        h1,
+        h2,
+        h3 {
+            color: #000;
+            position: relative;
+            /* 确保相对位置固定 */
+            transform: none !important;
+            /* 禁止任何变换 */
+        }
+
+        /* 确保第一个h1标题没有顶部空白 */
+        #app>h1:first-child,
+        #app>*:first-child>h1:first-child,
+        #app>div:first-child>h1:first-child {
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+        }
+
+        /* 确保第一个内容块没有顶部空白 */
+        #app>div:first-child:not(#skeleton),
+        #app>section:first-child,
+        #app>main:first-child>*:first-child:not(#skeleton),
+        #app>*:first-child:not(#skeleton) {
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+        }
+
+        /* 确保bootstrap_html创建的MAIN元素内的第一个元素也没有空白 */
+        #app>main>*:first-child:not(#skeleton) {
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+        }
+
+        /* 确保所有内容区域位置固定，不会因为滚动而变化 */
+        #app>* {
+            position: relative;
+            transform: none !important;
+            will-change: auto;
+            /* 避免GPU加速导致的位移 */
+        }
+
+        /* 确保初始渲染时没有缩放或位移 */
+        html,
+        body {
+            transform: none !important;
+            scale: 1 !important;
+            zoom: 1 !important;
+        }
+
+        /* 确保内容从一开始就在正确位置 */
+        #app {
+            transform: none !important;
+            scale: 1 !important;
+            zoom: 1 !important;
+        }
+
+        /* 确保骨架图可以立即移除，不留痕迹 */
+        #skeleton {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 流式输出内容应该在骨架图移除后显示 */
+        #app>*:not(#skeleton) {
+            position: relative;
+            z-index: 2;
+        }
+
+        /* 移除顶部空白 */
+        body {
+            padding-top: 0 !important;
+            margin-top: 0 !important;
+        }
+
+        html {
+            padding-top: 0 !important;
+            margin-top: 0 !important;
+        }
+
+        /* 确保已生成内容不位移 */
+        #main-content>* {
+            position: relative;
+            transform: none !important;
+            will-change: auto;
+        }
+
+        /* Add orange accent to headings if they have specific classes or just generally */
+        /* Since we don't know the exact classes, we use generic selectors cautiously */
+
+        /* Highlight specific keywords or summary cards if possible. 
+           Assuming standard HTML structure from LLM */
+        strong,
+        b {
+            color: #000;
+            /* Ensure bold text is dark */
+        }
+
+        .summary-card,
+        .highlight-card {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            /* Example blue gradient */
+            color: white;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+
+        /* Specific fix for "Xiaomi Orange" request */
+        .orange-text {
+            color: var(--xiaomi-orange);
+        }
+
+        /* Force some styles if the LLM output is plain */
+        blockquote {
+            border-left: 4px solid var(--xiaomi-orange);
+            margin: 1.5em 10px;
+            padding: 0.5em 10px;
+            background: #f9f9f9;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="page-loading">
+        <div class="loading-stage" aria-label="loading">
+            <div class="loading la-2x">
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+            </div>
+        </div>
+        <div class="loading-text">加载中...</div>
+    </div>
+    <div id="app">
+        <!-- Initial Skeleton Content - 只在首次且内容未展示时显示 -->
+        <div id="skeleton" class="skeleton-container" style="display: none;">
+            <!-- Card 1: Top Section - 铺满屏幕 -->
+            <div style="background: #ffffff; border-radius: 12px; padding: 20px; margin-bottom: 12px;">
+                <!-- 1. Top Title Bars -->
+                <div class="sk-bar dark" style="height: 28px; width: 70%; margin-top: 0; margin-bottom: 16px;"></div>
+                <div class="sk-bar dark" style="height: 24px; width: 90%; margin-bottom: 24px;"></div>
+
+                <!-- 2. Hero Image Placeholder -->
+                <div class="sk-rect" style="height: 180px; width: 100%; margin-bottom: 20px;"></div>
+
+                <!-- 3. Content Lines -->
+                <div class="sk-bar" style="height: 16px; width: 100%; margin-bottom: 12px;"></div>
+                <div class="sk-bar" style="height: 16px; width: 95%; margin-bottom: 12px;"></div>
+                <div class="sk-bar" style="height: 16px; width: 88%; margin-bottom: 12px;"></div>
+            </div>
+
+            <!-- Card 2: Content Section - 铺满屏幕 -->
+            <div style="background: #ffffff; border-radius: 12px; padding: 20px; margin-bottom: 12px;">
+                <!-- Heading -->
+                <div class="sk-bar dark" style="height: 24px; width: 50%; margin-bottom: 16px; margin-top: 0;"></div>
+
+                <!-- Paragraphs -->
+                <div class="sk-bar" style="height: 16px; width: 100%; margin-bottom: 10px;"></div>
+                <div class="sk-bar" style="height: 16px; width: 96%; margin-bottom: 10px;"></div>
+                <div class="sk-bar" style="height: 16px; width: 92%; margin-bottom: 10px;"></div>
+                <div class="sk-bar" style="height: 16px; width: 85%; margin-bottom: 20px;"></div>
+
+                <!-- Another paragraph -->
+                <div class="sk-bar" style="height: 16px; width: 100%; margin-bottom: 10px;"></div>
+                <div class="sk-bar" style="height: 16px; width: 98%; margin-bottom: 10px;"></div>
+                <div class="sk-bar" style="height: 16px; width: 80%; margin-bottom: 10px;"></div>
+            </div>
+
+            <!-- Card 3: Content Section - 铺满屏幕 -->
+            <div style="background: #ffffff; border-radius: 12px; padding: 20px;">
+                <!-- Heading -->
+                <div class="sk-bar dark" style="height: 24px; width: 45%; margin-bottom: 16px; margin-top: 0;"></div>
+
+                <!-- Paragraphs -->
+                <div class="sk-bar" style="height: 16px; width: 100%; margin-bottom: 10px;"></div>
+                <div class="sk-bar" style="height: 16px; width: 94%; margin-bottom: 10px;"></div>
+                <div class="sk-bar" style="height: 16px; width: 90%; margin-bottom: 10px;"></div>
+                <div class="sk-bar" style="height: 16px; width: 75%; margin-bottom: 10px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== Mi-FlowUI优化: 图片优化工具(占位符+预加载+缓存) ====================
+
+        // 全局图片缓存
+        window.__imageCache = window.__imageCache || new Map();
+        window.__processedImages = window.__processedImages || new Set();
+        window.__imgPlaceholderCounter = 0;
+
+        /**
+         * 创建图片占位符
+         */
+        window.createImagePlaceholder = function (src, id, height) {
+            height = height || 200;
+
+            const placeholder = document.createElement('div');
+            placeholder.id = id;
+            placeholder.dataset.imgSrc = src;
+            placeholder.style.cssText = 'height:' + height + 'px;width:100%;background:linear-gradient(135deg,#f5f7fa 0%,#e8ecf1 100%);display:flex;align-items:center;justify-content:center;border-radius:12px;margin:16px 0;overflow:hidden;position:relative;';
+
+            // 添加加载动画
+            const loadingContainer = document.createElement('div');
+            loadingContainer.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:12px;';
+
+            const spinner = document.createElement('div');
+            spinner.style.cssText = 'width:24px;height:24px;border:2px solid #e0e0e0;border-top:2px solid #667eea;border-radius:50%;animation:imgSpinner 0.8s linear infinite;';
+
+            const text = document.createElement('span');
+            text.textContent = '图片加载中...';
+            text.style.cssText = 'color:#9ca3af;font-size:12px;';
+
+            loadingContainer.appendChild(spinner);
+            loadingContainer.appendChild(text);
+            placeholder.appendChild(loadingContainer);
+
+            // 添加旋转动画样式(仅添加一次)
+            if (!document.getElementById('img-spinner-style')) {
+                const styleSheet = document.createElement('style');
+                styleSheet.id = 'img-spinner-style';
+                styleSheet.textContent = '@keyframes imgSpinner{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}';
+                document.head.appendChild(styleSheet);
+            }
+
+            return placeholder;
+        };
+
+        /**
+         * 预加载图片并获取尺寸
+         */
+        window.preloadImage = function (src) {
+            return new Promise(function (resolve, reject) {
+                // 检查缓存
+                if (window.__imageCache.has(src)) {
+                    const cached = window.__imageCache.get(src);
+                    if (cached.status === 'loaded') {
+                        resolve(cached.dimensions);
+                        return;
+                    } else if (cached.status === 'error') {
+                        reject(new Error('Image previously failed'));
+                        return;
+                    }
+                }
+
+                // 创建图片元素并加载
+                const img = new Image();
+
+                img.onload = function () {
+                    const dimensions = {
+                        width: img.naturalWidth,
+                        height: img.naturalHeight
+                    };
+                    window.__imageCache.set(src, {
+                        status: 'loaded',
+                        dimensions: dimensions
+                    });
+                    resolve(dimensions);
+                };
+
+                img.onerror = function () {
+                    window.__imageCache.set(src, {
+                        status: 'error',
+                        dimensions: null
+                    });
+                    reject(new Error('Image load failed'));
+                };
+
+                img.src = src;
+            });
+        };
+
+        /**
+         * 加载图片到占位符(带宽高比计算和平滑过渡)
+         */
+        window.loadImageToPlaceholder = async function (placeholder) {
+            if (!placeholder || !placeholder.dataset.imgSrc) return;
+
+            const src = placeholder.dataset.imgSrc;
+            const placeholderId = placeholder.id || 'unknown';
+
+            // 检查是否已处理
+            if (window.__processedImages.has(src + '_' + placeholderId)) {
+                return;
+            }
+            window.__processedImages.add(src + '_' + placeholderId);
+
+            try {
+                // 预加载获取尺寸
+                const dimensions = await window.preloadImage(src);
+
+                // 创建图片元素
+                const img = document.createElement('img');
+                img.src = src;
+                img.alt = placeholder.dataset.alt || '';
+                img.style.cssText = 'width:100%;height:auto;object-fit:contain;border-radius:12px;opacity:0;transition:opacity 0.3s ease-in-out;';
+
+                // 计算宽高比
+                const containerWidth = placeholder.offsetWidth || 300;
+                const aspectRatio = dimensions.height / dimensions.width;
+                const calculatedHeight = containerWidth * aspectRatio;
+
+                // 设置容器高度(平滑过渡)
+                placeholder.style.transition = 'height 0.3s ease-in-out, background 0.3s ease-in-out';
+                placeholder.style.height = calculatedHeight + 'px';
+                placeholder.style.background = 'transparent';
+
+                // 清空占位符内容并添加图片
+                placeholder.innerHTML = '';
+                placeholder.appendChild(img);
+
+                // 图片加载完成后淡入
+                if (img.complete) {
+                    requestAnimationFrame(function () {
+                        img.style.opacity = '1';
+                    });
+                } else {
+                    img.onload = function () {
+                        requestAnimationFrame(function () {
+                            img.style.opacity = '1';
+                        });
+                    };
+                }
+
+            } catch (e) {
+                // 加载失败,显示错误信息
+                placeholder.style.transition = 'all 0.3s ease-in-out';
+                placeholder.style.background = '#fef2f2';
+                placeholder.style.height = '100px';
+                placeholder.innerHTML = '<div style="color:#ef4444;font-size:12px;">图片加载失败</div>';
+            }
+        };
+
+        /**
+         * 批量加载所有待处理的图片占位符
+         */
+        window.loadAllPendingImages = function () {
+            const placeholders = document.querySelectorAll('[data-img-src]');
+            placeholders.forEach(function (placeholder) {
+                window.loadImageToPlaceholder(placeholder);
+            });
+        };
+
+        /**
+         * 替换HTML中的img标签为占位符
+         */
+        window.replaceImgWithPlaceholder = function (html) {
+            let counter = window.__imgPlaceholderCounter || 0;
+
+            const result = html.replace(/<img\s+([^>]*)\/?>/gi, function (match, attrs) {
+                counter++;
+                const id = 'img-placeholder-' + counter;
+
+                // 提取src
+                const srcMatch = attrs.match(/src\s*=\s*["']([^"']+)["']/i);
+                const src = srcMatch ? srcMatch[1] : '';
+
+                // 提取alt
+                const altMatch = attrs.match(/alt\s*=\s*["']([^"']+)["']/i);
+                const alt = altMatch ? altMatch[1] : '';
+
+                if (!src) return match; // 无src则保留原样
+
+                return '<div id="' + id + '" data-img-src="' + src + '" data-alt="' + alt + '" style="height:200px;width:100%;background:linear-gradient(135deg,#f5f7fa 0%,#e8ecf1 100%);display:flex;align-items:center;justify-content:center;border-radius:12px;margin:16px 0;"><div style="display:flex;flex-direction:column;align-items:center;gap:8px;"><div style="width:24px;height:24px;border:2px solid #e0e0e0;border-top:2px solid #667eea;border-radius:50%;animation:imgSpinner 0.8s linear infinite;"></div><span style="color:#9ca3af;font-size:12px;">图片加载中...</span></div></div>';
+            });
+
+            window.__imgPlaceholderCounter = counter;
+            return result;
+        };
+
+        // ==================== Mi-FlowUI优化: 批量DOM操作工具 ====================
+
+        // DOM事件队列
+        window.__domEventQueue = window.__domEventQueue || [];
+        window.__isProcessingDOMQueue = false;
+        window.__batchSize = 10;
+        window.__batchInterval = 16;
+
+        /**
+         * 批量追加DOM内容(使用DocumentFragment减少重排)
+         */
+        window.batchAppendDOM = function (html, targetId) {
+            targetId = targetId || 'app';
+            const target = document.getElementById(targetId);
+            if (!target) return;
+
+            // 应用图片占位符替换
+            if (window.replaceImgWithPlaceholder) {
+                html = window.replaceImgWithPlaceholder(html);
+            }
+
+            // 创建临时容器解析HTML
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = html;
+
+            // 使用DocumentFragment批量插入
+            const fragment = document.createDocumentFragment();
+            while (tempDiv.firstChild) {
+                fragment.appendChild(tempDiv.firstChild);
+            }
+
+            // 一次性插入DOM
+            target.appendChild(fragment);
+
+            // 触发图片加载
+            if (window.loadAllPendingImages) {
+                setTimeout(window.loadAllPendingImages, 50);
+            }
+        };
+
+        // ==================== Mi-FlowUI优化: 硬件加速 ====================
+
+        /**
+         * 检测平台
+         */
+        window.detectPlatform = function () {
+            const ua = navigator.userAgent || '';
+            if (/Android/i.test(ua)) return 'android';
+            if (/iPhone|iPad|iPod/i.test(ua)) return 'ios';
+            if (/Mac/i.test(ua)) return 'macos';
+            if (/Windows/i.test(ua)) return 'windows';
+            return 'unknown';
+        };
+
+        /**
+         * 应用硬件加速样式
+         */
+        window.applyHardwareAcceleration = function () {
+            const platform = window.detectPlatform();
+            const app = document.getElementById('app');
+            if (!app) return;
+
+            // 基础硬件加速
+            app.style.transform = 'translate3d(0,0,0)';
+            app.style.backfaceVisibility = 'hidden';
+
+            // 平台特定优化
+            if (platform === 'android') {
+                app.style.willChange = 'transform';
+            } else if (platform === 'ios') {
+                app.style.webkitOverflowScrolling = 'touch';
+                app.style.webkitTransform = 'translateZ(0)';
+            } else if (platform === 'macos') {
+                app.style.contentVisibility = 'auto';
+            }
+
+            // 添加优化样式表
+            if (!document.getElementById('hw-accel-style')) {
+                const style = document.createElement('style');
+                style.id = 'hw-accel-style';
+                style.textContent = '#app{contain:layout style paint;}#app>*{transform:translateZ(0);}img{will-change:opacity;}.fade-in{animation:fadeIn 0.3s ease-in-out;}@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}';
+                document.head.appendChild(style);
+            }
+
+            console.log('GenUI: Hardware acceleration applied for', platform);
+        };
+
+        // 自动应用硬件加速
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', window.applyHardwareAcceleration);
+        } else {
+            window.applyHardwareAcceleration();
+        }
+
+        console.log('GenUI: Mi-FlowUI optimizations loaded (Image+BatchDOM+HWAccel)');
+
+        // ==================== 原有代码 ====================
+
+        const nodeMap = new Map();
+        const stats = { total: 0, byType: {}, lastSeq: 0, errors: 0 };
+        const root = document.getElementById('app');
+        nodeMap.set('root', root);
+
+        // State
+        let hasContentStarted = false;
+        let isFirstLoad = true; // 标记是否是首次加载
+
+        // 移除调试日志以避免ERR_CLEARTEXT_NOT_PERMITTED错误
+
+        // Loading helper: should disappear immediately when streaming starts (ANY first event)
+        function hideLoadingNow(reason) {
+            const el = document.getElementById('page-loading');
+            if (!el) return;
+            // 防止重复调用导致异常/闪烁
+            if (el.dataset && el.dataset.genuiHidden === "1") return;
+            if (el.dataset) el.dataset.genuiHidden = "1";
+
+            // 双保险：隐藏 + 禁用交互 + 直接移除，避免 WebView 下“顶部残留”
+            el.classList.add('is-hidden');
+            el.style.display = 'none';
+            el.style.opacity = '0';
+            el.style.visibility = 'hidden';
+            el.style.pointerEvents = 'none';
+            try {
+                el.remove();
+            } catch (e) {
+                try {
+                    if (el.parentNode) el.parentNode.removeChild(el);
+                } catch (_) { }
+            }
+            console.log("GenUI: Loading hidden:", reason || "unknown");
+        }
+        window.__hideGenUILoading = hideLoadingNow;
+        // Backward compatible name (Android may call this)
+        window.hideSkeletonIfCached = function () { hideLoadingNow("android_or_cached"); };
+
+        // 检查URL参数，判断是否是首次加载/是否为缓存回放
+        const urlParams = new URLSearchParams(window.location.search);
+        const isCached = urlParams.get('cached') === 'true';
+        const isPreload = urlParams.get('preload') === 'true';
+        // Expose to Android-side injected JS (for conditional behavior)
+        window.__genuiIsCached = isCached;
+        window.__genuiIsPreload = isPreload;
+        console.log("GenUI: Page initialization - isCached:", isCached, "isPreload:", isPreload, "url:", window.location.href);
+
+        // P1优化: 预加载模式 - 页面已完成初始化,但保持loading显示
+        // 当Android端开始流式输出时,无需再次加载页面,直接注入事件即可
+        if (isPreload) {
+            console.log("GenUI: Preload mode - Page ready, waiting for stream events...");
+            // 预加载模式下,发送Ready信号但保持loading显示
+            // 这样后续流式输出时可以直接开始,无需等待页面加载
+        }
+
+        // 缓存回放（快速追赶）模式：缓存回放会在短时间内追加大量内容，平滑滚动会跟不上
+        // 规则：cached=true 且开始接收流式事件后，进入 catchupMode；finalize 后退出
+        let catchupMode = false;
+        let finalizeReceived = false;
+        let isAutoScrollingProgrammatically = false;
+        // 只有真实用户触摸/滑动后，才允许关闭 autoScrollEnabled（避免缓存回放被误判）
+        let userHasInteracted = false;
+
+        // 持续监控文档高度变化，自动触发滚动（打字机效果的关键）
+        let lastKnownDocHeight = 0;
+        let contentGrowthMonitor = null;
+
+        function maybeExitCatchupMode() {
+            if (!finalizeReceived) return;
+            if (catchupMode && !isProcessingQueue && renderQueue.length === 0) {
+                catchupMode = false;
+                // 停止内容增长监控器
+                if (contentGrowthMonitor) {
+                    clearInterval(contentGrowthMonitor);
+                    contentGrowthMonitor = null;
+                    console.log("GenUI: Content growth monitor stopped");
+                }
+                // 缓存回放结束后，如果用户没有交互过，恢复自动滚动能力
+                if (!userHasInteracted) {
+                    autoScrollEnabled = true;
+                    isUserScrolling = false;
+                }
+                console.log("GenUI: catchupMode disabled (queue drained)");
+            }
+        }
+
+        // 启动内容增长监控器（用于打字机效果的持续滚动）
+        function startContentGrowthMonitor() {
+            if (contentGrowthMonitor) return; // 避免重复启动
+
+            lastKnownDocHeight = document.body.scrollHeight;
+
+            // 每 100ms 检测一次文档高度变化
+            contentGrowthMonitor = setInterval(() => {
+                if (!catchupMode || isUserScrolling) return;
+
+                const currentDocHeight = document.body.scrollHeight;
+                if (currentDocHeight > lastKnownDocHeight + 50) { // 高度增加超过 50px
+                    lastKnownDocHeight = currentDocHeight;
+                    intelligentScroll(true); // 强制触发滚动
+                }
+            }, 100);
+
+            console.log("GenUI: Content growth monitor started");
+        }
+
+        // 检查是否有任何内容已存在（包括缓存内容或流式输出内容）
+        function checkForAnyContent() {
+            const app = document.getElementById('app');
+            if (app) {
+                // 检查app中是否有除了skeleton之外的任何元素
+                const children = Array.from(app.children || []);
+                const hasNonSkeletonElements = children.some(child => {
+                    return child.id !== 'skeleton' &&
+                        (child.children.length > 0 ||
+                            (child.textContent && child.textContent.trim().length > 0));
+                });
+
+                // 检查是否有文本内容
+                const allText = app.innerText || app.textContent || '';
+                const textWithoutSkeleton = allText.replace(/\s+/g, '');
+                const hasTextContent = textWithoutSkeleton.length > 0;
+
+                const hasContent = hasNonSkeletonElements || hasTextContent;
+                console.log("GenUI: Content check - hasNonSkeletonElements:", hasNonSkeletonElements, "hasTextContent:", hasTextContent, "hasContent:", hasContent);
+                return hasContent;
+            }
+            return false;
+        }
+
+        // Initial Loading State:
+        // - If cached/has content/stream already started: hide loading immediately
+        // - Otherwise: keep loading visible until the first stream event arrives
+        if (isCached || checkForAnyContent() || hasContentStarted) {
+            hideLoadingNow("init_has_content_or_cached");
+            isFirstLoad = false;
+        }
+
+        // ================= Advanced Queue System =================
+        // Ensures strict serial rendering: Block N must finish typing before Block N+1 enters DOM.
+
+        const renderQueue = []; // Stores { node, textTasks[] }
+        let isProcessingQueue = false;
+
+        // Configuration
+        let TYPE_SPEED_MS = 30; // 从10ms增加到30ms，减少更新频率
+
+        // Expose control to Android
+        window.setTypingSpeed = function (ms) {
+            TYPE_SPEED_MS = Math.max(ms, 20); // 最小20ms，避免太快
+        };
+
+        // Intelligent Scroll Helper - 优化滑动体验，避免闪烁
+        let isUserScrolling = false;
+        let userScrollTimeout = null;
+        let autoScrollEnabled = true;
+        let scrollAnimationId = null;
+        let lastScrollY = 0;
+        let lastTargetScroll = 0; // 记录上次的目标位置，避免重复滚动
+        let isAnimating = false; // 标记是否正在动画中
+
+        // 监听用户滚动，检测用户主动滑动
+        // 使用节流来避免误判自动滚动为用户滚动
+        let scrollCheckTimeout = null;
+        window.addEventListener('scroll', () => {
+            const currentScrollY = window.scrollY;
+            const scrollDelta = Math.abs(currentScrollY - lastScrollY);
+
+            // 清除之前的检查
+            if (scrollCheckTimeout) {
+                clearTimeout(scrollCheckTimeout);
+            }
+
+            // 延迟检查，避免误判自动滚动
+            scrollCheckTimeout = setTimeout(() => {
+                // 缓存回放期间大量 programmatic scroll，会触发 scroll 事件；没有真实触摸时不应禁用 autoScroll
+                if (!userHasInteracted) {
+                    lastScrollY = currentScrollY;
+                    return;
+                }
+                // 如果滚动距离较大（超过20px），且不是由我们的自动滚动引起的，认为是用户主动滑动
+                if (!isAutoScrollingProgrammatically && scrollDelta > 20 && scrollAnimationId === null) {
+                    isUserScrolling = true;
+                    autoScrollEnabled = false; // 用户滑动时禁用自动滚动
+
+                    // 清除之前的超时
+                    if (userScrollTimeout) {
+                        clearTimeout(userScrollTimeout);
+                    }
+
+                    // 用户停止滑动2秒后，重置状态（但不自动恢复滚动）
+                    userScrollTimeout = setTimeout(() => {
+                        isUserScrolling = false;
+                    }, 2000);
+                }
+
+                lastScrollY = currentScrollY;
+            }, 100); // 延迟100ms检查，避免误判
+        }, { passive: true });
+
+        // 监听触摸事件，更准确地检测用户手动滑动
+        let touchStartY = 0;
+        let touchStartTime = 0;
+        let isTouching = false;
+
+        window.addEventListener('touchstart', (e) => {
+            touchStartY = e.touches[0].clientY;
+            touchStartTime = Date.now();
+            isTouching = true;
+            userHasInteracted = true;
+            // 触摸开始时不清除自动滚动，等待确认是用户滑动
+        }, { passive: true });
+
+        window.addEventListener('touchmove', (e) => {
+            if (isTouching) {
+                const touchY = e.touches[0].clientY;
+                const deltaY = Math.abs(touchY - touchStartY);
+                // 只有当移动距离较大（超过30px）时才认为是用户主动滑动
+                if (deltaY > 30) {
+                    isUserScrolling = true;
+                    autoScrollEnabled = false;
+                    if (scrollAnimationId) {
+                        cancelAnimationFrame(scrollAnimationId);
+                        scrollAnimationId = null;
+                    }
+
+                    // 清除之前的超时
+                    if (userScrollTimeout) {
+                        clearTimeout(userScrollTimeout);
+                    }
+
+                    // 用户停止滑动2秒后，重置状态
+                    userScrollTimeout = setTimeout(() => {
+                        isUserScrolling = false;
+                    }, 2000);
+                }
+            }
+        }, { passive: true });
+
+        window.addEventListener('touchend', () => {
+            isTouching = false;
+        }, { passive: true });
+
+        // P3优化: 高级平滑滚动函数 - 使用easeOutQuad缓动实现更流畅的滚动
+        window.smoothScrollToPosition = function (targetY, duration) {
+            duration = duration || 300;
+
+            const startY = window.scrollY || 0;
+            const distance = targetY - startY;
+
+            if (Math.abs(distance) < 5) return; // 距离太小不滚动
+
+            const startTime = performance.now();
+
+            function scroll(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+
+                // easeOutQuad缓动: 开始快,结束慢,更符合物理感
+                const easeProgress = 1 - Math.pow(1 - progress, 2);
+
+                const newY = startY + distance * easeProgress;
+                window.scrollTo(0, newY);
+                lastScrollY = newY;
+
+                if (progress < 1 && !isUserScrolling) {
+                    requestAnimationFrame(scroll);
+                }
+            }
+
+            requestAnimationFrame(scroll);
+        };
+
+        // 平滑滚动到底部(带缓动)
+        window.smoothScrollToBottom = function (duration) {
+            duration = duration || 300;
+            const targetY = document.body.scrollHeight - window.innerHeight;
+            window.smoothScrollToPosition(targetY, duration);
+        };
+
+        function intelligentScroll(force = false) {
+            // 如果用户正在滑动，不执行自动滚动
+            if (isUserScrolling) {
+                console.log("GenUI: intelligentScroll skipped - user scrolling");
+                return;
+            }
+
+            // 如果自动滚动被禁用，且不是强制滚动，则不执行
+            if (!autoScrollEnabled && !force) {
+                console.log("GenUI: intelligentScroll skipped - autoScroll disabled");
+                return;
+            }
+
+            // 取消之前的滚动动画
+            if (scrollAnimationId) {
+                cancelAnimationFrame(scrollAnimationId);
+            }
+
+            // 追赶模式：打字机式连续滚动（缓存回放场景）
+            if (catchupMode) {
+                const viewportHeight = window.innerHeight;
+                const documentHeight = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+                // 使用当前动画的目标位置，而不是实际滚动位置（避免动画未完成时读取到旧值）
+                const currentScroll = isAnimating ? lastTargetScroll : (window.scrollY || 0);
+                console.log("GenUI: intelligentScroll [CATCHUP] - viewportH:", viewportHeight, "docH:", documentHeight, "currentScroll:", currentScroll, "isAnimating:", isAnimating);
+
+                if (documentHeight >= viewportHeight) {
+                    // 目标：让最新内容显示在屏幕底部可见区域（30%位置）
+                    const targetScroll = Math.max(0, documentHeight - viewportHeight * 0.3);
+                    const scrollDelta = targetScroll - currentScroll;
+
+                    // 防重复：如果目标位置和上次相同（或非常接近），跳过
+                    if (Math.abs(targetScroll - lastTargetScroll) < 10) {
+                        console.log("GenUI: intelligentScroll [CATCHUP] - Target unchanged, skipping (target:", targetScroll, "lastTarget:", lastTargetScroll, ")");
+                        return;
+                    }
+
+                    // 使用连续滚动动画，模拟打字机跟随效果
+                    if (Math.abs(scrollDelta) > 20) {
+                        // 取消之前的滚动动画
+                        if (scrollAnimationId) {
+                            cancelAnimationFrame(scrollAnimationId);
+                        }
+
+                        // 记录新的目标位置
+                        lastTargetScroll = targetScroll;
+                        isAnimating = true;
+
+                        // 启动连续滚动动画
+                        const startScroll = currentScroll;
+                        const startTime = performance.now();
+                        // 根据距离动态调整动画时长：小距离快速滚动，大距离稍慢
+                        const duration = Math.min(200 + Math.abs(scrollDelta) * 0.15, 500);
+
+                        function animateScroll(currentTime) {
+                            const elapsed = currentTime - startTime;
+                            const progress = Math.min(elapsed / duration, 1);
+
+                            // 使用 easeOutQuad 缓动函数（比 cubic 更快）
+                            const easeProgress = 1 - Math.pow(1 - progress, 2);
+                            const newScroll = startScroll + scrollDelta * easeProgress;
+
+                            isAutoScrollingProgrammatically = true;
+                            window.scrollTo(0, newScroll);
+                            lastScrollY = newScroll;
+
+                            if (progress < 1 && !isUserScrolling) {
+                                scrollAnimationId = requestAnimationFrame(animateScroll);
+                            } else {
+                                scrollAnimationId = null;
+                                isAutoScrollingProgrammatically = false;
+                                isAnimating = false;
+                                console.log("GenUI: intelligentScroll [CATCHUP] - Animation completed, scrolled to:", newScroll);
+                            }
+                        }
+
+                        scrollAnimationId = requestAnimationFrame(animateScroll);
+                        console.log("GenUI: intelligentScroll [CATCHUP] - Starting animation to:", targetScroll, "delta:", scrollDelta, "duration:", duration);
+                    } else {
+                        console.log("GenUI: intelligentScroll [CATCHUP] - Already near target, delta:", scrollDelta);
+                    }
+                } else {
+                    console.log("GenUI: intelligentScroll [CATCHUP] - Doc too short, no scroll needed");
+                }
+                return;
+            }
+
+            // 只在用户没有滑动时，才执行平滑滚动
+            if (!isUserScrolling && autoScrollEnabled) {
+                console.log("GenUI: intelligentScroll started - documentHeight:", document.body.scrollHeight, "currentScroll:", window.scrollY);
+                scrollAnimationId = requestAnimationFrame(function smoothScroll() {
+                    // 检查用户是否开始滑动或自动滚动被禁用
+                    if (isUserScrolling || !autoScrollEnabled) {
+                        scrollAnimationId = null;
+                        return;
+                    }
+
+                    const viewportHeight = window.innerHeight;
+                    const documentHeight = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+                    const currentScroll = window.scrollY || window.pageYOffset || 0;
+
+                    // 如果文档高度太小，不需要滚动
+                    if (documentHeight < viewportHeight) {
+                        scrollAnimationId = null;
+                        return;
+                    }
+
+                    // 目标位置：让最新内容显示在屏幕中间靠下（70%位置）
+                    const targetScroll = Math.max(0, documentHeight - viewportHeight * 0.3);
+                    const scrollDistance = targetScroll - currentScroll;
+
+                    // 如果距离很小，不需要滚动
+                    if (Math.abs(scrollDistance) < 5) {
+                        scrollAnimationId = null;
+                        return;
+                    }
+
+                    // P3优化: 使用easeOutQuad缓动函数实现更流畅的滚动
+                    // 每次移动距离*0.12,比之前0.15更平滑
+                    const scrollSpeed = 0.12;
+                    const newScroll = currentScroll + scrollDistance * scrollSpeed;
+
+                    // 如果用户开始滑动，立即停止
+                    if (isUserScrolling) {
+                        scrollAnimationId = null;
+                        return;
+                    }
+
+                    // 执行滚动
+                    window.scrollTo({
+                        top: newScroll,
+                        behavior: 'auto'
+                    });
+
+                    // 更新lastScrollY，避免误判为用户滚动
+                    lastScrollY = newScroll;
+
+                    // 继续滚动直到到达目标位置，确保界面持续刷新
+                    if (Math.abs(targetScroll - newScroll) > 5 && !isUserScrolling && autoScrollEnabled) {
+                        scrollAnimationId = requestAnimationFrame(smoothScroll);
+                    } else {
+                        scrollAnimationId = null;
+                        console.log("GenUI: intelligentScroll completed - target:", targetScroll, "current:", newScroll, "documentHeight:", documentHeight);
+                    }
+                });
+            } else {
+                console.log("GenUI: intelligentScroll SKIPPED [not catchup] - isUserScrolling:", isUserScrolling, "autoScrollEnabled:", autoScrollEnabled);
+            }
+        }
+
+        // 重置自动滚动状态（当新的流式输出开始时调用）
+        window.resetAutoScroll = function () {
+            autoScrollEnabled = true;
+            isUserScrolling = false;
+            lastScrollY = window.scrollY;
+            lastTargetScroll = 0; // 重置目标位置
+            isAnimating = false; // 重置动画状态
+            lastKnownDocHeight = document.body.scrollHeight; // 重置监控高度
+            if (scrollAnimationId) {
+                cancelAnimationFrame(scrollAnimationId);
+                scrollAnimationId = null;
+            }
+            if (userScrollTimeout) {
+                clearTimeout(userScrollTimeout);
+                userScrollTimeout = null;
+            }
+            console.log("GenUI: Auto-scroll reset");
+        };
+
+        function removeSkeleton() {
+            const skeleton = document.getElementById('skeleton');
+            if (skeleton) {
+                // Signal to Native: Content Started
+                console.log("GenUI: Content Started - Removing skeleton with smooth transition");
+                console.log("GenUI: Skeleton before removal - display:", skeleton.style.display, "height:", skeleton.offsetHeight, "computed height:", window.getComputedStyle(skeleton).height, "parent:", skeleton.parentNode ? "exists" : "null");
+                console.log("GenUI: Body height before:", document.body.offsetHeight, "scrollHeight:", document.body.scrollHeight);
+                const app = document.getElementById('app');
+                console.log("GenUI: App height before:", app?.offsetHeight, "children count:", app?.children.length);
+
+                // 立即隐藏并移除骨架图（不需要淡出动画，因为真实内容已经来了）
+                skeleton.style.display = 'none';
+                skeleton.style.opacity = '0';
+                skeleton.style.visibility = 'hidden';
+                skeleton.style.height = '0';
+                skeleton.style.minHeight = '0';
+                skeleton.style.maxHeight = '0';
+                skeleton.style.overflow = 'hidden';
+                skeleton.style.margin = '0';
+                skeleton.style.padding = '0';
+                skeleton.style.position = 'fixed';
+                skeleton.style.top = '-9999px'; // 移到屏幕外
+                skeleton.style.left = '-9999px';
+                skeleton.style.width = '0';
+                skeleton.style.zIndex = '-1';
+                skeleton.style.pointerEvents = 'none';
+
+                // 从DOM中立即移除
+                try {
+                    if (skeleton.parentNode) {
+                        skeleton.parentNode.removeChild(skeleton);
+                        console.log("GenUI: Skeleton removed from DOM immediately");
+                    }
+                } catch (e) {
+                    console.warn("GenUI: Error removing skeleton:", e);
+                }
+
+                // 确保body和app没有因为骨架图留下的空白
+                document.body.style.paddingTop = '0';
+                document.body.style.marginTop = '0';
+                if (app) {
+                    app.style.paddingTop = '0';
+                    app.style.marginTop = '0';
+                    console.log("GenUI: App padding/margin reset");
+                }
+
+                // 强制重排，确保空白被移除
+                void document.body.offsetHeight;
+                if (app) void app.offsetHeight;
+
+                console.log("GenUI: Skeleton removal complete - body height after:", document.body.offsetHeight, "scrollHeight:", document.body.scrollHeight);
+                console.log("GenUI: App height after:", app?.offsetHeight, "children count:", app?.children.length);
+                if (app && app.firstElementChild) {
+                    console.log("GenUI: First child of app:", app.firstElementChild.tagName, "height:", app.firstElementChild.offsetHeight, "margin-top:", window.getComputedStyle(app.firstElementChild).marginTop);
+                }
+            } else {
+                console.log("GenUI: removeSkeleton called but no skeleton element found");
+            }
+        }
+
+        // Recursively extract text nodes and clear them for typing
+        function prepareNodeForTyping(node) {
+            const tasks = [];
+
+            function traverse(el) {
+                if (el.nodeType === Node.TEXT_NODE) {
+                    const text = el.textContent;
+                    if (text.trim().length > 0) { // Only type non-empty text
+                        tasks.push({ node: el, text: text });
+                        el.textContent = ''; // Clear immediately
+                    }
+                } else if (el.nodeType === Node.ELEMENT_NODE) {
+                    // Pre-process children
+                    // We need to convert live NodeList to array because we might modify it? 
+                    // No, just traversing is fine.
+                    Array.from(el.childNodes).forEach(child => traverse(child));
+                }
+            }
+
+            traverse(node);
+            return tasks;
+        }
+
+        function processRenderQueue() {
+            if (renderQueue.length === 0) {
+                isProcessingQueue = false;
+                return;
+            }
+
+            isProcessingQueue = true;
+            const item = renderQueue.shift();
+            const node = item.node;
+            const textTasks = item.textTasks;
+
+            // 1. 当第一个内容块要渲染时，移除骨架图
+            if (!hasContentStarted) {
+                console.log("GenUI: processRenderQueue - First content block, removing skeleton");
+                hasContentStarted = true;
+
+                // 检查骨架图是否可见，只有可见时才移除
+                const skeleton = document.getElementById('skeleton');
+                if (skeleton && skeleton.style.display !== 'none' && window.getComputedStyle(skeleton).display !== 'none') {
+                    removeSkeleton(); // 立即移除，不等待
+                }
+
+                // 重置自动滚动状态
+                window.resetAutoScroll();
+                console.log("GenUI: processRenderQueue - Skeleton removed, hasContentStarted:", hasContentStarted);
+            }
+
+            // 2. Append the container node to DOM
+            // 确保节点没有transform或scale，避免初始渲染位置问题
+            if (node.style) {
+                node.style.transform = 'none';
+                node.style.scale = '1';
+                node.style.zoom = '1';
+            }
+
+            // 使用 requestAnimationFrame 优化DOM更新，避免闪烁
+            requestAnimationFrame(() => {
+                root.appendChild(node);
+                console.log("GenUI: processRenderQueue - Node appended, triggering scroll");
+
+                // 强制重排，确保DOM更新
+                void root.offsetHeight;
+
+                // P0优化: 触发图片占位符加载
+                if (window.loadAllPendingImages) {
+                    setTimeout(window.loadAllPendingImages, 100);
+                }
+
+                // 3. 触发滚动跟随（只在用户没有滑动时）
+                // 使用双重 requestAnimationFrame 确保DOM更新后再滚动
+                requestAnimationFrame(() => {
+                    if (!isUserScrolling && autoScrollEnabled) {
+                        // 延迟一点确保DOM完全渲染和布局计算完成
+                        setTimeout(() => {
+                            if (!isUserScrolling && autoScrollEnabled) {
+                                console.log("GenUI: processRenderQueue - Calling intelligentScroll, documentHeight:", document.body.scrollHeight);
+                                // cached 回放用强制追赶（但 intelligentScroll 内仍尊重 isUserScrolling，不抢用户手势）
+                                intelligentScroll(isCached === true);
+                            }
+                            maybeExitCatchupMode();
+                        }, 100); // 增加延迟，确保布局计算完成
+                    } else {
+                        console.log("GenUI: processRenderQueue - Scroll skipped - isUserScrolling:", isUserScrolling, "autoScrollEnabled:", autoScrollEnabled);
+                        maybeExitCatchupMode();
+                    }
+                });
+            });
+
+            // 4. Execute Typing Animation for this block
+            if (textTasks.length > 0) {
+                processTextTasks(textTasks, () => {
+                    // Block Finished -> Next
+                    // 延迟处理下一个块，减少DOM更新频率
+                    setTimeout(() => {
+                        processRenderQueue();
+                    }, 50);
+                });
+            } else {
+                // No text (e.g. image only), just wait a tick then next
+                setTimeout(processRenderQueue, 100);
+            }
+        }
+
+        function processTextTasks(tasks, onComplete) {
+            if (tasks.length === 0) {
+                onComplete();
+                return;
+            }
+
+            const task = tasks.shift();
+            let charIndex = 0;
+            const text = task.text;
+            const node = task.node;
+
+            // 增加批次大小，减少更新频率
+            const CHUNK_SIZE = 5; // 从3增加到5，减少更新次数
+
+            // 用于节流滚动触发：每打 10 个字符触发一次滚动
+            let scrollTriggerCount = 0;
+            const SCROLL_TRIGGER_INTERVAL = 10;
+
+            function typeChar() {
+                if (charIndex < text.length) {
+                    // 使用 requestAnimationFrame 优化性能
+                    requestAnimationFrame(() => {
+                        const chunk = text.substr(charIndex, CHUNK_SIZE);
+                        node.textContent += chunk;
+                        charIndex += CHUNK_SIZE;
+
+                        // 打字过程中持续触发滚动（节流：每 10 个字符触发一次）
+                        scrollTriggerCount++;
+                        if (scrollTriggerCount >= SCROLL_TRIGGER_INTERVAL) {
+                            scrollTriggerCount = 0;
+                            // 使用 requestAnimationFrame 延迟到下一帧，避免阻塞打字
+                            requestAnimationFrame(() => {
+                                intelligentScroll(isCached === true);
+                            });
+                        }
+                    });
+
+                    setTimeout(typeChar, TYPE_SPEED_MS);
+                } else {
+                    // Task done, next text node in this block
+                    // 块内完成时触发一次滚动，确保最新内容可见
+                    setTimeout(() => {
+                        intelligentScroll(isCached === true);
+                        processTextTasks(tasks, onComplete);
+                    }, 20); // 增加延迟，减少更新频率
+                }
+            }
+
+            typeChar();
+        }
+
+        // ================= Event Handler =================
+
+        window.handleGenUIEvent = function (jsonStr) {
+            try {
+                const event = (typeof jsonStr === 'string') ? JSON.parse(jsonStr) : jsonStr;
+                const type = event.t || event.type;
+                const data = event.payload || event.data || event;
+
+                stats.total += 1;
+                console.log("GenUI Event", type, event.seq || 0);
+
+                // P0: once streaming starts (ANY first event, including meta), hide loading immediately
+                if (!window.__streamStarted) {
+                    window.__streamStarted = true;
+                    hasContentStarted = true;
+                    if (isCached) {
+                        catchupMode = true; // 缓存回放：开启追赶模式，滚动改为瞬移跟随
+                        startContentGrowthMonitor(); // 启动内容增长监控器，实现打字机跟随效果
+                        console.log("GenUI: catchupMode ENABLED (cached replay)");
+                    }
+                    if (typeof window.__hideGenUILoading === 'function') {
+                        window.__hideGenUILoading("first_event_" + type);
+                    }
+                    // also ensure legacy skeleton is removed (even though it's disabled)
+                    if (typeof window.hideSkeletonIfCached === 'function') {
+                        window.hideSkeletonIfCached();
+                    }
+                    window.resetAutoScroll && window.resetAutoScroll();
+                }
+
+                // no skeleton gating; keep rendering
+
+                switch (type) {
+                    case 'meta':
+                        if (data.page_title) document.title = data.page_title;
+                        break;
+
+                    case 'append_head':
+                    case 'append_css':
+                        // Head/CSS updates don't need queueing, apply immediately
+                        if (data.html) {
+                            const div = document.createElement('div');
+                            div.innerHTML = data.html;
+                            Array.from(div.childNodes).forEach(node => document.head.appendChild(node));
+                        }
+                        if (data.css) {
+                            const style = document.createElement('style');
+                            style.appendChild(document.createTextNode(data.css));
+                            document.head.appendChild(style);
+                        }
+                        break;
+
+                    case 'append_section':
+                        if (data.html) {
+                            // P0优化: 激活图片占位符替换(防止布局抖动)
+                            let sectionHtml = data.html;
+                            if (window.replaceImgWithPlaceholder) {
+                                sectionHtml = window.replaceImgWithPlaceholder(sectionHtml);
+                            }
+
+                            // Parse HTML offline (fragment)
+                            const div = document.createElement('div');
+                            div.innerHTML = sectionHtml;
+
+                            // Process each top-level child
+                            while (div.firstChild) {
+                                const node = div.firstChild;
+                                div.removeChild(node); // Detach
+
+                                // 确保节点样式固定，不会因为滚动而变化，避免初始渲染时的缩放问题
+                                if (node.style) {
+                                    node.style.position = 'relative';
+                                    node.style.transform = 'none';
+                                    node.style.scale = '1';
+                                    node.style.zoom = '1';
+                                }
+
+                                // Prepare: extract text, clear content
+                                const textTasks = prepareNodeForTyping(node);
+
+                                // Enqueue
+                                renderQueue.push({ node: node, textTasks: textTasks });
+                            }
+
+                            // Trigger Queue if idle
+                            if (!isProcessingQueue) {
+                                processRenderQueue();
+                            }
+                        }
+                        break;
+
+                    case 'bootstrap_html':
+                        // Handle bootstrap HTML - 这是第一个内容，确保骨架图已移除
+                        if (data.html) {
+                            console.log("GenUI: bootstrap_html event received, html length:", data.html.length);
+                            // 确保骨架图已移除（在handleGenUIEvent开头已经处理，这里再次确保）
+                            if (!hasContentStarted && isFirstLoad) {
+                                console.log("GenUI: bootstrap_html - Removing skeleton");
+                                hasContentStarted = true;
+                                removeSkeleton();
+                                window.resetAutoScroll();
+                            }
+
+                            // 解析HTML，但只提取head和body中的内容，不要创建新的结构
+                            const parser = new DOMParser();
+                            const doc = parser.parseFromString(data.html, 'text/html');
+
+                            // 移除bootstrap_html中可能包含的skeleton/loading（loading由shell统一控制）
+                            const skeletonInBootstrap = doc.getElementById('skeleton');
+                            if (skeletonInBootstrap) {
+                                console.log("GenUI: bootstrap_html - Removing skeleton from bootstrap HTML");
+                                skeletonInBootstrap.remove();
+                            }
+                            const loadingInBootstrap = doc.getElementById('page-loading');
+                            if (loadingInBootstrap) {
+                                console.log("GenUI: bootstrap_html - Removing loading overlay from bootstrap HTML");
+                                loadingInBootstrap.remove();
+                            }
+
+                            // 提取head中的内容（meta, title, style等）
+                            Array.from(doc.head.children).forEach(node => {
+                                // 跳过已经存在的meta和title
+                                if (node.tagName === 'META') {
+                                    // 对于META标签，检查name或http-equiv属性
+                                    const nameAttr = node.getAttribute('name');
+                                    const httpEquivAttr = node.getAttribute('http-equiv');
+                                    let existing = null;
+
+                                    if (nameAttr) {
+                                        existing = document.head.querySelector(`meta[name="${nameAttr}"]`);
+                                    } else if (httpEquivAttr) {
+                                        existing = document.head.querySelector(`meta[http-equiv="${httpEquivAttr}"]`);
+                                    }
+
+                                    if (!existing) {
+                                        document.head.appendChild(node.cloneNode(true));
+                                        console.log("GenUI: bootstrap_html - Appended meta to head:", nameAttr || httpEquivAttr);
+                                    }
+                                } else if (node.tagName === 'TITLE') {
+                                    // Title标签，检查是否已存在
+                                    const existing = document.head.querySelector('title');
+                                    if (!existing) {
+                                        document.head.appendChild(node.cloneNode(true));
+                                        console.log("GenUI: bootstrap_html - Appended title to head");
+                                    } else {
+                                        existing.textContent = node.textContent;
+                                        console.log("GenUI: bootstrap_html - Updated existing title");
+                                    }
+                                } else if (node.tagName === 'STYLE') {
+                                    // Style标签直接添加
+                                    document.head.appendChild(node.cloneNode(true));
+                                    console.log("GenUI: bootstrap_html - Appended style to head");
+                                }
+                            });
+
+                            // 提取body中的内容，但跳过MAIN元素（因为我们已经有了#app）
+                            const bodyContent = doc.body;
+                            let contentAdded = false;
+
+                            Array.from(bodyContent.children).forEach(node => {
+                                if (node.tagName === 'MAIN' || node.id === 'app') {
+                                    // 如果是MAIN元素，提取其子元素
+                                    Array.from(node.children).forEach(child => {
+                                        // 跳过skeleton元素
+                                        if (child.id !== 'skeleton') {
+                                            const clonedChild = child.cloneNode(true);
+                                            // 确保克隆的元素没有transform或scale
+                                            if (clonedChild.style) {
+                                                clonedChild.style.transform = 'none';
+                                                clonedChild.style.scale = '1';
+                                                clonedChild.style.zoom = '1';
+                                            }
+                                            root.appendChild(clonedChild);
+                                            contentAdded = true;
+                                            console.log("GenUI: bootstrap_html - Appended child from MAIN:", child.tagName);
+                                        } else {
+                                            console.log("GenUI: bootstrap_html - Skipped skeleton child");
+                                        }
+                                    });
+                                } else if (node.id !== 'skeleton') {
+                                    // 其他元素直接添加
+                                    const clonedNode = node.cloneNode(true);
+                                    // 确保克隆的元素没有transform或scale
+                                    if (clonedNode.style) {
+                                        clonedNode.style.transform = 'none';
+                                        clonedNode.style.scale = '1';
+                                        clonedNode.style.zoom = '1';
+                                    }
+                                    root.appendChild(clonedNode);
+                                    contentAdded = true;
+                                    console.log("GenUI: bootstrap_html - Appended node:", node.tagName);
+                                } else {
+                                    console.log("GenUI: bootstrap_html - Skipped skeleton node");
+                                }
+                            });
+
+                            // 强制重排，确保布局计算完成
+                            void root.offsetHeight;
+
+                            // 移除可能残留的skeleton
+                            const skeletonAfterBootstrap = document.getElementById('skeleton');
+                            if (skeletonAfterBootstrap && skeletonAfterBootstrap.parentNode) {
+                                console.log("GenUI: bootstrap_html - Removing residual skeleton");
+                                skeletonAfterBootstrap.parentNode.removeChild(skeletonAfterBootstrap);
+                            }
+
+                            console.log("GenUI: bootstrap_html - App children count:", root.children.length, "contentAdded:", contentAdded);
+
+                            // 如果添加了内容，触发滚动
+                            if (contentAdded && !isUserScrolling && autoScrollEnabled) {
+                                setTimeout(() => {
+                                    console.log("GenUI: bootstrap_html - Triggering scroll after content added, documentHeight:", document.body.scrollHeight);
+                                    intelligentScroll(false);
+                                }, 150); // 增加延迟，确保布局计算完成
+                            }
+                        }
+                        break;
+
+                    case 'append_chart':
+                        // Handle chart insertion
+                        if (data.html) {
+                            const div = document.createElement('div');
+                            div.innerHTML = data.html;
+                            while (div.firstChild) {
+                                const node = div.firstChild;
+                                div.removeChild(node);
+
+                                // 确保节点样式固定
+                                if (node.style) {
+                                    node.style.position = 'relative';
+                                    node.style.transform = 'none';
+                                }
+
+                                const textTasks = prepareNodeForTyping(node);
+                                renderQueue.push({ node: node, textTasks: textTasks });
+                            }
+                            if (!isProcessingQueue) {
+                                processRenderQueue();
+                            }
+                        }
+                        break;
+
+                    case 'append_script':
+                        // Handle script insertion
+                        if (data.js) {
+                            const script = document.createElement('script');
+                            script.textContent = data.js;
+                            document.head.appendChild(script);
+                        }
+                        break;
+
+                    case 'finalize':
+                        // Finalize event - page is complete
+                        console.log("GenUI: Page finalized");
+
+                        // finalize 到来不代表 DOM 已完成渲染（renderQueue/typing 可能还在跑）
+                        // 这里仅标记，真正退出追赶模式要等队列清空
+                        finalizeReceived = true;
+                        maybeExitCatchupMode();
+
+                        // 确保骨架屏完全移除
+                        const finalSkeleton = document.getElementById('skeleton');
+                        if (finalSkeleton && finalSkeleton.parentNode) {
+                            finalSkeleton.parentNode.removeChild(finalSkeleton);
+                            console.log("GenUI: Final cleanup - skeleton removed");
+                        }
+
+                        // 确保页面可以正常交互和滚动
+                        document.body.style.overflow = 'auto';
+                        document.body.style.pointerEvents = 'auto';
+                        root.style.pointerEvents = 'auto';
+                        console.log("GenUI: Page interaction enabled");
+                        break;
+
+                    case 'error':
+                        // Error event - log but don't break rendering
+                        stats.errors += 1;
+                        console.warn("GenUI Event Error:", data.message || data.error || "Unknown error");
+                        // Don't break rendering, just log the error
+                        break;
+
+                    default:
+                        // Unknown event type - log but don't break
+                        console.warn("GenUI Unknown Event Type:", type);
+                }
+
+            } catch (e) {
+                console.error("GenUI Error", e.message);
+            }
+        };
+
+        console.log("GenUI Renderer Ready (Queue Mode)");
+
+        // 修复初始渲染位置：确保滚动位置为0
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function () {
+                setTimeout(function () {
+                    window.scrollTo(0, 0);
+                    document.documentElement.scrollTop = 0;
+                    document.body.scrollTop = 0;
+                }, 100);
+            });
+        } else {
+            setTimeout(function () {
+                window.scrollTo(0, 0);
+                document.documentElement.scrollTop = 0;
+                document.body.scrollTop = 0;
+            }, 100);
+        }
+    </script>
+</body>
+
+</html>

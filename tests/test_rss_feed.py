@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from adapters.layer0_official.rss_feed import parse_feed, FeedEntry
+from pipeline.sources.layer0_official.rss_feed import parse_feed, FeedEntry
 
 SAMPLE_RSS = """<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">

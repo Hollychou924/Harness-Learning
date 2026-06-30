@@ -1,7 +1,7 @@
 import json
 import subprocess
 from unittest.mock import patch
-from adapters.layer0_official.github_releases import fetch_releases, Release
+from pipeline.sources.layer0_official.github_releases import fetch_releases, Release
 
 FAKE_GH_OUTPUT = json.dumps([
     {
@@ -21,7 +21,7 @@ FAKE_GH_OUTPUT = json.dumps([
 ])
 
 def test_fetch_releases_parses_gh_output():
-    with patch("adapters.layer0_official.github_releases.subprocess.run") as m:
+    with patch("pipeline.sources.layer0_official.github_releases.subprocess.run") as m:
         m.return_value = subprocess.CompletedProcess(
             args=[], returncode=0, stdout=FAKE_GH_OUTPUT, stderr="",
         )
@@ -33,7 +33,7 @@ def test_fetch_releases_parses_gh_output():
     assert "simplify" in releases[0].body
 
 def test_fetch_releases_empty_repo():
-    with patch("adapters.layer0_official.github_releases.subprocess.run") as m:
+    with patch("pipeline.sources.layer0_official.github_releases.subprocess.run") as m:
         m.return_value = subprocess.CompletedProcess(
             args=[], returncode=0, stdout="[]", stderr="",
         )
@@ -41,7 +41,7 @@ def test_fetch_releases_empty_repo():
 
 def test_fetch_releases_command_failure():
     import pytest
-    with patch("adapters.layer0_official.github_releases.subprocess.run") as m:
+    with patch("pipeline.sources.layer0_official.github_releases.subprocess.run") as m:
         m.return_value = subprocess.CompletedProcess(
             args=[], returncode=1, stdout="", stderr="HTTP 404",
         )

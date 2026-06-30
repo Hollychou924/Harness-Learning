@@ -7,15 +7,15 @@ from pathlib import Path
 
 import pytest
 
-from packages.competitive_analysis.portfolio.engine import PortfolioReportEngine
-from packages.competitive_analysis.portfolio.theme import (
+from pipeline.core.competitive_analysis.portfolio.engine import PortfolioReportEngine
+from pipeline.core.competitive_analysis.portfolio.theme import (
     PortfolioReportRequest,
     ReportTheme,
 )
-from packages.llm_wiki.ingest import StubLLM
-from packages.llm_wiki.paths import WikiLayout, init_wiki
-from packages.llm_wiki.provenance import write_provenance
-from packages.schemas.evaluation import Confidence, ProductEvaluation
+from pipeline.core.llm_wiki.ingest import StubLLM
+from pipeline.core.llm_wiki.paths import WikiLayout, init_wiki
+from pipeline.core.llm_wiki.provenance import write_provenance
+from pipeline.core.schemas.evaluation import Confidence, ProductEvaluation
 
 
 def _seed_evaluation(

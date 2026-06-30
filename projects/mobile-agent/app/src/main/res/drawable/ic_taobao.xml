@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- 橙色圆角背景 -->
+    <path
+        android:fillColor="#FF5000"
+        android:pathData="M4,0h16c2.2,0 4,1.8 4,4v16c0,2.2 -1.8,4 -4,4H4c-2.2,0 -4,-1.8 -4,-4V4C0,1.8 1.8,0 4,0z"/>
+    <!-- 淘宝人形图标 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,5a2.5,2.5 0,1 1,0 5,2.5 2.5,0 0,1 0,-5z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M8,12h8v2H8z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M11,14h2v5h-2z"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M7,17l5,2l5,-2v2l-5,2l-5,-2z"/>
+</vector>

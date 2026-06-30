@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --glass-bg: rgba(255, 255, 255, 0.55);
+  --glass-border: rgba(255, 255, 255, 0.7);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+  --ink: #1d1d1f;
+  --ink-soft: #6e6e73;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  background: rgba(245, 245, 247, 0.85);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: 0;
+}
+
+/* Mac 液态玻璃基础层：配合主进程 vibrancy */
+body {
+  background: transparent;
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(40px) saturate(200%);
+  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
+}
+
+.glass-soft {
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+}
+
+/* 自定义滚动条，克制 */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* 可拖拽区域：顶栏 */
+.drag { -webkit-app-region: drag; }
+.no-drag { -webkit-app-region: no-drag; }
+
+/* 报告内链接 */
+.prose a { color: #0071e3; text-decoration: none; }
+.prose a:hover { text-decoration: underline; }
+.prose h1, .prose h2, .prose h3 { font-weight: 600; margin: 1em 0 0.5em; }
+.prose h1 { font-size: 1.4rem; }
+.prose h2 { font-size: 1.15rem; }
+.prose h3 { font-size: 1rem; }
+.prose p { margin: 0.5em 0; line-height: 1.7; }
+.prose ul, .prose ol { margin: 0.5em 0; padding-left: 1.5em; }
+.prose li { margin: 0.25em 0; }
+.prose code { background: rgba(0,0,0,0.06); padding: 0.1em 0.35em; border-radius: 4px; font-size: 0.9em; }
+.prose pre { background: rgba(0,0,0,0.05); padding: 0.8em; border-radius: 8px; overflow-x: auto; }

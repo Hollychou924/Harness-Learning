@@ -1,8 +1,8 @@
 from datetime import datetime
 from pathlib import Path
-from packages.schemas.evaluation import ProductEvaluation, Confidence
-from packages.llm_wiki.review import ReviewQueue
-from packages.llm_wiki.paths import init_wiki
+from pipeline.core.schemas.evaluation import ProductEvaluation, Confidence
+from pipeline.core.llm_wiki.review import ReviewQueue
+from pipeline.core.llm_wiki.paths import init_wiki
 
 def make_eval(conf: Confidence, dim: str = "E5") -> ProductEvaluation:
     return ProductEvaluation(

@@ -1,6 +1,6 @@
 from pathlib import Path
-from packages.llm_wiki.paths import init_wiki, WikiLayout
-from packages.llm_wiki.index_log import update_product_in_index
+from pipeline.core.llm_wiki.paths import init_wiki, WikiLayout
+from pipeline.core.llm_wiki.index_log import update_product_in_index
 
 
 def test_add_product_section_to_index(tmp_wiki: Path):

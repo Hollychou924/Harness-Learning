@@ -13,16 +13,16 @@ from unittest.mock import patch
 
 import pytest
 
-from packages.competitive_analysis.comparison_request import (
+from pipeline.core.competitive_analysis.comparison_request import (
     ComparisonRequest,
     OutputFormat,
 )
-from packages.competitive_analysis.path_c_sync import sync_path_c
-from packages.llm_wiki.paths import WikiLayout, init_wiki
-from packages.llm_wiki.provenance import write_provenance
-from packages.schemas.dimension import Dimension
-from packages.schemas.evaluation import Confidence, ProductEvaluation
-from packages.schemas.product import Product
+from pipeline.core.competitive_analysis.path_c_sync import sync_path_c
+from pipeline.core.llm_wiki.paths import WikiLayout, init_wiki
+from pipeline.core.llm_wiki.provenance import write_provenance
+from pipeline.core.schemas.dimension import Dimension
+from pipeline.core.schemas.evaluation import Confidence, ProductEvaluation
+from pipeline.core.schemas.product import Product
 
 
 def _make_eval(pid: str, did: str, value: int) -> ProductEvaluation:
@@ -136,7 +136,7 @@ async def test_path_c_writes_markdown_html_and_marp(tmp_wiki: Path):
     )
 
     # Force `marp` CLI to appear absent so the test never shells out.
-    with patch("render.pptx_renderer.shutil.which", return_value=None):
+    with patch("pipeline.renderers.pptx_renderer.shutil.which", return_value=None):
         result = await sync_path_c(
             request=request,
             layout=layout,
@@ -218,7 +218,7 @@ async def test_path_c_feishu_only_when_parent_node_provided(tmp_wiki: Path):
 
     # No feishu_parent_node passed → feishu sync must not be attempted.
     with patch(
-        "packages.competitive_analysis.path_c_sync.sync_to_feishu_wiki"
+        "pipeline.core.competitive_analysis.path_c_sync.sync_to_feishu_wiki"
     ) as mock_sync:
         result = await sync_path_c(
             request=request,
@@ -244,7 +244,7 @@ async def test_path_c_feishu_sync_invoked_with_parent_node(tmp_wiki: Path):
     )
 
     with patch(
-        "packages.competitive_analysis.path_c_sync.sync_to_feishu_wiki",
+        "pipeline.core.competitive_analysis.path_c_sync.sync_to_feishu_wiki",
         return_value=True,
     ) as mock_sync:
         result = await sync_path_c(

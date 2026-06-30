@@ -1,4 +1,4 @@
-"""Tests for `render.pptx_renderer`.
+"""Tests for `pipeline.renderers.pptx_renderer`.
 
 The renderer turns a `ComparisonMatrix` into Marp-flavored markdown that the
 `marp` CLI can convert to PPTX. Tests focus on:
@@ -13,11 +13,11 @@ from unittest.mock import patch
 
 import pytest
 
-from packages.competitive_analysis.matrix_builder import ComparisonMatrix
-from packages.schemas.dimension import Dimension
-from packages.schemas.evaluation import Confidence, ProductEvaluation
-from packages.schemas.product import Product
-from render.pptx_renderer import convert_to_pptx, render_marp_markdown
+from pipeline.core.competitive_analysis.matrix_builder import ComparisonMatrix
+from pipeline.core.schemas.dimension import Dimension
+from pipeline.core.schemas.evaluation import Confidence, ProductEvaluation
+from pipeline.core.schemas.product import Product
+from pipeline.renderers.pptx_renderer import convert_to_pptx, render_marp_markdown
 
 
 def _build_test_matrix() -> ComparisonMatrix:
@@ -150,7 +150,7 @@ def test_render_marp_empty_matrix_does_not_crash() -> None:
 
 def test_convert_to_pptx_returns_false_when_marp_cli_missing(tmp_path: Path) -> None:
     """Without the `marp` CLI, conversion gracefully degrades to False."""
-    with patch("render.pptx_renderer.shutil.which", return_value=None):
+    with patch("pipeline.renderers.pptx_renderer.shutil.which", return_value=None):
         ok = convert_to_pptx("---\nmarp: true\n---\n# X", tmp_path / "out.pptx")
     assert ok is False
     assert not (tmp_path / "out.pptx").exists()
@@ -165,8 +165,8 @@ def test_convert_to_pptx_invokes_cli_when_available(tmp_path: Path) -> None:
 
     output = tmp_path / "out.pptx"
     with (
-        patch("render.pptx_renderer.shutil.which", return_value="/usr/local/bin/marp"),
-        patch("render.pptx_renderer.subprocess.run", return_value=_Result()) as run_mock,
+        patch("pipeline.renderers.pptx_renderer.shutil.which", return_value="/usr/local/bin/marp"),
+        patch("pipeline.renderers.pptx_renderer.subprocess.run", return_value=_Result()) as run_mock,
     ):
         ok = convert_to_pptx("---\nmarp: true\n---\n# X", output)
 
@@ -185,8 +185,8 @@ def test_convert_to_pptx_returns_false_when_cli_exits_nonzero(tmp_path: Path) ->
         stderr = "boom"
 
     with (
-        patch("render.pptx_renderer.shutil.which", return_value="/usr/local/bin/marp"),
-        patch("render.pptx_renderer.subprocess.run", return_value=_Result()),
+        patch("pipeline.renderers.pptx_renderer.shutil.which", return_value="/usr/local/bin/marp"),
+        patch("pipeline.renderers.pptx_renderer.subprocess.run", return_value=_Result()),
     ):
         ok = convert_to_pptx("---\nmarp: true\n---\n# X", tmp_path / "out.pptx")
     assert ok is False

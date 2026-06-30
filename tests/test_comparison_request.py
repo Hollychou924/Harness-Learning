@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from packages.competitive_analysis.comparison_request import (
+from pipeline.core.competitive_analysis.comparison_request import (
     ComparisonRequest,
     OutputFormat,
 )

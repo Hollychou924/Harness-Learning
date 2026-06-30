@@ -249,12 +249,12 @@ def hit_signals(body: str) -> list[tuple[str, int]]:
 
 def destinations(post: Post) -> list[str]:
     text = f"{post.title}\n{post.final_url}\n{post.body[:6000]}".lower()
-    out = {"wiki/entities/codex.md"}
+    out = {"research/entities/codex.md"}
     if re.search(r"harness|agent loop|智能体循环|sandbox|沙箱|tool|工具|context|上下文|mcp", text):
-        out.add("wiki/concepts/prompt-context-harness.md")
-        out.add("wiki/concepts/harness-engineering.md")
+        out.add("research/concepts/prompt-context-harness.md")
+        out.add("research/concepts/harness-engineering.md")
     if re.search(r"security|safety|安全|system card|eval|review|gartner|rate limit|pricing|enterprise|速率|定价|访问规模", text):
-        out.add("wiki/topics/agent-evaluation-system.md")
+        out.add("research/topics/agent-evaluation-system.md")
     return sorted(out)
 
 
@@ -407,7 +407,7 @@ def write_coverage(posts: list[Post], failures: list[tuple[str, str]]) -> None:
         assert post.raw_path and post.card_path and post.destinations
         raw_rel = rel_from(COVERAGE_PATH.parent, post.raw_path)
         card_rel = rel_from(COVERAGE_PATH.parent, post.card_path)
-        dest = ", ".join(d.replace("wiki/", "") for d in post.destinations)
+        dest = ", ".join(d.replace("research/", "") for d in post.destinations)
         lines.append(
             f"| {idx} | [{post.title}]({raw_rel}) | [card]({card_rel}) | {dest} | 进入 E1-E9 写作时按章节复核 |"
         )
@@ -421,13 +421,13 @@ def write_coverage(posts: list[Post], failures: list[tuple[str, str]]) -> None:
         "",
         "| 位置 | 状态 | 说明 |",
         "|---|---|---|",
-        "| `wiki/raw/official-posts/codex/` | 已新增 | 官方原文入库 |",
-        "| `wiki/review/source-cards/official-posts/` | 已新增 | 每篇文章一张卡 |",
-        "| `wiki/entities/codex.md` | 待/已更新 | 承接 Codex 官方机制 |",
-        "| `wiki/concepts/harness-engineering.md` | 待/已更新 | 补强 OpenAI 官方 Harness 叙述 |",
-        "| `wiki/concepts/prompt-context-harness.md` | 待/已更新 | 补强 Codex 的 Prompt / Context / Harness 拆解 |",
-        "| `wiki/topics/agent-evaluation-system.md` | 待/已更新 | 承接安全、系统卡、企业化与评估材料 |",
-        "| `wiki/index.md` | 待/已更新 | 增加官方文章账本和 Codex 入口 |",
+        "| `research/raw/official-posts/codex/` | 已新增 | 官方原文入库 |",
+        "| `research/review/source-cards/official-posts/` | 已新增 | 每篇文章一张卡 |",
+        "| `research/entities/codex.md` | 待/已更新 | 承接 Codex 官方机制 |",
+        "| `research/concepts/harness-engineering.md` | 待/已更新 | 补强 OpenAI 官方 Harness 叙述 |",
+        "| `research/concepts/prompt-context-harness.md` | 待/已更新 | 补强 Codex 的 Prompt / Context / Harness 拆解 |",
+        "| `research/topics/agent-evaluation-system.md` | 待/已更新 | 承接安全、系统卡、企业化与评估材料 |",
+        "| `research/index.md` | 待/已更新 | 增加官方文章账本和 Codex 入口 |",
     ]
     COVERAGE_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
 

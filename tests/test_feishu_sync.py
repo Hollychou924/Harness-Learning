@@ -1,18 +1,18 @@
-"""Tests for render.feishu_sync — single-direction Feishu Wiki sync (MVP)."""
+"""Tests for pipeline.renderers.feishu_sync — single-direction Feishu Wiki sync (MVP)."""
 
 from __future__ import annotations
 
 import subprocess
 from unittest.mock import patch
 
-from render.feishu_sync import sync_to_feishu_wiki
+from pipeline.renderers.feishu_sync import sync_to_feishu_wiki
 
 
 def test_sync_to_feishu_wiki_calls_skill():
     """When feishu CLI is available and returns 0, sync returns True and invokes feishu."""
     with (
-        patch("render.feishu_sync.shutil.which", return_value="/usr/local/bin/feishu"),
-        patch("render.feishu_sync.subprocess.run") as m,
+        patch("pipeline.renderers.feishu_sync.shutil.which", return_value="/usr/local/bin/feishu"),
+        patch("pipeline.renderers.feishu_sync.subprocess.run") as m,
     ):
         m.return_value = subprocess.CompletedProcess(
             args=[],
@@ -35,8 +35,8 @@ def test_sync_to_feishu_wiki_calls_skill():
 def test_sync_to_feishu_wiki_failure_returns_false():
     """Subprocess returncode != 0 → sync returns False (logged, not raised)."""
     with (
-        patch("render.feishu_sync.shutil.which", return_value="/usr/local/bin/feishu"),
-        patch("render.feishu_sync.subprocess.run") as m,
+        patch("pipeline.renderers.feishu_sync.shutil.which", return_value="/usr/local/bin/feishu"),
+        patch("pipeline.renderers.feishu_sync.subprocess.run") as m,
     ):
         m.return_value = subprocess.CompletedProcess(
             args=[], returncode=1, stdout="", stderr="auth error",
@@ -50,7 +50,7 @@ def test_sync_to_feishu_wiki_failure_returns_false():
 
 def test_sync_skipped_when_feishu_not_available():
     """If feishu CLI not in PATH, skip gracefully and return False (no exception)."""
-    with patch("render.feishu_sync.shutil.which", return_value=None):
+    with patch("pipeline.renderers.feishu_sync.shutil.which", return_value=None):
         result = sync_to_feishu_wiki(
             markdown="# test", title="t", parent_node_token="x",
         )

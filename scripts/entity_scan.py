@@ -1,5 +1,5 @@
 """
-对 wiki/raw/harness-engineering/ 下正文做精准实体扫描。
+对 research/raw/harness-engineering/ 下正文做精准实体扫描。
 - 用 word-boundary 匹配避免误命中
 - 输出每个实体: TF (总出现) / DF (跨多少篇) / 在 6 个分类的分布
 """

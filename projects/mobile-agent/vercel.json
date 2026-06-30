@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/deep_research", "destination": "/api/deep_research.js" }
+  ]
+}

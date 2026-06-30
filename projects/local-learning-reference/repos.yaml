@@ -1,0 +1,29 @@
+public_open_source:
+  codex-cli: https://github.com/openai/codex.git
+  gemini-cli: https://github.com/google-gemini/gemini-cli.git
+  opencode: https://github.com/sst/opencode.git
+  goose: https://github.com/block/goose.git
+  opencowork: https://github.com/AIDotNet/OpenCowork.git
+  cline: https://github.com/cline/cline.git
+  kilocode: https://github.com/Kilo-Org/kilocode.git
+  openhands: https://github.com/OpenHands/OpenHands.git
+  qwen-code: https://github.com/QwenLM/qwen-code.git
+  mimo-code: https://github.com/XiaomiMiMo/MiMo-Code.git
+  aider: https://github.com/Aider-AI/aider.git
+  deerflow: https://github.com/bytedance/deer-flow.git
+  agentscope: https://github.com/modelscope/agentscope.git
+  openharness: https://github.com/HKUDS/OpenHarness.git
+  crewai: https://github.com/crewAIInc/crewAI.git
+  zagens: https://github.com/didclawapp-ai/zagens.git
+  kuse-cowork: https://github.com/kuse-ai/kuse_cowork.git
+  harnessclaw: https://github.com/harnessclaw/harnessclaw.git
+  harnessclaw-engine: https://github.com/harnessclaw/harnessclaw-engine.git
+local_learning:
+  claude-code-learning:
+    source: /Users/zhouhao/桌面/桌面原有文件夹/AITR/claude-code
+    local_dir: claude-code
+    note: 同事做的学习项目，不是泄露源码；仅供本地学习分析，不提交源码。
+notes:
+  - 共 20 个本地参考项目：19 个公开开源项目 + 1 个本地学习项目。
+  - 所有源码仅供本地分析，不提交到当前仓库。
+  - 后续小蓝鲸决策可以引用这些项目做对比，但不能直接复制源码。

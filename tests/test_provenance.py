@@ -1,8 +1,8 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from packages.schemas.evaluation import ProductEvaluation, Confidence
-from packages.llm_wiki.provenance import write_provenance, read_provenance
+from pipeline.core.schemas.evaluation import ProductEvaluation, Confidence
+from pipeline.core.llm_wiki.provenance import write_provenance, read_provenance
 
 
 def test_write_and_read_provenance(tmp_wiki: Path):

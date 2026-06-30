@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from packages.llm_wiki.atomic import atomic_write_text
+from pipeline.core.llm_wiki.atomic import atomic_write_text
 
 
 def test_atomic_write_creates_file(tmp_path: Path):

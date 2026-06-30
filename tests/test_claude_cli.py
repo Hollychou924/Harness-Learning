@@ -1,9 +1,9 @@
 import json
 import subprocess
 from unittest.mock import patch
-from packages.llm_wiki.ingest import IngestSource, AnalysisDraft
-from packages.llm_wiki.claude_cli import ClaudeCliLLMClient
-from packages.schemas.dimension import Dimension
+from pipeline.core.llm_wiki.ingest import IngestSource, AnalysisDraft
+from pipeline.core.llm_wiki.claude_cli import ClaudeCliLLMClient
+from pipeline.core.schemas.dimension import Dimension
 
 
 def _make_source() -> IngestSource:
@@ -40,7 +40,7 @@ def _make_dims() -> list[Dimension]:
 
 def test_analyze_calls_claude_cli_with_prompt():
     fake_response = json.dumps({"facts": [], "entities": [], "topics": []})
-    with patch("packages.llm_wiki.claude_cli.subprocess.run") as m:
+    with patch("pipeline.core.llm_wiki.claude_cli.subprocess.run") as m:
         m.return_value = subprocess.CompletedProcess(
             args=[], returncode=0, stdout=fake_response, stderr="",
         )
@@ -58,7 +58,7 @@ def test_analyze_truncates_long_content():
     long_content = "x" * 10000
     source = IngestSource(url="https://x.test", content=long_content, product_id="p")
     fake_response = json.dumps({"facts": [], "entities": [], "topics": []})
-    with patch("packages.llm_wiki.claude_cli.subprocess.run") as m:
+    with patch("pipeline.core.llm_wiki.claude_cli.subprocess.run") as m:
         m.return_value = subprocess.CompletedProcess(
             args=[], returncode=0, stdout=fake_response, stderr="",
         )
@@ -74,7 +74,7 @@ def test_generate_with_facts():
     facts = [{"claim": "Skills support hooks", "evidence_url": "https://docs.anthropic.com/x", "confidence": "EXTRACTED", "dimension_id": "E5"}]
     draft = AnalysisDraft(facts=facts, entities=[], topics=[])
 
-    with patch("packages.llm_wiki.claude_cli.subprocess.run") as m:
+    with patch("pipeline.core.llm_wiki.claude_cli.subprocess.run") as m:
         m.return_value = subprocess.CompletedProcess(
             args=[], returncode=0, stdout="# E5 自定义工具\n\nClaude Code: Skill+Hook\n", stderr="",
         )
@@ -89,7 +89,7 @@ def test_generate_with_facts():
 def test_generate_empty_facts_returns_empty():
     """No facts to render -> skip the LLM call entirely."""
     draft = AnalysisDraft(facts=[], entities=[], topics=[])
-    with patch("packages.llm_wiki.claude_cli.subprocess.run") as m:
+    with patch("pipeline.core.llm_wiki.claude_cli.subprocess.run") as m:
         client = ClaudeCliLLMClient()
         result = client.generate(draft, _make_source())
 
@@ -98,7 +98,7 @@ def test_generate_empty_facts_returns_empty():
 
 def test_call_raises_runtime_error_on_failure():
     import pytest
-    with patch("packages.llm_wiki.claude_cli.subprocess.run") as m:
+    with patch("pipeline.core.llm_wiki.claude_cli.subprocess.run") as m:
         m.return_value = subprocess.CompletedProcess(
             args=[], returncode=1, stdout="", stderr="auth error",
         )
@@ -108,7 +108,7 @@ def test_call_raises_runtime_error_on_failure():
 
 def test_call_raises_on_timeout():
     import pytest
-    with patch("packages.llm_wiki.claude_cli.subprocess.run") as m:
+    with patch("pipeline.core.llm_wiki.claude_cli.subprocess.run") as m:
         m.side_effect = subprocess.TimeoutExpired(cmd=["claude"], timeout=180)
         client = ClaudeCliLLMClient(timeout=180)
         with pytest.raises(RuntimeError, match="timeout"):
@@ -116,7 +116,7 @@ def test_call_raises_on_timeout():
 
 def test_call_raises_on_missing_binary():
     import pytest
-    with patch("packages.llm_wiki.claude_cli.subprocess.run") as m:
+    with patch("pipeline.core.llm_wiki.claude_cli.subprocess.run") as m:
         m.side_effect = FileNotFoundError()
         client = ClaudeCliLLMClient(claude_bin="/nonexistent/claude")
         with pytest.raises(RuntimeError, match="not found"):
@@ -126,7 +126,7 @@ def test_call_raises_on_missing_binary():
 def test_analyze_prompt_includes_dim_table_when_dims_passed():
     """When dimensions are provided, the analyze prompt embeds the dim table."""
     fake_response = json.dumps({"facts": [], "entities": [], "topics": []})
-    with patch("packages.llm_wiki.claude_cli.subprocess.run") as m:
+    with patch("pipeline.core.llm_wiki.claude_cli.subprocess.run") as m:
         m.return_value = subprocess.CompletedProcess(
             args=[], returncode=0, stdout=fake_response, stderr="",
         )
@@ -152,7 +152,7 @@ def test_generate_prompt_for_known_dim_includes_name_and_rubric():
     }]
     draft = AnalysisDraft(facts=facts, entities=[], topics=[])
 
-    with patch("packages.llm_wiki.claude_cli.subprocess.run") as m:
+    with patch("pipeline.core.llm_wiki.claude_cli.subprocess.run") as m:
         m.return_value = subprocess.CompletedProcess(
             args=[], returncode=0, stdout="# E5 自定义工具/Hook 系统\n", stderr="",
         )
@@ -177,7 +177,7 @@ def test_generate_prompt_for_unknown_dim_falls_back():
     }]
     draft = AnalysisDraft(facts=facts, entities=[], topics=[])
 
-    with patch("packages.llm_wiki.claude_cli.subprocess.run") as m:
+    with patch("pipeline.core.llm_wiki.claude_cli.subprocess.run") as m:
         m.return_value = subprocess.CompletedProcess(
             args=[], returncode=0, stdout="# Z99 Unknown\n", stderr="",
         )

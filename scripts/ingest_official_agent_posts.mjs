@@ -240,12 +240,12 @@ function signalHits(content) {
 function destinations(vendor, title, url, content) {
   const s = `${title}\n${url}\n${content.slice(0, 4000)}`.toLowerCase();
   const out = new Set();
-  if (vendor === "cursor") out.add("wiki/entities/cursor.md");
-  if (vendor === "claude") out.add("wiki/entities/claude-code.md");
-  if (/review|bugbot|cursorbench|benchmark|eval|stability|support/.test(s)) out.add("wiki/topics/agent-evaluation-system.md");
-  if (/context|memory|skills|subagent|multi-agent|mcp|tool|cache|harness/.test(s)) out.add("wiki/concepts/prompt-context-harness.md");
+  if (vendor === "cursor") out.add("research/entities/cursor.md");
+  if (vendor === "claude") out.add("research/entities/claude-code.md");
+  if (/review|bugbot|cursorbench|benchmark|eval|stability|support/.test(s)) out.add("research/topics/agent-evaluation-system.md");
+  if (/context|memory|skills|subagent|multi-agent|mcp|tool|cache|harness/.test(s)) out.add("research/concepts/prompt-context-harness.md");
   if (/cloud agent|automations|self-driving|scaling|agent harness|auto mode|sandbox|permission/.test(s)) {
-    out.add("wiki/concepts/harness-engineering.md");
+    out.add("research/concepts/harness-engineering.md");
   }
   return [...out];
 }
@@ -348,8 +348,8 @@ function writeCard(post, rawPath, dests) {
   const slug = slugify(post.title);
   const path = join(CARD_BASE, `${post.vendor}-${slug}.md`);
   mkdirSync(dirname(path), { recursive: true });
-  const rawRel = rel("wiki/review/source-cards/official-posts", rawPath.replace(`${ROOT}/`, ""));
-  const destLines = dests.map((d) => `- [${d.split("/").pop().replace(/\.md$/, "")}](${rel("wiki/review/source-cards/official-posts", d)})`);
+  const rawRel = rel("research/review/source-cards/official-posts", rawPath.replace(`${ROOT}/`, ""));
+  const destLines = dests.map((d) => `- [${d.split("/").pop().replace(/\.md$/, "")}](${rel("research/review/source-cards/official-posts", d)})`);
   const signalRows = signalHits(post.body)
     .sort((a, b) => b[1] - a[1])
     .map(([name, count]) => `| ${name} | ${count} |`)
@@ -448,8 +448,8 @@ function writeCoverage(rows, failures) {
     "|---:|---|---|---|---|---|",
   ];
   rows.forEach((row, idx) => {
-    const rawRel = rel("wiki/review/ingest-coverage", row.rawPath.replace(`${ROOT}/`, ""));
-    const cardRel = rel("wiki/review/ingest-coverage", row.cardPath.replace(`${ROOT}/`, ""));
+    const rawRel = rel("research/review/ingest-coverage", row.rawPath.replace(`${ROOT}/`, ""));
+    const cardRel = rel("research/review/ingest-coverage", row.cardPath.replace(`${ROOT}/`, ""));
     const dest = row.destinations.map((d) => d.replace(/^wiki\//, "")).join(", ");
     lines.push(
       `| ${idx + 1} | ${row.vendor} | [${row.title.replace(/\|/g, "\\|")}](${rawRel}) | [card](${cardRel}) | ${dest} | 进入 E1-E9 写作时按章节复核 |`,
@@ -465,12 +465,12 @@ function writeCoverage(rows, failures) {
     "",
     "| 位置 | 状态 | 说明 |",
     "|---|---|---|",
-    "| `wiki/raw/official-posts/` | 已新增 | 官方原文入库 |",
-    "| `wiki/review/source-cards/official-posts/` | 已新增 | 每篇文章一张卡 |",
-    "| `wiki/entities/cursor.md` | 待/已更新 | 承接 Cursor 官方机制 |",
-    "| `wiki/entities/claude-code.md` | 待/已更新 | 补强 Claude 官方机制 |",
-    "| `wiki/topics/agent-evaluation-system.md` | 待/已更新 | 承接评测、Bugbot、CursorBench、Code Review |",
-    "| `wiki/index.md` | 待/已更新 | 增加官方文章账本和新页面入口 |",
+    "| `research/raw/official-posts/` | 已新增 | 官方原文入库 |",
+    "| `research/review/source-cards/official-posts/` | 已新增 | 每篇文章一张卡 |",
+    "| `research/entities/cursor.md` | 待/已更新 | 承接 Cursor 官方机制 |",
+    "| `research/entities/claude-code.md` | 待/已更新 | 补强 Claude 官方机制 |",
+    "| `research/topics/agent-evaluation-system.md` | 待/已更新 | 承接评测、Bugbot、CursorBench、Code Review |",
+    "| `research/index.md` | 待/已更新 | 增加官方文章账本和新页面入口 |",
   );
   writeFileSync(COVERAGE_PATH, `${lines.join("\n")}\n`, "utf-8");
 }

@@ -1,0 +1,6 @@
+# 外部开源 Harness 参考源码，仅供本地分析，不提交到本仓库
+# 只保留本目录说明文件和清单，源码目录全部忽略
+*
+!.gitignore
+!README.md
+!repos.yaml

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from packages.llm_wiki.ingest import (
+from pipeline.core.llm_wiki.ingest import (
     AnalysisDraft,
     IngestEngine,
     IngestError,
@@ -48,7 +48,7 @@ def test_step1_analyze_returns_structured_draft(tmp_wiki: Path):
 
 
 def test_step2_generate_writes_dimension_card(tmp_wiki: Path):
-    from packages.llm_wiki.paths import init_wiki
+    from pipeline.core.llm_wiki.paths import init_wiki
     init_wiki(tmp_wiki)
 
     stub = StubLLM(

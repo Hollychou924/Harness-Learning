@@ -1,10 +1,10 @@
 import json
 from pathlib import Path
 from unittest.mock import patch, MagicMock
-from packages.schemas.product import Product
-from packages.llm_wiki.paths import init_wiki, WikiLayout
-from packages.llm_wiki.ingest import StubLLM
-from packages.llm_wiki.sync import sync_product_path_a
+from pipeline.core.schemas.product import Product
+from pipeline.core.llm_wiki.paths import init_wiki, WikiLayout
+from pipeline.core.llm_wiki.ingest import StubLLM
+from pipeline.core.llm_wiki.sync import sync_product_path_a
 
 def make_claude_product() -> Product:
     return Product(
@@ -43,8 +43,8 @@ def test_path_a_writes_raw_compiled_index_log(tmp_wiki: Path):
     ]
 
     with (
-        patch("packages.llm_wiki.sync.fetch_sitemap_and_pages", return_value=fake_pages) as m_pages,
-        patch("packages.llm_wiki.sync.fetch_releases", return_value=fake_releases) as m_rel,
+        patch("pipeline.core.llm_wiki.sync.fetch_sitemap_and_pages", return_value=fake_pages) as m_pages,
+        patch("pipeline.core.llm_wiki.sync.fetch_releases", return_value=fake_releases) as m_rel,
     ):
         result = sync_product_path_a(make_claude_product(), layout=layout, llm=stub)
 

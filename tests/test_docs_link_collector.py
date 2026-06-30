@@ -1,5 +1,5 @@
 import pytest
-from packages.docs_link_collector.collector import discover_links_from_sitemap
+from pipeline.core.docs_link_collector.collector import discover_links_from_sitemap
 
 SAMPLE_SITEMAP = """<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">

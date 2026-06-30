@@ -3,8 +3,8 @@
 import pytest
 from pydantic import ValidationError
 
-from packages.competitive_analysis.comparison_request import OutputFormat
-from packages.competitive_analysis.portfolio.theme import (
+from pipeline.core.competitive_analysis.comparison_request import OutputFormat
+from pipeline.core.competitive_analysis.portfolio.theme import (
     PortfolioReportRequest,
     ReportTheme,
 )

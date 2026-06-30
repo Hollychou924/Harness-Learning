@@ -1,4 +1,4 @@
-from packages.schemas.product import Product
+from pipeline.core.schemas.product import Product
 
 def test_product_minimal():
     p = Product(
@@ -29,7 +29,7 @@ def test_product_invalid_category_rejected():
             homepage="https://x.test", keywords=["x"],
         )
 
-from packages.schemas.dimension import Dimension
+from pipeline.core.schemas.dimension import Dimension
 
 def test_dimension_minimal():
     d = Dimension(
@@ -68,7 +68,7 @@ def test_dimension_weight_must_be_in_range():
         )
 
 from datetime import datetime
-from packages.schemas.evaluation import ProductEvaluation, Confidence
+from pipeline.core.schemas.evaluation import ProductEvaluation, Confidence
 
 def test_evaluation_extracted():
     ev = ProductEvaluation(
