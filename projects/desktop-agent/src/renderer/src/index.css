@@ -13,11 +13,15 @@
 html, body, #root {
   height: 100%;
   margin: 0;
-  background: rgba(245, 245, 247, 0.85);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
   letter-spacing: 0;
+}
+
+#root {
+  border-radius: 12px;
+  overflow: hidden;
 }
 
 /* Mac 液态玻璃基础层：配合主进程 vibrancy */

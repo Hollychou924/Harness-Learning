@@ -24,20 +24,7 @@ export function RightPanel() {
   const hasTask = status !== 'idle'
 
   if (!hasTask) {
-    return (
-      <aside className="glass-soft w-72 flex-shrink-0 flex flex-col border-l border-white/40">
-        <div className="drag h-9" />
-        <div className="flex-1 flex flex-col items-center justify-center px-6 text-center select-none">
-          <div className="w-10 h-10 rounded-xl glass flex items-center justify-center mb-3">
-            <Flag size={16} className="text-[var(--ink-soft)]" />
-          </div>
-          <p className="text-sm text-[var(--ink-soft)]">还没有任务</p>
-          <p className="text-xs text-[var(--ink-soft)] mt-1 opacity-70">
-            发送一条指令后，这里会显示目标和进度
-          </p>
-        </div>
-      </aside>
-    )
+    return null
   }
 
   const total = steps.length > 0 ? steps[0].total : 0
