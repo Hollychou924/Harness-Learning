@@ -18,12 +18,18 @@ public_open_source:
   kuse-cowork: https://github.com/kuse-ai/kuse_cowork.git
   harnessclaw: https://github.com/harnessclaw/harnessclaw.git
   harnessclaw-engine: https://github.com/harnessclaw/harnessclaw-engine.git
+  aionui: https://github.com/iOfficeAI/AionUi.git
+  myagents: https://github.com/hAcKlyc/MyAgents.git
+  hexclaw-desktop: https://github.com/hexagon-codes/hexclaw-desktop.git
+  deepseek-gui: https://github.com/XingYu-Zhong/DeepSeek-GUI.git
+  lobsterai: https://github.com/netease-youdao/lobsterai.git
+  qwenpaw: https://github.com/agentscope-ai/QwenPaw.git
 local_learning:
   claude-code-learning:
     source: /Users/zhouhao/桌面/桌面原有文件夹/AITR/claude-code
     local_dir: claude-code
     note: 同事做的学习项目，不是泄露源码；仅供本地学习分析，不提交源码。
 notes:
-  - 共 20 个本地参考项目：19 个公开开源项目 + 1 个本地学习项目。
+  - 共 26 个本地参考项目：25 个公开开源项目 + 1 个本地学习项目。
   - 所有源码仅供本地分析，不提交到当前仓库。
   - 后续小蓝鲸决策可以引用这些项目做对比，但不能直接复制源码。
