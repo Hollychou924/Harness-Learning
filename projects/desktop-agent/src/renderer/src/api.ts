@@ -11,6 +11,30 @@ export interface ModelConfig {
   autoApproveLow?: boolean
 }
 
+export interface TraceMeta {
+  traceId: string
+  message: string
+  mode: string
+  model: string
+  provider: string
+  status: 'running' | 'completed' | 'failed' | 'cancelled'
+  startedAt: number
+  finishedAt?: number
+  eventCount: number
+}
+
+export interface TraceEvent {
+  ts: number
+  phase: string
+  type: string
+  data: Record<string, unknown>
+}
+
+export interface TraceDetail {
+  meta: TraceMeta | null
+  events: TraceEvent[]
+}
+
 type Api = {
   startTask: (args: { mode: 'work' | 'code'; message: string; workspaceDir?: string; maxIterations?: number; autoApproveLow?: boolean }) =>
     Promise<{ taskId: string; error?: string }>
@@ -25,6 +49,8 @@ type Api = {
   configGet: (key: string) => Promise<unknown>
   saveModelConfig: (cfg: ModelConfig) => Promise<{ success: boolean }>
   openExternal: (url: string) => Promise<void>
+  traceList: (limit?: number) => Promise<TraceMeta[]>
+  traceGet: (traceId: string) => Promise<TraceDetail>
 }
 
 const noop = () => {}
@@ -40,7 +66,9 @@ const empty: Api = {
   appendInput: async () => {},
   configGet: async () => null,
   saveModelConfig: async () => ({ success: false }),
-  openExternal: async () => {}
+  openExternal: async () => {},
+  traceList: async () => [],
+  traceGet: async () => ({ meta: null, events: [] })
 }
 
 export const api: Api = (globalThis as { api?: Api }).api ?? empty

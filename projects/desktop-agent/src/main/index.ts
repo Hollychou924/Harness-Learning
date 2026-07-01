@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { agentBridge } from './agent-bridge.js'
+import { startTrace, logAgentEvent, logUserAction, listTraces, getTrace } from './trace-logger.js'
 import type { StdoutMessage, AgentConfig } from '../agent/src/protocol.js'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
@@ -68,6 +69,7 @@ function buildAgentConfig(): AgentConfig {
 }
 
 let mainWindow: BrowserWindow | null = null
+let activeTraceId: string | null = null
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -92,6 +94,12 @@ function createWindow(): void {
 
   // 把 Agent 子进程消息转发给渲染进程
   agentBridge.onMessage((msg: StdoutMessage) => {
+    if (activeTraceId) {
+      logAgentEvent(activeTraceId, msg)
+      if (msg.type === 'completed' || msg.type === 'error') {
+        activeTraceId = null
+      }
+    }
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('agent:event', msg)
     }
@@ -132,6 +140,19 @@ ipcMain.handle('agent:startTask', async (_e, args: { mode: 'work' | 'code'; mess
   }
   if (args.maxIterations) config.maxIterations = args.maxIterations
   if (args.autoApproveLow !== undefined) config.autoApproveLow = args.autoApproveLow
+  activeTraceId = sessionId
+  startTrace(sessionId, {
+    message: args.message,
+    mode: args.mode,
+    model: config.model,
+    provider: config.provider,
+    maxIterations: config.maxIterations,
+    autoApproveLow: config.autoApproveLow ?? false,
+    apiKey: config.apiKey,
+    apiBaseUrl: config.apiBaseUrl,
+    providerId: config.providerId,
+    customProviderId: config.customProviderId
+  })
   agentBridge.startTask(sessionId, args.message, config, args.workspaceDir)
   return { taskId: sessionId }
 })
@@ -169,6 +190,7 @@ ipcMain.handle('agent:resume', async (_e, args: { taskId: string }) => {
 })
 
 ipcMain.handle('agent:cancel', async (_e, args: { taskId: string }) => {
+  if (activeTraceId) logUserAction(activeTraceId, 'task_cancelled', { taskId: args.taskId })
   agentBridge.send({ type: 'task_control', task_id: args.taskId, action: 'cancel' })
 })
 
@@ -179,15 +201,26 @@ ipcMain.handle('agent:rollback', async (_e, args: { taskId: string }) => {
 
 // 权限审批通道（转发为 stdin approval_response）
 ipcMain.handle('agent:approval', async (_e, args: { requestId: string; approved: boolean }) => {
+  if (activeTraceId) logUserAction(activeTraceId, 'approval_response', { requestId: args.requestId, approved: args.approved })
   agentBridge.send({ type: 'approval_response', request_id: args.requestId, approved: args.approved })
 })
 
 // 计划响应通道（转发为 stdin plan_response）
 ipcMain.handle('agent:planResponse', async (_e, args: { requestId: string; decision: 'approve' | 'reject_stop' | 'reject_revise'; feedback?: string }) => {
+  if (activeTraceId) logUserAction(activeTraceId, 'plan_response', { requestId: args.requestId, decision: args.decision, feedback: args.feedback })
   agentBridge.send({ type: 'plan_response', request_id: args.requestId, decision: args.decision, feedback: args.feedback })
 })
 
 // 追加指令通道（转发为 stdin append_input）
 ipcMain.handle('agent:appendInput', async (_e, args: { taskId: string; message: string; mode?: 'inject' | 'queue' }) => {
+  if (activeTraceId) logUserAction(activeTraceId, 'append_input', { taskId: args.taskId, message: args.message, mode: args.mode })
   agentBridge.send({ type: 'append_input', task_id: args.taskId, message: args.message, mode: args.mode })
+})
+
+ipcMain.handle('trace:list', async (_e, limit?: number) => {
+  return listTraces(limit ?? 50)
+})
+
+ipcMain.handle('trace:get', async (_e, traceId: string) => {
+  return getTrace(traceId)
 })
