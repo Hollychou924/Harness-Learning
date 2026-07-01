@@ -10,7 +10,7 @@ import { TodoChecklist } from './TodoChecklist'
 import { SubtaskList } from './SubtaskList'
 
 export function ProcessFlow() {
-  const { status, thinking, toolLogs, chunks, error } = useTaskStore()
+  const { status, thinking, toolLogs, error } = useTaskStore()
   const { showThinking } = useSettingsStore()
   const merged = getMergedToolLogs(toolLogs)
   const fileChanges = getMergedFileChanges(toolLogs)
@@ -35,17 +35,6 @@ export function ProcessFlow() {
           {merged.map((group) => (
             <MergedToolGroupView key={group.id} group={group} />
           ))}
-        </div>
-      )}
-
-      {/* 最终回答（Turn 三段之最终回答，仅完成态展示） */}
-      {isCompleted && chunks && (
-        <div className="glass rounded-xl px-3 py-2.5">
-          <div className="text-xs text-[var(--ink-soft)] mb-1 flex items-center gap-1.5">
-            <Check size={12} className="text-green-500" />
-            <span>任务完成</span>
-          </div>
-          <p className="text-sm leading-relaxed text-[var(--ink)]">{chunks}</p>
         </div>
       )}
 
