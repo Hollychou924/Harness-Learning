@@ -237,8 +237,8 @@ ipcMain.handle('dialog:openFiles', async () => {
   return result.filePaths.map((filePath) => {
     const fileName = filePath.split('/').pop() || filePath
     const ext = fileName.split('.').pop()?.toLowerCase() || ''
-    const isImage = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)
-    const isText = ['txt', 'md', 'json', 'csv', 'log', 'ts', 'js', 'tsx', 'jsx', 'py', 'go', 'rs', 'java'].includes(ext)
+    const isImage = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(ext)
+    const isText = ['txt', 'md', 'json', 'csv', 'log', 'ts', 'js', 'tsx', 'jsx', 'py', 'go', 'rs', 'java', 'html', 'css', 'xml', 'yaml', 'yml', 'sh', 'sql'].includes(ext)
     const mime = isImage ? `image/${ext === 'jpg' ? 'jpeg' : ext}` : isText ? 'text/plain' : 'application/octet-stream'
 
     let dataUrl: string | undefined
@@ -250,7 +250,7 @@ ipcMain.handle('dialog:openFiles', async () => {
       size = buf.length
       if (isImage) {
         dataUrl = `data:${mime};base64,${buf.toString('base64')}`
-      } else if (isText || size < 512 * 1024) {
+      } else if (isText) {
         textContent = buf.toString('utf-8')
       }
     } catch {

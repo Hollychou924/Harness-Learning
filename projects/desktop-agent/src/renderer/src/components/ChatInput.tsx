@@ -24,7 +24,6 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
   const { openSettings, modelConfig: storeConfig } = useSettingsStore()
   const { attachments, setAttachments } = useTaskStore()
   const taRef = useRef<HTMLTextAreaElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     api.configGet('modelConfig').then((c) => {
@@ -163,28 +162,7 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
           >
             <Plus size={18} />
           </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            className="hidden"
-            onChange={(e) => {
-              const files = e.target.files
-              if (files && files.length > 0) {
-                api.openFiles().then((ipcFiles) => {
-                  if (ipcFiles.length > 0) {
-                    const newAtts: Attachment[] = ipcFiles.map((f, i) => ({
-                      id: `file-${Date.now()}-${i}`,
-                      name: f.name, type: f.type, size: f.size,
-                      dataUrl: f.dataUrl, textContent: f.textContent, mime: f.mime
-                    }))
-                    setAttachments([...attachments, ...newAtts])
-                  }
-                }).catch(() => {})
-              }
-              e.target.value = ''
-            }}
-          />
+
 
           {/* 右下：模型选择 + 发送 */}
           <div className="flex items-center gap-2">
