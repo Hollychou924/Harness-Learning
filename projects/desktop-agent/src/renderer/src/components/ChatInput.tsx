@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { Plus, ArrowUp, ChevronDown, Check, X, FileText, Image as ImageIcon, Eye } from 'lucide-react'
 import { api, type ModelConfig, type AttachmentFile } from '../api'
 import { useSettingsStore } from './settings/settingsStore'
@@ -204,14 +205,20 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
                 <ChevronDown size={11} />
               </button>
 
-            {modelMenuOpen && (
+            {modelMenuOpen && menuPos && createPortal(
               <>
-                <div className="fixed inset-0 z-40" onClick={() => setModelMenuOpen(false)} />
+                <div className="fixed inset-0 z-[9998]" onClick={() => setModelMenuOpen(false)} />
                 <div
-                  className="fixed z-50 w-72 glass rounded-xl p-2 shadow-lg"
-                  style={menuPos ? { left: menuPos.left, bottom: menuPos.bottom } : { left: 0, bottom: 0 }}
+                  className="fixed z-[9999] w-72 rounded-xl p-2 shadow-xl border border-white/50"
+                  style={{
+                    left: menuPos.left,
+                    bottom: menuPos.bottom,
+                    background: 'rgba(255,255,255,0.92)',
+                    backdropFilter: 'blur(40px) saturate(180%)',
+                    WebkitBackdropFilter: 'blur(40px) saturate(180%)'
+                  }}
                 >
-                  <div className="max-h-72 overflow-y-auto space-y-0.5">
+                  <div className="max-h-80 overflow-y-auto space-y-0.5">
                     {BUILTIN_PROVIDER_ORDER.map((id) => {
                       const preset = PROVIDER_PRESETS[id]
                       const isActive = config?.providerId === id
@@ -220,7 +227,7 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
                           key={id}
                           onClick={() => { setModelMenuOpen(false); openSettings('model') }}
                           className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition ${
-                            isActive ? 'bg-sky-50 text-sky-600' : 'hover:bg-black/[0.04] text-[var(--ink)]'
+                            isActive ? 'bg-sky-50 text-sky-600' : 'hover:bg-black/[0.06] text-[var(--ink)]'
                           }`}
                         >
                           <span className="flex-1 text-left">{preset.label}</span>
@@ -231,7 +238,8 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
                     })}
                   </div>
                 </div>
-              </>
+              </>,
+              document.body
             )}
             </div>
 
