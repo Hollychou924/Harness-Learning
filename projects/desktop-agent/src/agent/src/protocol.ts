@@ -10,6 +10,9 @@ export interface AgentConfig {
   apiKey: string
   maxIterations: number
   workspaceDir?: string
+  providerId?: string
+  apiFormat?: 'openai' | 'anthropic'
+  contextLimit?: number
   embedding?: {
     apiBaseUrl: string
     model: string

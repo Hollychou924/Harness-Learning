@@ -2,21 +2,60 @@ import { app, BrowserWindow, ipcMain, shell, nativeTheme } from 'electron'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
+import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { agentBridge } from './agent-bridge.js'
-import type { StdoutMessage } from '../agent/src/protocol.js'
+import type { StdoutMessage, AgentConfig } from '../agent/src/protocol.js'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 
-// 凭证管理：只从环境变量取，不把明文 key 经 IPC 返回渲染（依据 docs/09 第五章）
-function getApiKey(): string {
-  return process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY || ''
+interface ModelConfig {
+  providerId: string
+  model: string
+  apiKey: string
+  apiBaseUrl: string
+  apiFormat: 'openai' | 'anthropic'
+  contextLimit: number
 }
 
-function buildAgentConfig() {
+function getConfigPath(): string {
+  return join(app.getPath('userData'), 'model-config.json')
+}
+
+function loadConfig(): ModelConfig | null {
+  try {
+    const p = getConfigPath()
+    if (!existsSync(p)) return null
+    const raw = readFileSync(p, 'utf-8')
+    return JSON.parse(raw) as ModelConfig
+  } catch {
+    return null
+  }
+}
+
+function saveConfigFile(cfg: ModelConfig): void {
+  writeFileSync(getConfigPath(), JSON.stringify(cfg, null, 2), 'utf-8')
+}
+
+function buildAgentConfig(): AgentConfig {
+  const saved = loadConfig()
+  if (saved && saved.apiKey) {
+    return {
+      provider: saved.apiFormat === 'anthropic' ? 'anthropic' : 'openai',
+      model: saved.model,
+      apiKey: saved.apiKey,
+      apiBaseUrl: saved.apiBaseUrl || undefined,
+      maxIterations: Number(process.env.XLJ_MAX_ITER || 8),
+      workspaceDir: process.env.XLJ_WORKSPACE || undefined,
+      providerId: saved.providerId,
+      apiFormat: saved.apiFormat,
+      contextLimit: saved.contextLimit
+    }
+  }
+  // 兜底：环境变量
   return {
     provider: 'anthropic' as const,
-    model: process.env.XLJ_MODEL || 'claude-3-5-sonnet-20241022',
-    apiKey: getApiKey(),
+    model: process.env.XLJ_MODEL || 'claude-sonnet-4-5-20250929',
+    apiKey: process.env.ANTHROPIC_API_KEY || '',
     apiBaseUrl: process.env.ANTHROPIC_BASE_URL || undefined,
     maxIterations: Number(process.env.XLJ_MAX_ITER || 8),
     workspaceDir: process.env.XLJ_WORKSPACE || undefined
@@ -91,9 +130,17 @@ ipcMain.handle('agent:startTask', async (_e, args: { mode: 'work' | 'code'; mess
 })
 
 ipcMain.handle('config:get', async (_e, key: string) => {
-  if (key === 'hasApiKey') return Boolean(getApiKey())
-  if (key === 'model') return process.env.XLJ_MODEL || 'claude-3-5-sonnet-20241022'
+  const cfg = loadConfig()
+  if (key === 'hasApiKey') return Boolean(cfg?.apiKey || process.env.ANTHROPIC_API_KEY)
+  if (key === 'model') return cfg?.model || process.env.XLJ_MODEL || 'claude-sonnet-4-5-20250929'
+  if (key === 'modelConfig') return cfg
+  if (key === 'contextLimit') return cfg?.contextLimit || 200000
   return null
+})
+
+ipcMain.handle('config:saveModel', async (_e, cfg: ModelConfig) => {
+  saveConfigFile(cfg)
+  return { success: true }
 })
 
 ipcMain.handle('shell:openExternal', async (_e, url: string) => {

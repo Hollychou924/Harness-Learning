@@ -1,5 +1,14 @@
 import type { StdoutMessage } from '../../agent/src/protocol'
 
+export interface ModelConfig {
+  providerId: string
+  model: string
+  apiKey: string
+  apiBaseUrl: string
+  apiFormat: 'openai' | 'anthropic'
+  contextLimit: number
+}
+
 type Api = {
   startTask: (args: { mode: 'work' | 'code'; message: string; workspaceDir?: string }) =>
     Promise<{ taskId: string; error?: string }>
@@ -12,6 +21,7 @@ type Api = {
   sendPlanResponse: (requestId: string, decision: 'approve' | 'reject_stop' | 'reject_revise', feedback?: string) => Promise<void>
   appendInput: (taskId: string, message: string, mode?: 'inject' | 'queue') => Promise<void>
   configGet: (key: string) => Promise<unknown>
+  saveModelConfig: (cfg: ModelConfig) => Promise<{ success: boolean }>
   openExternal: (url: string) => Promise<void>
 }
 
@@ -27,6 +37,7 @@ const empty: Api = {
   sendPlanResponse: async () => {},
   appendInput: async () => {},
   configGet: async () => null,
+  saveModelConfig: async () => ({ success: false }),
   openExternal: async () => {}
 }
 

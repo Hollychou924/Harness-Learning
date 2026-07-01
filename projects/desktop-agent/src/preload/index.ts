@@ -25,6 +25,8 @@ const api = {
   appendInput: (taskId: string, message: string, mode?: 'inject' | 'queue') =>
     ipcRenderer.invoke('agent:appendInput', { taskId, message, mode }) as Promise<void>,
   configGet: (key: string) => ipcRenderer.invoke('config:get', key) as Promise<unknown>,
+  saveModelConfig: (cfg: { providerId: string; model: string; apiKey: string; apiBaseUrl: string; apiFormat: 'openai' | 'anthropic'; contextLimit: number }) =>
+    ipcRenderer.invoke('config:saveModel', cfg) as Promise<{ success: boolean }>,
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url) as Promise<void>
 }
 

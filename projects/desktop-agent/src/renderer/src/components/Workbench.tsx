@@ -4,17 +4,10 @@ import { api } from '../api'
 import { Composer } from './Composer'
 import { ResultView } from './ResultView'
 import { ProcessFlow } from './ProcessFlow'
+import { ModelSelector } from './ModelSelector'
 
 export function Workbench() {
   const { status, mode, goal, message, summary } = useTaskStore()
-  const [model, setModel] = useState('claude-3-5-sonnet')
-  const [hasKey, setHasKey] = useState(true)
-
-  useEffect(() => {
-    api.configGet('hasApiKey').then((v) => setHasKey(Boolean(v)))
-    api.configGet('model').then((v) => setModel(typeof v === 'string' ? v : 'claude-3-5-sonnet'))
-  }, [])
-
   const greeting = greetingText()
   const taskTitle = status !== 'idle' ? goal || message : ''
 
@@ -38,13 +31,13 @@ export function Workbench() {
             </>
           )}
         </div>
-        <div className="no-drag text-xs text-[var(--ink-soft)] flex-shrink-0">{model}</div>
+        <ModelSelector />
       </div>
 
       {/* 主区域 */}
       <div className="flex-1 overflow-y-auto">
         {status === 'idle' ? (
-          <HomeView greeting={greeting} hasKey={hasKey} />
+          <HomeView greeting={greeting} />
         ) : (
           <RunningView summary={summary} status={status} />
         )}
@@ -65,8 +58,12 @@ function greetingText(): string {
 }
 
 
-function HomeView({ greeting, hasKey }: { greeting: string; hasKey: boolean }) {
-  const { message, setMessage, startTask } = useTaskStore()
+function HomeView({ greeting }: { greeting: string }) {
+  const { message, setMessage, startTask, mode } = useTaskStore()
+  const [hasKey, setHasKey] = useState(false)
+  useEffect(() => {
+    api.configGet('hasApiKey').then((v) => setHasKey(Boolean(v)))
+  }, [])
   const quickActions = [
     { label: '网页读取', desc: '抓取网页内容' },
     { label: '调研分析', desc: '多源整理成报告' },
@@ -106,7 +103,7 @@ function HomeView({ greeting, hasKey }: { greeting: string; hasKey: boolean }) {
       </div>
 
       {!hasKey && (
-        <p className="text-xs text-red-500 mt-3">未检测到模型凭证，请先配置 ANTHROPIC_API_KEY 环境变量</p>
+        <p className="text-xs text-amber-500 mt-3">未配置模型，请点击右上角选择供应商并填写 API Key</p>
       )}
 
       {/* 快捷能力 */}

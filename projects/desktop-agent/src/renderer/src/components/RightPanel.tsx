@@ -14,6 +14,7 @@ import {
   Flag
 } from 'lucide-react'
 import { useTaskStore } from '../store/task'
+import { api } from '../api'
 import type { ArtifactEntry } from '../store/task'
 
 // 右栏：目标 + 进度清单 + 用量 + 产物，参考竞品 IDE 的"任务控制台"
@@ -256,7 +257,13 @@ const DEFAULT_CONTEXT_LIMIT = 200000
 
 function ContextCapacityIndicator({ usedTokens }: { usedTokens: number }) {
   const [expanded, setExpanded] = useState(false)
-  const percentage = Math.min(100, (usedTokens / DEFAULT_CONTEXT_LIMIT) * 100)
+  const [contextLimit, setContextLimit] = useState(DEFAULT_CONTEXT_LIMIT)
+  useEffect(() => {
+    api.configGet('contextLimit').then((v) => {
+      if (typeof v === 'number' && v > 0) setContextLimit(v)
+    })
+  }, [])
+  const percentage = Math.min(100, (usedTokens / contextLimit) * 100)
   const isWarning = percentage > 70
   const isDanger = percentage > 90
   const color = isDanger ? 'rgb(239 68 68)' : isWarning ? 'rgb(245 158 11)' : 'rgb(14 165 233)'
@@ -292,7 +299,7 @@ function ContextCapacityIndicator({ usedTokens }: { usedTokens: number }) {
           上下文
         </span>
         <span className="ml-auto text-xs font-mono text-[var(--ink-soft)]">
-          {formatTokens(usedTokens)} / {formatTokens(DEFAULT_CONTEXT_LIMIT)}
+          {formatTokens(usedTokens)} / {formatTokens(contextLimit)}
         </span>
       </button>
       {expanded && (
@@ -303,7 +310,7 @@ function ContextCapacityIndicator({ usedTokens }: { usedTokens: number }) {
             {isDanger && <span className="text-red-500">即将触发上下文整理</span>}
             {!isDanger && isWarning && <span className="text-amber-500">接近压缩阈值</span>}
           </div>
-          <div>剩余 {formatTokens(Math.max(0, DEFAULT_CONTEXT_LIMIT - usedTokens))}</div>
+          <div>剩余 {formatTokens(Math.max(0, contextLimit - usedTokens))}</div>
         </div>
       )}
     </section>
