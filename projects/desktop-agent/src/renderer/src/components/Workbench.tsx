@@ -122,11 +122,7 @@ function RunningView({ summary, status }: { summary: string; status: string }) {
       {/* 执行过程 + 回复：左侧 */}
       <ProcessFlow />
       {(chunks || status === 'completed') && (
-        <div className="flex justify-start">
-          <div className="max-w-[85%]">
-            <ResultView content={chunks} />
-          </div>
-        </div>
+        <ResultView content={chunks} />
       )}
     </div>
   )

@@ -1,15 +1,13 @@
 import {
-  Search,
-  Wrench,
-  Bot,
-  FolderTree,
-  Clock,
   Settings,
   Plus,
   CheckCircle2,
   XCircle,
-  History
+  Clock,
+  History,
+  Trash2
 } from 'lucide-react'
+import { useState } from 'react'
 import { useTaskStore } from '../store/task'
 import { useSettingsStore } from './settings/settingsStore'
 import type { HistoryEntry } from '../store/task'
@@ -86,20 +84,20 @@ export function Sidebar() {
         )}
       </div>
 
-      {/* 导航 */}
-      <nav className="px-3 py-1.5 border-t border-white/40 space-y-0.5 text-sm">
-        <NavItem icon={<Search size={15} />} label="搜索" />
-        <NavItem icon={<Wrench size={15} />} label="技能" />
-        <NavItem icon={<FolderTree size={15} />} label="项目" />
-        <NavItem icon={<Bot size={15} />} label="自动化" />
-      </nav>
-
-      {/* 底部 */}
-      <div className="px-3 py-3 border-t border-white/40 space-y-1">
-        <NavItem icon={<Settings size={15} />} label="设置" onClick={() => openSettings()} />
-        <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-[var(--ink-soft)]">
-          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-amber-300 to-pink-400" />
-          <span>周浩</span>
+      {/* 底部：用户名 + 设置 icon 对称排列 */}
+      <div className="px-3 py-2.5 border-t border-white/40">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 px-1 flex-1 min-w-0">
+            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-amber-300 to-pink-400 flex-shrink-0" />
+            <span className="text-xs text-[var(--ink-soft)] truncate">周浩</span>
+          </div>
+          <button
+            onClick={() => openSettings()}
+            className="no-drag w-8 h-8 rounded-lg flex items-center justify-center text-[var(--ink-soft)] hover:bg-black/[0.06] hover:text-[var(--ink)] transition flex-shrink-0"
+            title="设置"
+          >
+            <Settings size={16} />
+          </button>
         </div>
       </div>
     </aside>
@@ -107,6 +105,8 @@ export function Sidebar() {
 }
 
 function HistoryItem({ entry }: { entry: HistoryEntry }) {
+  const { deleteHistory } = useTaskStore()
+  const [menuOpen, setMenuOpen] = useState(false)
   const icon =
     entry.status === 'completed' ? (
       <CheckCircle2 size={13} className="text-green-500 flex-shrink-0 mt-0.5" />
@@ -115,34 +115,49 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
     ) : (
       <Clock size={13} className="text-[var(--ink-soft)] flex-shrink-0 mt-0.5" />
     )
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setMenuOpen(true)
+  }
+
   return (
-    <button
-      className="no-drag w-full text-left px-2 py-1.5 rounded-lg hover:bg-black/[0.04] transition group"
-      title={entry.title}
-    >
-      <div className="flex items-start gap-1.5">
-        {icon}
-        <div className="flex-1 min-w-0">
-          <div className="text-xs leading-snug text-[var(--ink)] line-clamp-2 group-hover:text-[var(--ink)]">
-            {entry.title}
-          </div>
-          <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-[var(--ink-soft)]">
-            <span>{timeAgo(entry.finishedAt)}</span>
-            {entry.stepCount > 0 && <span>· {entry.stepCount} 步</span>}
-            {entry.tokens > 0 && <span>· {formatTokens(entry.tokens)}</span>}
+    <div className="relative">
+      <button
+        onContextMenu={handleContextMenu}
+        className="no-drag w-full text-left px-2 py-1.5 rounded-lg hover:bg-black/[0.04] transition group"
+        title={entry.title}
+      >
+        <div className="flex items-start gap-1.5">
+          {icon}
+          <div className="flex-1 min-w-0">
+            <div className="text-xs leading-snug text-[var(--ink)] truncate">
+              {entry.title}
+            </div>
+            <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-[var(--ink-soft)]">
+              <span>{timeAgo(entry.finishedAt)}</span>
+              {entry.stepCount > 0 && <span>· {entry.stepCount} 步</span>}
+              {entry.tokens > 0 && <span>· {formatTokens(entry.tokens)}</span>}
+            </div>
           </div>
         </div>
-      </div>
-    </button>
-  )
-}
+      </button>
 
-function NavItem({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick?: () => void }) {
-  return (
-    <button onClick={onClick} className="no-drag w-full h-8 px-2 rounded-lg flex items-center gap-2.5 text-[var(--ink-soft)] hover:bg-black/[0.04] hover:text-[var(--ink)] transition">
-      {icon}
-      <span>{label}</span>
-    </button>
+      {/* 右键删除菜单 */}
+      {menuOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+          <div className="absolute right-0 top-0 z-50 w-28 glass rounded-lg shadow-lg py-1">
+            <button
+              onClick={() => { deleteHistory(entry.id); setMenuOpen(false) }}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 transition rounded-lg"
+            >
+              <Trash2 size={12} /> 删除
+            </button>
+          </div>
+        </>
+      )}
+    </div>
   )
 }
 

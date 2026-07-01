@@ -17,6 +17,8 @@ const PASTE_TEXT_THRESHOLD = 500
 export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
   const [config, setConfig] = useState<ModelConfig | null>(null)
   const [modelMenuOpen, setModelMenuOpen] = useState(false)
+  const [menuPos, setMenuPos] = useState<{ left: number; bottom: number } | null>(null)
+  const modelBtnRef = useRef<HTMLButtonElement>(null)
   const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null)
   const { openSettings, modelConfig: storeConfig } = useSettingsStore()
   const { attachments, setAttachments } = useTaskStore()
@@ -188,7 +190,14 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
             {/* 模型选择 */}
             <div className="relative">
               <button
-                onClick={() => setModelMenuOpen(!modelMenuOpen)}
+                onClick={() => {
+                  if (!modelMenuOpen && modelBtnRef.current) {
+                    const rect = modelBtnRef.current.getBoundingClientRect()
+                    setMenuPos({ left: rect.left, bottom: window.innerHeight - rect.top + 4 })
+                  }
+                  setModelMenuOpen(!modelMenuOpen)
+                }}
+                ref={modelBtnRef}
                 className="flex items-center gap-1 text-[11px] text-[var(--ink-soft)] hover:text-[var(--ink)] transition px-1.5 py-1.5 rounded-lg hover:bg-black/[0.04]"
               >
                 <span className="truncate max-w-[120px]">{modelLabel}</span>
@@ -198,7 +207,10 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
             {modelMenuOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setModelMenuOpen(false)} />
-                <div className="absolute left-0 bottom-full mb-1 z-50 w-72 glass rounded-xl p-2 shadow-lg">
+                <div
+                  className="fixed z-50 w-72 glass rounded-xl p-2 shadow-lg"
+                  style={menuPos ? { left: menuPos.left, bottom: menuPos.bottom } : { left: 0, bottom: 0 }}
+                >
                   <div className="max-h-72 overflow-y-auto space-y-0.5">
                     {BUILTIN_PROVIDER_ORDER.map((id) => {
                       const preset = PROVIDER_PRESETS[id]

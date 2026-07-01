@@ -116,6 +116,7 @@ export interface TaskState {
   respondPlan: (decision: 'approve' | 'reject_stop' | 'reject_revise', feedback?: string) => Promise<void>
   reset: () => void
   loadHistory: () => void
+  deleteHistory: (id: string) => void
   appendEvent: (msg: StdoutMessage) => void
 }
 
@@ -194,6 +195,11 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   setAttachments: (a) => set({ attachments: a }),
   setGoal: (s) => set({ goal: s }),
   loadHistory: () => set({ history: loadHistoryFromStorage() }),
+  deleteHistory: (id) => {
+    const next = get().history.filter((h) => h.id !== id)
+    saveHistoryToStorage(next)
+    set({ history: next })
+  },
   reset: () => set({ ...initial, history: get().history, mode: get().mode, approvalPending: null, pendingPlan: null, todos: [], subtasks: [], attachments: [] }),
   cancelTask: async () => {
     const { taskId } = get()

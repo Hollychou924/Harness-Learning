@@ -6,14 +6,14 @@ export function ResultView({ content }: { content: string }) {
   if (!content) {
     return (
       <div className="glass rounded-2xl p-4 text-sm text-[var(--ink-soft)]">
-        正在生成报告…
+        正在生成回复…
       </div>
     )
   }
   return (
     <div className="glass rounded-2xl p-5">
       <div className="text-xs text-[var(--ink-soft)] mb-2 flex items-center gap-1.5">
-        <span>📦 报告</span>
+        <span>💬 回复</span>
       </div>
       <div className="prose text-sm">
         <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
