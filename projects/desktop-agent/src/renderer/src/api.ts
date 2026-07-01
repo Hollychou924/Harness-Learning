@@ -1,5 +1,14 @@
 import type { StdoutMessage } from '../../agent/src/protocol'
 
+export interface AttachmentFile {
+  name: string
+  type: 'image' | 'text' | 'file'
+  size: number
+  mime: string
+  dataUrl?: string
+  textContent?: string
+}
+
 export interface ModelConfig {
   providerId: string
   model: string
@@ -49,6 +58,7 @@ type Api = {
   configGet: (key: string) => Promise<unknown>
   saveModelConfig: (cfg: ModelConfig) => Promise<{ success: boolean }>
   openExternal: (url: string) => Promise<void>
+  openFiles: () => Promise<AttachmentFile[]>
   traceList: (limit?: number) => Promise<TraceMeta[]>
   traceGet: (traceId: string) => Promise<TraceDetail>
 }
@@ -67,6 +77,7 @@ const empty: Api = {
   configGet: async () => null,
   saveModelConfig: async () => ({ success: false }),
   openExternal: async () => {},
+  openFiles: async () => [],
   traceList: async () => [],
   traceGet: async () => ({ meta: null, events: [] })
 }

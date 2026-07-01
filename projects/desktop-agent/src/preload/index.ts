@@ -29,7 +29,8 @@ const api = {
     ipcRenderer.invoke('config:saveModel', cfg) as Promise<{ success: boolean }>,
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url) as Promise<void>,
   traceList: (limit?: number) => ipcRenderer.invoke('trace:list', limit) as Promise<unknown[]>,
-  traceGet: (traceId: string) => ipcRenderer.invoke('trace:get', traceId) as Promise<unknown>
+  traceGet: (traceId: string) => ipcRenderer.invoke('trace:get', traceId) as Promise<unknown>,
+  openFiles: () => ipcRenderer.invoke('dialog:openFiles') as Promise<unknown[]>
 }
 
 contextBridge.exposeInMainWorld('api', api)

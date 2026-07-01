@@ -63,6 +63,16 @@ export interface TodoItem {
   status: 'pending' | 'in_progress' | 'completed'
 }
 
+export interface Attachment {
+  id: string
+  name: string
+  type: 'image' | 'text' | 'file'
+  size: number
+  dataUrl?: string
+  textContent?: string
+  mime: string
+}
+
 export interface SubtaskEntry {
   id: string
   title: string
@@ -94,6 +104,8 @@ export interface TaskState {
   pendingPlan: PendingPlan | null
   todos: TodoItem[]
   subtasks: SubtaskEntry[]
+  attachments: Attachment[]
+  setAttachments: (a: Attachment[]) => void
   setMode: (m: 'work' | 'code') => void
   setMessage: (s: string) => void
   setGoal: (s: string) => void
@@ -106,6 +118,9 @@ export interface TaskState {
   loadHistory: () => void
   appendEvent: (msg: StdoutMessage) => void
 }
+
+// 各模式的状态快照，切换 Work/Code 时保存/恢复
+const modeSnapshots = new Map<'work' | 'code', Partial<TaskState>>()
 
 const HISTORY_KEY = 'xld.history.v1'
 const HISTORY_MAX = 20
@@ -148,17 +163,38 @@ const initial = {
   approvalPending: null as ApprovalRequest | null,
   pendingPlan: null as PendingPlan | null,
   todos: [] as TodoItem[],
-  subtasks: [] as SubtaskEntry[]
+  subtasks: [] as SubtaskEntry[],
+  attachments: [] as Attachment[]
 }
 
 export const useTaskStore = create<TaskState>((set, get) => ({
   ...initial,
   history: loadHistoryFromStorage(),
-  setMode: (m) => set({ mode: m }),
+  setMode: (m) => {
+    const cur = get()
+    if (cur.mode === m) return
+    // 保存当前模式状态
+    modeSnapshots.set(cur.mode, {
+      status: cur.status, taskId: cur.taskId, message: cur.message, goal: cur.goal,
+      chunks: cur.chunks, summary: cur.summary, thinking: cur.thinking, toolLogs: cur.toolLogs,
+      steps: cur.steps, artifacts: cur.artifacts, usage: cur.usage, error: cur.error,
+      startedAt: cur.startedAt, finishedAt: cur.finishedAt, todos: cur.todos,
+      subtasks: cur.subtasks, attachments: cur.attachments,
+      approvalPending: null, pendingPlan: null
+    })
+    // 恢复目标模式状态
+    const snap = modeSnapshots.get(m)
+    if (snap) {
+      set({ mode: m, ...snap })
+    } else {
+      set({ mode: m, ...initial, history: cur.history, mode: m })
+    }
+  },
   setMessage: (s) => set({ message: s }),
+  setAttachments: (a) => set({ attachments: a }),
   setGoal: (s) => set({ goal: s }),
   loadHistory: () => set({ history: loadHistoryFromStorage() }),
-  reset: () => set({ ...initial, history: get().history, approvalPending: null, pendingPlan: null, todos: [], subtasks: [] }),
+  reset: () => set({ ...initial, history: get().history, mode: get().mode, approvalPending: null, pendingPlan: null, todos: [], subtasks: [], attachments: [] }),
   cancelTask: async () => {
     const { taskId } = get()
     if (taskId) await api.cancelTask(taskId)
@@ -168,7 +204,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const { taskId } = get()
     if (taskId && text.trim()) {
       await api.appendInput(taskId, text, mode)
-      set({ message: '' })
+      set({ message: '', attachments: [] })
     }
   },
   respondApproval: async (approved: boolean) => {
@@ -319,6 +355,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       pendingPlan: null,
       todos: [],
       subtasks: [],
+      attachments: [],
       usage: { inputTokens: 0, outputTokens: 0 },
       startedAt: Date.now(),
       finishedAt: null,

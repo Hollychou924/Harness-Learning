@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, nativeTheme } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, nativeTheme, dialog } from 'electron'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
@@ -223,4 +223,47 @@ ipcMain.handle('trace:list', async (_e, limit?: number) => {
 
 ipcMain.handle('trace:get', async (_e, traceId: string) => {
   return getTrace(traceId)
+})
+
+ipcMain.handle('dialog:openFiles', async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openFile', 'multiSelections'],
+    filters: [
+      { name: '常用文件', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'txt', 'md', 'json', 'csv', 'pdf', 'doc', 'docx', 'xlsx', 'pptx'] }
+    ]
+  })
+  if (result.canceled || result.filePaths.length === 0) return []
+
+  return result.filePaths.map((filePath) => {
+    const fileName = filePath.split('/').pop() || filePath
+    const ext = fileName.split('.').pop()?.toLowerCase() || ''
+    const isImage = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)
+    const isText = ['txt', 'md', 'json', 'csv', 'log', 'ts', 'js', 'tsx', 'jsx', 'py', 'go', 'rs', 'java'].includes(ext)
+    const mime = isImage ? `image/${ext === 'jpg' ? 'jpeg' : ext}` : isText ? 'text/plain' : 'application/octet-stream'
+
+    let dataUrl: string | undefined
+    let textContent: string | undefined
+    let size = 0
+
+    try {
+      const buf = readFileSync(filePath)
+      size = buf.length
+      if (isImage) {
+        dataUrl = `data:${mime};base64,${buf.toString('base64')}`
+      } else if (isText || size < 512 * 1024) {
+        textContent = buf.toString('utf-8')
+      }
+    } catch {
+      // 读取失败
+    }
+
+    return {
+      name: fileName,
+      type: isImage ? 'image' : isText ? 'text' : 'file',
+      size,
+      mime,
+      dataUrl,
+      textContent
+    }
+  })
 })
