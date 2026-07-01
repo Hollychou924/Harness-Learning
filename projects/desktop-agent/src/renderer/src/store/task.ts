@@ -220,3 +220,101 @@ function pushHistory(
   saveHistoryToStorage(next)
   set({ history: next })
 }
+
+// ============================================================
+// 合并逻辑 + Turn 分段（纯计算 selector，不改 store 数据结构）
+// ============================================================
+
+/** 合并后的工具日志分组：连续同类工具合并为一条 */
+export interface MergedToolGroup {
+  id: string
+  name: string
+  count: number
+  entries: ToolLogEntry[]
+  firstEntry: ToolLogEntry
+  lastEntry: ToolLogEntry
+  allDone: boolean
+  anyError: boolean
+}
+
+/** 连续同类工具调用合并 */
+export function getMergedToolLogs(toolLogs: ToolLogEntry[]): MergedToolGroup[] {
+  const groups: MergedToolGroup[] = []
+  for (const entry of toolLogs) {
+    const last = groups[groups.length - 1]
+    if (last && last.name === entry.name && last.allDone) {
+      last.count++
+      last.entries.push(entry)
+      last.lastEntry = entry
+      last.allDone = last.entries.every((e) => e.result)
+      last.anyError = last.anyError || Boolean(entry.result?.includes('"error"'))
+    } else {
+      groups.push({
+        id: entry.id,
+        name: entry.name,
+        count: 1,
+        entries: [entry],
+        firstEntry: entry,
+        lastEntry: entry,
+        allDone: Boolean(entry.result),
+        anyError: Boolean(entry.result?.includes('"error"'))
+      })
+    }
+  }
+  return groups
+}
+
+/** 文件变更按路径合并 */
+export interface MergedFileChange {
+  path: string
+  name: string
+  totalLines: number
+  entries: ToolLogEntry[]
+}
+
+export function getMergedFileChanges(toolLogs: ToolLogEntry[]): MergedFileChange[] {
+  const writes = toolLogs.filter((t) => t.name === 'write_file' && t.result && !t.result.includes('"error"'))
+  const byPath = new Map<string, MergedFileChange>()
+  for (const entry of writes) {
+    const rawPath = typeof entry.args.path === 'string' ? entry.args.path : ''
+    const normalized = rawPath.replace(/\\/g, '/').replace(/\/+$/, '')
+    const content = typeof entry.args.content === 'string' ? entry.args.content : ''
+    const lines = content === '' ? 0 : content.split('\n').length
+    const existing = byPath.get(normalized)
+    if (existing) {
+      existing.totalLines += lines
+      existing.entries.push(entry)
+    } else {
+      byPath.set(normalized, {
+        path: rawPath,
+        name: normalized.split('/').pop() || normalized || '未命名',
+        totalLines: lines,
+        entries: [entry]
+      })
+    }
+  }
+  return Array.from(byPath.values())
+}
+
+/** Turn 三段拆分 */
+export interface TurnSections {
+  processBlocks: MergedToolGroup[]
+  finalAnswer: string
+  fileChanges: MergedFileChange[]
+}
+
+export function getTurnSections(state: {
+  thinking: string[]
+  chunks: string
+  toolLogs: ToolLogEntry[]
+  status: TaskStatus
+}): TurnSections {
+  const merged = getMergedToolLogs(state.toolLogs)
+  const fileChanges = getMergedFileChanges(state.toolLogs)
+  const finalAnswer = state.status === 'completed' ? state.chunks : ''
+  return {
+    processBlocks: merged,
+    finalAnswer,
+    fileChanges
+  }
+}

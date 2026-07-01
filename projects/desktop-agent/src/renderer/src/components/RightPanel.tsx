@@ -118,6 +118,9 @@ export function RightPanel() {
           </section>
         )}
 
+        {/* 上下文容量指示器 */}
+        <ContextCapacityIndicator usedTokens={usage.inputTokens + usage.outputTokens} />
+
         {/* 用量与计时 */}
         <section className="glass rounded-xl p-3 space-y-2">
           <div className="flex items-center gap-2">
@@ -247,4 +250,62 @@ function Duration({
   if (!start) return <span>—</span>
   const finish = end || now
   return <>{formatDuration(start, finish)}</>
+}
+
+const DEFAULT_CONTEXT_LIMIT = 200000
+
+function ContextCapacityIndicator({ usedTokens }: { usedTokens: number }) {
+  const [expanded, setExpanded] = useState(false)
+  const percentage = Math.min(100, (usedTokens / DEFAULT_CONTEXT_LIMIT) * 100)
+  const isWarning = percentage > 70
+  const isDanger = percentage > 90
+  const color = isDanger ? 'rgb(239 68 68)' : isWarning ? 'rgb(245 158 11)' : 'rgb(14 165 233)'
+  const size = 28
+  const strokeWidth = 2.5
+  const radius = (size - strokeWidth) / 2
+  const circumference = 2 * Math.PI * radius
+  const strokeDashoffset = circumference - (percentage / 100) * circumference
+
+  return (
+    <section className="glass rounded-xl p-3 space-y-2">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center gap-2"
+      >
+        <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
+          <svg width={size} height={size} className="-rotate-90">
+            <circle
+              cx={size / 2} cy={size / 2} r={radius}
+              fill="none" stroke="rgb(0 0 0 / 0.08)" strokeWidth={strokeWidth}
+            />
+            <circle
+              cx={size / 2} cy={size / 2} r={radius}
+              fill="none" stroke={color} strokeWidth={strokeWidth}
+              strokeDasharray={circumference}
+              strokeDashoffset={strokeDashoffset}
+              strokeLinecap="round"
+              className="transition-all duration-500"
+            />
+          </svg>
+        </div>
+        <span className="text-xs font-semibold tracking-wide text-[var(--ink-soft)] uppercase">
+          上下文
+        </span>
+        <span className="ml-auto text-xs font-mono text-[var(--ink-soft)]">
+          {formatTokens(usedTokens)} / {formatTokens(DEFAULT_CONTEXT_LIMIT)}
+        </span>
+      </button>
+      {expanded && (
+        <div className="space-y-1 text-xs text-[var(--ink-soft)] pl-1">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full" style={{ background: color }} />
+            <span>占用 {percentage.toFixed(1)}%</span>
+            {isDanger && <span className="text-red-500">即将触发上下文整理</span>}
+            {!isDanger && isWarning && <span className="text-amber-500">接近压缩阈值</span>}
+          </div>
+          <div>剩余 {formatTokens(Math.max(0, DEFAULT_CONTEXT_LIMIT - usedTokens))}</div>
+        </div>
+      )}
+    </section>
+  )
 }

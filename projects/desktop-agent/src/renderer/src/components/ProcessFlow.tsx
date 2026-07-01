@@ -1,39 +1,45 @@
 import { useState } from 'react'
-import { ChevronRight, Loader2, Check, AlertCircle, Brain } from 'lucide-react'
-import { useTaskStore } from '../store/task'
-import { ToolLog } from './ToolLog'
-import { FileWriteCard } from './FileWriteCard'
+import { ChevronRight, Loader2, Check, AlertCircle, Brain, FilePlus } from 'lucide-react'
+import { useTaskStore, getMergedToolLogs, getMergedFileChanges, type MergedToolGroup } from '../store/task'
+import { ToolCard } from './toolCards'
+import { ToolCardShell } from './ToolCardShell'
 
-// 任务执行过程流：思考过程 + 工具步骤，默认折叠技术细节
 export function ProcessFlow() {
-  const { status, thinking, toolLogs, error } = useTaskStore()
+  const { status, thinking, toolLogs, chunks, error } = useTaskStore()
+  const merged = getMergedToolLogs(toolLogs)
+  const fileChanges = getMergedFileChanges(toolLogs)
   const doneCount = toolLogs.filter((t) => t.result).length
   const runningCount = toolLogs.filter((t) => !t.result).length
-  const fileWrites = toolLogs.filter((t) => t.name === 'write_file' && t.result)
+  const isCompleted = status === 'completed'
 
   return (
     <div className="space-y-2">
-      {/* 总体状态条 */}
       <StatusLine status={status} doneCount={doneCount} runningCount={runningCount} total={toolLogs.length} />
 
-      {/* 思考过程（可折叠） */}
       {thinking.length > 0 && <ThinkingBlock items={thinking} executing={status === 'executing'} />}
 
-      {/* 文件写入产物卡：突出 +N 行，像竞品 IDE 那样 */}
-      {fileWrites.length > 0 && (
-        <div className="space-y-1.5">
-          {fileWrites.map((t, i) => (
-            <FileWriteCard key={i} entry={t} />
+      {/* 文件变更区（Turn 三段之文件变更） */}
+      {fileChanges.length > 0 && (
+        <FileChangeSection changes={fileChanges} collapsed={isCompleted} />
+      )}
+
+      {/* 过程块区（Turn 三段之过程块） */}
+      {merged.length > 0 && (
+        <div className={`glass rounded-xl p-1.5 space-y-0.5 ${isCompleted ? 'opacity-70' : ''}`}>
+          {merged.map((group) => (
+            <MergedToolGroupView key={group.id} group={group} />
           ))}
         </div>
       )}
 
-      {/* 工具步骤流 */}
-      {toolLogs.length > 0 && (
-        <div className="glass rounded-xl p-1.5 space-y-0.5">
-          {toolLogs.map((t, i) => (
-            <ToolLog key={i} entry={t} />
-          ))}
+      {/* 最终回答（Turn 三段之最终回答，仅完成态展示） */}
+      {isCompleted && chunks && (
+        <div className="glass rounded-xl px-3 py-2.5">
+          <div className="text-xs text-[var(--ink-soft)] mb-1 flex items-center gap-1.5">
+            <Check size={12} className="text-green-500" />
+            <span>任务完成</span>
+          </div>
+          <p className="text-sm leading-relaxed text-[var(--ink)]">{chunks}</p>
         </div>
       )}
 
@@ -102,4 +108,87 @@ function ThinkingBlock({ items, executing }: { items: string[]; executing: boole
       )}
     </div>
   )
+}
+
+function FileChangeSection({ changes, collapsed }: { changes: { path: string; name: string; totalLines: number; entries: { id: string }[] }[]; collapsed: boolean }) {
+  const [open, setOpen] = useState(!collapsed)
+  const totalLines = changes.reduce((sum, c) => sum + c.totalLines, 0)
+  return (
+    <div className="glass rounded-xl overflow-hidden">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-black/[0.02] transition"
+      >
+        <FilePlus size={14} className="text-sky-600 flex-shrink-0" />
+        <span className="text-[var(--ink)]">文件变更</span>
+        <span className="text-xs text-[var(--ink-soft)]">{changes.length} 个文件 · +{totalLines} 行</span>
+        <ChevronRight size={14} className={`text-[var(--ink-soft)] transition-transform ml-auto ${open ? 'rotate-90' : ''}`} />
+      </button>
+      {open && (
+        <div className="px-3 pb-2 space-y-1.5">
+          {changes.map((c, i) => (
+            <div key={i} className="flex items-center gap-2 text-sm">
+              <span className="font-mono text-[var(--ink)] truncate flex-1" title={c.path}>{c.name}</span>
+              {c.entries.length > 1 && (
+                <span className="text-xs text-[var(--ink-soft)]">{c.entries.length} 次写入</span>
+              )}
+              {c.totalLines > 0 && (
+                <span className="text-xs font-mono text-green-600 flex-shrink-0">+{c.totalLines}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MergedToolGroupView({ group }: { group: MergedToolGroup }) {
+  if (group.count === 1) {
+    return <ToolCard entry={group.firstEntry} />
+  }
+  // 合并展示：同类工具连续调用 >1 次时折叠为一条
+  return <MergedGroupCard group={group} />
+}
+
+function MergedGroupCard({ group }: { group: MergedToolGroup }) {
+  const [open, setOpen] = useState(false)
+  const label = MERGED_LABELS[group.name] || group.name
+  return (
+    <div className="rounded-lg overflow-hidden text-sm">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-black/[0.02] transition"
+      >
+        {group.allDone ? (
+          group.anyError ? (
+            <AlertCircle size={14} className="text-amber-500 flex-shrink-0" />
+          ) : (
+            <Check size={14} className="text-green-500 flex-shrink-0" />
+          )
+        ) : (
+          <Loader2 size={14} className="text-sky-500 animate-spin flex-shrink-0" />
+        )}
+        <span className="text-[var(--ink)]">
+          {label} <span className="text-[var(--ink-soft)]">· {group.count} 次</span>
+        </span>
+        <ChevronRight size={14} className={`text-[var(--ink-soft)] transition-transform ml-auto ${open ? 'rotate-90' : ''}`} />
+      </button>
+      {open && (
+        <div className="px-3 pb-2 pt-1 space-y-0.5">
+          {group.entries.map((entry, i) => (
+            <ToolCard key={entry.id || i} entry={entry} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const MERGED_LABELS: Record<string, string> = {
+  fetch_page: '网页读取',
+  parse_page: '内容解析',
+  list_files: '文件检索',
+  read_file: '文件读取',
+  write_file: '文件写入',
 }

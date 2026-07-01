@@ -68,13 +68,20 @@ export function Sidebar() {
           <span>最近任务</span>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-0.5">
+      <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-1.5">
         {history.length === 0 ? (
           <p className="px-2 py-2 text-xs text-[var(--ink-soft)] opacity-70">
             还没有任务记录
           </p>
         ) : (
-          history.map((h) => <HistoryItem key={h.id} entry={h} />)
+          groupHistoryByTime(history).map((group) => (
+            <div key={group.label} className="space-y-0.5">
+              <div className="px-1 pt-1 text-[10px] font-medium text-[var(--ink-soft)]/70">
+                {group.label}
+              </div>
+              {group.items.map((h) => <HistoryItem key={h.id} entry={h} />)}
+            </div>
+          ))
         )}
       </div>
 
@@ -142,6 +149,26 @@ function NavItem({ icon, label }: { icon: React.ReactNode; label: string }) {
       <span>{label}</span>
     </button>
   )
+}
+
+function groupHistoryByTime(items: HistoryEntry[]): { label: string; items: HistoryEntry[] }[] {
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const yesterday = today - 86400000
+  const weekAgo = today - 6 * 86400000
+  const groups: { label: string; items: HistoryEntry[] }[] = [
+    { label: '今天', items: [] },
+    { label: '昨天', items: [] },
+    { label: '近 7 天', items: [] },
+    { label: '更早', items: [] }
+  ]
+  for (const item of items) {
+    if (item.finishedAt >= today) groups[0].items.push(item)
+    else if (item.finishedAt >= yesterday) groups[1].items.push(item)
+    else if (item.finishedAt >= weekAgo) groups[2].items.push(item)
+    else groups[3].items.push(item)
+  }
+  return groups.filter((g) => g.items.length > 0)
 }
 
 function timeAgo(ts: number): string {
