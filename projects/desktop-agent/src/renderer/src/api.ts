@@ -9,7 +9,8 @@ type Api = {
   cancelTask: (taskId: string) => Promise<void>
   rollbackTask: (taskId: string) => Promise<{ success: boolean }>
   sendApproval: (requestId: string, approved: boolean) => Promise<void>
-  appendInput: (taskId: string, message: string) => Promise<void>
+  sendPlanResponse: (requestId: string, decision: 'approve' | 'reject_stop' | 'reject_revise', feedback?: string) => Promise<void>
+  appendInput: (taskId: string, message: string, mode?: 'inject' | 'queue') => Promise<void>
   configGet: (key: string) => Promise<unknown>
   openExternal: (url: string) => Promise<void>
 }
@@ -23,6 +24,7 @@ const empty: Api = {
   cancelTask: async () => {},
   rollbackTask: async () => ({ success: false }),
   sendApproval: async () => {},
+  sendPlanResponse: async () => {},
   appendInput: async () => {},
   configGet: async () => null,
   openExternal: async () => {}

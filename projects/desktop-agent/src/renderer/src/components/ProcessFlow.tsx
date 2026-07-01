@@ -4,6 +4,9 @@ import { useTaskStore, getMergedToolLogs, getMergedFileChanges, type MergedToolG
 import { ToolCard } from './toolCards'
 import { ToolCardShell } from './ToolCardShell'
 import { ApprovalCard } from './ApprovalCard'
+import { PlanCard } from './PlanCard'
+import { TodoChecklist } from './TodoChecklist'
+import { SubtaskList } from './SubtaskList'
 
 export function ProcessFlow() {
   const { status, thinking, toolLogs, chunks, error } = useTaskStore()
@@ -44,6 +47,9 @@ export function ProcessFlow() {
         </div>
       )}
 
+      <PlanCard />
+      <TodoChecklist />
+      <SubtaskList />
       <ApprovalCard />
 
       {error && (

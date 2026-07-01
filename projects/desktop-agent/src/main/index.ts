@@ -125,7 +125,12 @@ ipcMain.handle('agent:approval', async (_e, args: { requestId: string; approved:
   agentBridge.send({ type: 'approval_response', request_id: args.requestId, approved: args.approved })
 })
 
+// 计划响应通道（转发为 stdin plan_response）
+ipcMain.handle('agent:planResponse', async (_e, args: { requestId: string; decision: 'approve' | 'reject_stop' | 'reject_revise'; feedback?: string }) => {
+  agentBridge.send({ type: 'plan_response', request_id: args.requestId, decision: args.decision, feedback: args.feedback })
+})
+
 // 追加指令通道（转发为 stdin append_input）
-ipcMain.handle('agent:appendInput', async (_e, args: { taskId: string; message: string }) => {
-  agentBridge.send({ type: 'append_input', task_id: args.taskId, message: args.message })
+ipcMain.handle('agent:appendInput', async (_e, args: { taskId: string; message: string; mode?: 'inject' | 'queue' }) => {
+  agentBridge.send({ type: 'append_input', task_id: args.taskId, message: args.message, mode: args.mode })
 })

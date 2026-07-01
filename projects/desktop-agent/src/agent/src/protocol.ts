@@ -32,7 +32,8 @@ export type StdinMessage =
   | { type: 'chat_request'; session_id: string; message: string; config: AgentConfig; history?: AgentMessage[]; workspace_dir?: string }
   | { type: 'task_control'; task_id: string; action: 'pause' | 'resume' | 'cancel' | 'rollback' }
   | { type: 'approval_response'; request_id: string; approved: boolean }
-  | { type: 'append_input'; task_id: string; message: string }
+  | { type: 'append_input'; task_id: string; message: string; mode?: 'inject' | 'queue' }
+  | { type: 'plan_response'; request_id: string; decision: 'approve' | 'reject_stop' | 'reject_revise'; feedback?: string }
 
 // Agent -> 主进程 (stdout)
 export type StdoutMessage =
@@ -47,6 +48,23 @@ export type StdoutMessage =
   | { type: 'artifact'; artifact_type: 'diff' | 'report' | 'file' | 'preview' | 'evidence' | 'task_summary'; file_path: string }
   | { type: 'error'; message: string }
   | { type: 'completed'; task_id: string; summary: string }
+  | { type: 'plan_proposed'; request_id: string; plan: string; steps: PlanStep[] }
+  | { type: 'todo_update'; todos: TodoItem[] }
+  | { type: 'subtask_started'; subtask_id: string; title: string; agent_id?: string }
+  | { type: 'subtask_completed'; subtask_id: string; title: string; duration_ms: number; tool_count: number; tokens: number }
+  | { type: 'subtask_failed'; subtask_id: string; title: string; error: string }
+
+export interface PlanStep {
+  step: number
+  title: string
+  status: 'pending' | 'in_progress' | 'completed' | 'removed'
+}
+
+export interface TodoItem {
+  id: string
+  content: string
+  status: 'pending' | 'in_progress' | 'completed'
+}
 
 export function send(msg: StdoutMessage): void {
   process.stdout.write(JSON.stringify(msg) + '\n')

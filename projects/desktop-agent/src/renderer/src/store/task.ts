@@ -44,6 +44,34 @@ export interface ApprovalRequest {
   canRollback: boolean
 }
 
+export interface PlanStep {
+  step: number
+  title: string
+  status: 'pending' | 'in_progress' | 'completed' | 'removed'
+}
+
+export interface PendingPlan {
+  requestId: string
+  plan: string
+  steps: PlanStep[]
+}
+
+export interface TodoItem {
+  id: string
+  content: string
+  status: 'pending' | 'in_progress' | 'completed'
+}
+
+export interface SubtaskEntry {
+  id: string
+  title: string
+  status: 'running' | 'completed' | 'failed'
+  durationMs?: number
+  toolCount?: number
+  tokens?: number
+  error?: string
+}
+
 export interface TaskState {
   status: TaskStatus
   taskId: string | null
@@ -62,6 +90,9 @@ export interface TaskState {
   finishedAt: number | null
   history: HistoryEntry[]
   approvalPending: ApprovalRequest | null
+  pendingPlan: PendingPlan | null
+  todos: TodoItem[]
+  subtasks: SubtaskEntry[]
   setMode: (m: 'work' | 'code') => void
   setMessage: (s: string) => void
   setGoal: (s: string) => void
@@ -69,6 +100,7 @@ export interface TaskState {
   cancelTask: () => Promise<void>
   appendInput: (text: string) => Promise<void>
   respondApproval: (approved: boolean) => Promise<void>
+  respondPlan: (decision: 'approve' | 'reject_stop' | 'reject_revise', feedback?: string) => Promise<void>
   reset: () => void
   loadHistory: () => void
   appendEvent: (msg: StdoutMessage) => void
@@ -112,7 +144,10 @@ const initial = {
   error: null as string | null,
   startedAt: null as number | null,
   finishedAt: null as number | null,
-  approvalPending: null as ApprovalRequest | null
+  approvalPending: null as ApprovalRequest | null,
+  pendingPlan: null as PendingPlan | null,
+  todos: [] as TodoItem[],
+  subtasks: [] as SubtaskEntry[]
 }
 
 export const useTaskStore = create<TaskState>((set, get) => ({
@@ -122,16 +157,16 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   setMessage: (s) => set({ message: s }),
   setGoal: (s) => set({ goal: s }),
   loadHistory: () => set({ history: loadHistoryFromStorage() }),
-  reset: () => set({ ...initial, history: get().history }),
+  reset: () => set({ ...initial, history: get().history, approvalPending: null, pendingPlan: null, todos: [], subtasks: [] }),
   cancelTask: async () => {
     const { taskId } = get()
     if (taskId) await api.cancelTask(taskId)
     set({ status: 'idle', finishedAt: Date.now() })
   },
-  appendInput: async (text: string) => {
+  appendInput: async (text: string, mode?: 'inject' | 'queue') => {
     const { taskId } = get()
     if (taskId && text.trim()) {
-      await api.appendInput(taskId, text)
+      await api.appendInput(taskId, text, mode)
       set({ message: '' })
     }
   },
@@ -140,6 +175,13 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     if (approvalPending) {
       await api.sendApproval(approvalPending.requestId, approved)
       set({ approvalPending: null })
+    }
+  },
+  respondPlan: async (decision: 'approve' | 'reject_stop' | 'reject_revise', feedback?: string) => {
+    const { pendingPlan } = get()
+    if (pendingPlan) {
+      await api.sendPlanResponse(pendingPlan.requestId, decision, feedback)
+      set({ pendingPlan: null })
     }
   },
   appendEvent: (msg) => {
@@ -213,6 +255,45 @@ export const useTaskStore = create<TaskState>((set, get) => ({
           }
         })
         break
+      case 'plan_proposed':
+        set({
+          pendingPlan: {
+            requestId: msg.request_id,
+            plan: msg.plan,
+            steps: msg.steps
+          }
+        })
+        break
+      case 'todo_update':
+        set({ todos: msg.todos })
+        break
+      case 'subtask_started':
+        set((s) => ({
+          subtasks: [...s.subtasks, {
+            id: msg.subtask_id,
+            title: msg.title,
+            status: 'running'
+          }]
+        }))
+        break
+      case 'subtask_completed':
+        set((s) => ({
+          subtasks: s.subtasks.map((st) =>
+            st.id === msg.subtask_id
+              ? { ...st, status: 'completed', durationMs: msg.duration_ms, toolCount: msg.tool_count, tokens: msg.tokens }
+              : st
+          )
+        }))
+        break
+      case 'subtask_failed':
+        set((s) => ({
+          subtasks: s.subtasks.map((st) =>
+            st.id === msg.subtask_id
+              ? { ...st, status: 'failed', error: msg.error }
+              : st
+          )
+        }))
+        break
       case 'status':
         if (msg.status === 'EXECUTING') set({ status: 'executing' })
         if (msg.status === 'PAUSED') set({ status: 'idle' })
@@ -233,6 +314,10 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       steps: [],
       artifacts: [],
       error: null,
+      approvalPending: null,
+      pendingPlan: null,
+      todos: [],
+      subtasks: [],
       usage: { inputTokens: 0, outputTokens: 0 },
       startedAt: Date.now(),
       finishedAt: null,
