@@ -45,7 +45,7 @@ export type StdoutMessage =
   | { type: 'chunk'; text: string }
   | { type: 'thinking'; text: string }
   | { type: 'tool_call'; name: string; args: Record<string, unknown>; id: string }
-  | { type: 'tool_result'; name: string; result: string }
+  | { type: 'tool_result'; name: string; result: string; id: string }
   | { type: 'approval_request'; request_id: string; tool_name: string; args: Record<string, unknown>; risk_level: 'low' | 'medium' | 'high' | 'critical'; impact: string; can_rollback: boolean }
   | { type: 'usage'; inputTokens: number; outputTokens: number }
   | { type: 'status'; status: string; message?: string }

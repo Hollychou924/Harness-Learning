@@ -120,7 +120,7 @@ export async function runReact(
     const tool = tools.find((t) => t.name === toolUse.name)
     if (!tool) {
       const errMsg = `工具 ${toolUse.name} 不存在`
-      onEvent({ type: 'tool_result', name: toolUse.name, result: JSON.stringify({ error: errMsg }) })
+      onEvent({ type: 'tool_result', name: toolUse.name, result: JSON.stringify({ error: errMsg }), id: toolUse.id })
       messages.push({
         role: 'assistant',
         content: assistantText,
@@ -159,7 +159,7 @@ export async function runReact(
         canRollback: tool.riskLevel !== 'critical'
       })
       if (!approved) {
-        onEvent({ type: 'tool_result', name: toolUse.name, result: JSON.stringify({ error: '用户拒绝执行此操作' }) })
+        onEvent({ type: 'tool_result', name: toolUse.name, result: JSON.stringify({ error: '用户拒绝执行此操作' }), id: toolUse.id })
         messages.push({
           role: 'assistant',
           content: assistantText,
@@ -185,7 +185,7 @@ export async function runReact(
       result = JSON.stringify({ error: e instanceof Error ? e.message : String(e) })
     }
 
-    onEvent({ type: 'tool_result', name: toolUse.name, result })
+    onEvent({ type: 'tool_result', name: toolUse.name, result, id: toolUse.id })
 
     messages.push({
       role: 'assistant',

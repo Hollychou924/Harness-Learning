@@ -53,14 +53,122 @@ body {
 .no-drag { -webkit-app-region: no-drag; }
 
 /* 报告内链接 */
-.prose a { color: #0071e3; text-decoration: none; }
-.prose a:hover { text-decoration: underline; }
-.prose h1, .prose h2, .prose h3 { font-weight: 600; margin: 1em 0 0.5em; }
-.prose h1 { font-size: 1.4rem; }
-.prose h2 { font-size: 1.15rem; }
-.prose h3 { font-size: 1rem; }
-.prose p { margin: 0.5em 0; line-height: 1.7; }
-.prose ul, .prose ol { margin: 0.5em 0; padding-left: 1.5em; }
-.prose li { margin: 0.25em 0; }
-.prose code { background: rgba(0,0,0,0.06); padding: 0.1em 0.35em; border-radius: 4px; font-size: 0.9em; }
-.prose pre { background: rgba(0,0,0,0.05); padding: 0.8em; border-radius: 8px; overflow-x: auto; }
+/* 旧 prose 样式已迁移到 md-content */
+
+/* ============ Markdown 内容渲染 ============ */
+.md-content {
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--ink);
+}
+
+.md-content > *:first-child { margin-top: 0; }
+.md-content > *:last-child { margin-bottom: 0; }
+
+/* 标题 */
+.md-content h1 { font-size: 1.4em; font-weight: 700; margin: 1.2em 0 0.5em; line-height: 1.3; }
+.md-content h2 { font-size: 1.2em; font-weight: 600; margin: 1.1em 0 0.5em; line-height: 1.3; }
+.md-content h3 { font-size: 1.05em; font-weight: 600; margin: 1em 0 0.4em; line-height: 1.4; }
+.md-content h4, .md-content h5, .md-content h6 { font-size: 1em; font-weight: 600; margin: 0.9em 0 0.4em; }
+
+/* 段落 */
+.md-content p { margin: 0.5em 0; }
+
+/* 列表 */
+.md-content ul, .md-content ol { margin: 0.5em 0; padding-left: 1.6em; }
+.md-content li { margin: 0.25em 0; }
+.md-content ul li::marker { color: var(--ink-soft); }
+.md-content ol li::marker { color: var(--ink-soft); font-weight: 500; }
+
+/* 任务列表 checkbox */
+.md-content input[type="checkbox"] { margin-right: 0.4em; transform: translateY(1px); }
+
+/* 行内代码 */
+.md-content .inline-code {
+  background: rgba(0,0,0,0.06);
+  padding: 0.15em 0.4em;
+  border-radius: 5px;
+  font-size: 0.88em;
+  font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  color: #d4380d;
+}
+
+/* 代码块 */
+.md-content .code-block {
+  background: #1e1e2e;
+  border-radius: 10px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  margin: 0.8em 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.md-content .code-block code {
+  background: none;
+  padding: 0;
+  color: #cdd6f4;
+  font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+/* 表格 */
+.md-content .table-wrapper {
+  overflow-x: auto;
+  margin: 0.8em 0;
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,0.08);
+}
+.md-content table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.md-content thead {
+  background: rgba(0,0,0,0.03);
+}
+.md-content th {
+  padding: 8px 12px;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 1px solid rgba(0,0,0,0.08);
+  white-space: nowrap;
+}
+.md-content td {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+}
+.md-content tr:last-child td { border-bottom: none; }
+.md-content tbody tr:hover { background: rgba(0,0,0,0.02); }
+
+/* 引用块 */
+.md-content .blockquote {
+  border-left: 3px solid #0071e3;
+  padding: 0.3em 0.9em;
+  margin: 0.8em 0;
+  background: rgba(0,113,227,0.04);
+  border-radius: 0 6px 6px 0;
+  color: var(--ink-soft);
+}
+.md-content .blockquote p { margin: 0.2em 0; }
+
+/* 链接 */
+.md-content a { color: #0071e3; text-decoration: none; }
+.md-content a:hover { text-decoration: underline; }
+
+/* 分割线 */
+.md-content hr { border: none; border-top: 1px solid rgba(0,0,0,0.08); margin: 1.2em 0; }
+
+/* 图片 */
+.md-content img { max-width: 100%; border-radius: 8px; margin: 0.5em 0; }
+
+/* ============ highlight.js Catppuccin Mocha 配色 ============ */
+.hljs { color: #cdd6f4; background: transparent; }
+.hljs-comment, .hljs-quote { color: #6c7086; font-style: italic; }
+.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-section, .hljs-link { color: #cba6f7; }
+.hljs-string, .hljs-attr, .hljs-template-tag, .hljs-template-variable, .hljs-addition { color: #a6e3a1; }
+.hljs-title, .hljs-name, .hljs-type, .hljs-attribute, .hljs-symbol, .hljs-bullet, .hljs-built_in { color: #89b4fa; }
+.hljs-number, .hljs-meta, .hljs-link { color: #fab387; }
+.hljs-deletion { color: #f38ba8; }
+.hljs-variable, .hljs-property { color: #f9e2af; }
+.hljs-regexp { color: #f5c2e7; }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 700; }

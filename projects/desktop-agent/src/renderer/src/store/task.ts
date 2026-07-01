@@ -244,7 +244,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       case 'tool_result':
         set((s) => ({
           toolLogs: s.toolLogs.map((t) =>
-            t.id === msg.name && !t.result ? { ...t, result: msg.result } : t
+            t.id === msg.id && !t.result ? { ...t, result: msg.result } : t
           )
         }))
         break
