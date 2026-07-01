@@ -121,7 +121,7 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
 
   return (
     <>
-      <div className="w-full max-w-3xl glass rounded-2xl shadow-lg overflow-hidden">
+      <div className="w-full max-w-3xl glass rounded-2xl shadow-lg">
         {/* 附件缩略图区 */}
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-2 px-3 pt-3">

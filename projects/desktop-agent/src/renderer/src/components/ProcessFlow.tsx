@@ -20,7 +20,9 @@ export function ProcessFlow() {
 
   return (
     <div className="space-y-2">
-      <StatusLine status={status} doneCount={doneCount} runningCount={runningCount} total={toolLogs.length} />
+      {(toolLogs.length > 0 || status === 'executing') && (
+        <StatusLine status={status} doneCount={doneCount} runningCount={runningCount} total={toolLogs.length} />
+      )}
 
       {showThinking && thinking.length > 0 && <ThinkingBlock items={thinking} executing={status === 'executing'} />}
 
@@ -94,7 +96,7 @@ function ThinkingBlock({ items, executing }: { items: string[]; executing: boole
         )}
         <span className="text-[var(--ink)]">思考过程</span>
         <span className="text-xs text-[var(--ink-soft)] truncate flex-1 text-left">
-          {recent.replace(/^第 \d+ 轮思考$/, '正在分析任务')}
+          {executing ? recent.replace(/^第 \d+ 轮思考$/, '正在分析任务') : '思考完成'}
         </span>
         <span className="text-xs text-[var(--ink-soft)]">{items.length} 条</span>
         <ChevronRight size={14} className={`text-[var(--ink-soft)] transition-transform ${open ? 'rotate-90' : ''}`} />
