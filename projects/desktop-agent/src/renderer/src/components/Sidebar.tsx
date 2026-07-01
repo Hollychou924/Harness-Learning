@@ -75,7 +75,7 @@ export function Sidebar() {
             还没有任务记录
           </p>
         ) : (
-          groupHistoryByTime(history).map((group) => (
+          groupHistoryByTime(history.filter((h) => h.mode === mode)).map((group) => (
             <div key={group.label} className="space-y-0.5">
               <div className="px-1 pt-1 text-[10px] font-medium text-[var(--ink-soft)]/70">
                 {group.label}

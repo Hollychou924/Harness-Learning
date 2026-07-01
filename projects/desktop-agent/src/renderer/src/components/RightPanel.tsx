@@ -79,7 +79,7 @@ export function RightPanel() {
           </div>
           {steps.length === 0 ? (
             <p className="text-xs text-[var(--ink-soft)] py-1">
-              {isFailed ? '任务未完成' : '等待 Agent 拆解步骤…'}
+              {isFailed ? '任务未完成' : isComplete ? '任务已完成' : '等待 Agent 拆解步骤…'}
             </p>
           ) : (
             <ul className="space-y-1.5">
@@ -100,7 +100,7 @@ export function RightPanel() {
         </section>
 
         {/* 产物 */}
-        {artifacts.length > 0 && (
+        {artifacts.filter((a) => a.filePath !== 'inline').length > 0 && (
           <section className="glass rounded-xl p-3">
             <div className="flex items-center gap-2 mb-2.5">
               <FileCode size={14} className="text-[var(--ink-soft)]" />
@@ -112,7 +112,7 @@ export function RightPanel() {
               </span>
             </div>
             <ul className="space-y-1">
-              {artifacts.map((a, i) => (
+              {artifacts.filter((a) => a.filePath !== 'inline').map((a, i) => (
                 <ArtifactItem key={i} art={a} />
               ))}
             </ul>

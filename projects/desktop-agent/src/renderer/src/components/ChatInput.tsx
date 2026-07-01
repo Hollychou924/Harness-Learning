@@ -198,7 +198,7 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
             {modelMenuOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setModelMenuOpen(false)} />
-                <div className="absolute left-0 top-full mt-1 z-50 w-72 glass rounded-xl p-2 shadow-lg">
+                <div className="absolute left-0 bottom-full mb-1 z-50 w-72 glass rounded-xl p-2 shadow-lg">
                   <div className="max-h-72 overflow-y-auto space-y-0.5">
                     {BUILTIN_PROVIDER_ORDER.map((id) => {
                       const preset = PROVIDER_PRESETS[id]
