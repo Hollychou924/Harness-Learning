@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ChevronRight, Loader2, Check, AlertCircle, Brain, FilePlus } from 'lucide-react'
 import { useTaskStore, getMergedToolLogs, getMergedFileChanges, type MergedToolGroup } from '../store/task'
+import { useSettingsStore } from './settings/settingsStore'
 import { ToolCard } from './toolCards'
 import { ToolCardShell } from './ToolCardShell'
 import { ApprovalCard } from './ApprovalCard'
@@ -10,6 +11,7 @@ import { SubtaskList } from './SubtaskList'
 
 export function ProcessFlow() {
   const { status, thinking, toolLogs, chunks, error } = useTaskStore()
+  const { showThinking } = useSettingsStore()
   const merged = getMergedToolLogs(toolLogs)
   const fileChanges = getMergedFileChanges(toolLogs)
   const doneCount = toolLogs.filter((t) => t.result).length
@@ -20,7 +22,7 @@ export function ProcessFlow() {
     <div className="space-y-2">
       <StatusLine status={status} doneCount={doneCount} runningCount={runningCount} total={toolLogs.length} />
 
-      {thinking.length > 0 && <ThinkingBlock items={thinking} executing={status === 'executing'} />}
+      {showThinking && thinking.length > 0 && <ThinkingBlock items={thinking} executing={status === 'executing'} />}
 
       {/* 文件变更区（Turn 三段之文件变更） */}
       {fileChanges.length > 0 && (

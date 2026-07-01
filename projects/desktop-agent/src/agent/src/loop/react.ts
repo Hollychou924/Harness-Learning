@@ -4,6 +4,8 @@ import type { AgentTool } from '../tools/index.js'
 import { isSafe, isBlocked } from '../tools/index.js'
 import { makePlanExecuteHandler, clearPendingPlanRequestId } from '../tools/plan.js'
 import { makeTodoExecuteHandler } from '../tools/todo.js'
+import { requestApproval } from '../approval.js'
+import { randomUUID } from 'node:crypto'
 import { AnthropicProvider, type LlmProvider } from '../providers/anthropic.js'
 import { OpenAIProvider } from '../providers/openai.js'
 import { buildSystemPrompt } from '../prompt/system.js'
@@ -140,9 +142,34 @@ export async function runReact(
 
     onEvent({ type: 'tool_call', name: toolUse.name, args: toolUse.args, id: toolUse.id })
 
-    // 权限判定：SAFE 白名单免审批，其余按风险等级处理
-    // 一期 Work 任务只用低风险只读工具，medium 写文件也先自动执行（write_file 写草稿）
-    // 遇 high/critical 会请求审批；一期 Work 不提供 high 工具
+    // 权限判定：根据 autoApproveLow 开关和工具风险等级决定是否需要审批
+    const autoApprove = config.autoApproveLow !== false
+    const needsApproval = !autoApprove
+      ? !isSafe(toolUse.name)
+      : tool.riskLevel === 'high' || tool.riskLevel === 'critical'
+
+    if (needsApproval) {
+      const approvalId = `approval-${randomUUID()}`
+      const approved = await requestApproval({
+        requestId: approvalId,
+        toolName: toolUse.name,
+        args: toolUse.args,
+        riskLevel: tool.riskLevel,
+        impact: tool.description.slice(0, 120),
+        canRollback: tool.riskLevel !== 'critical'
+      })
+      if (!approved) {
+        onEvent({ type: 'tool_result', name: toolUse.name, result: JSON.stringify({ error: '用户拒绝执行此操作' }) })
+        messages.push({
+          role: 'assistant',
+          content: assistantText,
+          tool_calls: [{ id: toolUse.id, type: 'function', function: { name: toolUse.name, arguments: JSON.stringify(toolUse.args) } }]
+        })
+        messages.push({ role: 'tool', tool_call_id: toolUse.id, content: JSON.stringify({ error: '用户拒绝执行此操作' }) })
+        continue
+      }
+    }
+
     let result: string
     try {
       if (toolUse.name === 'shell' && typeof toolUse.args.command === 'string' && isBlocked(toolUse.args.command)) {

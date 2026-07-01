@@ -14,6 +14,7 @@ export interface AgentConfig {
   apiFormat?: 'openai' | 'anthropic'
   contextLimit?: number
   customProviderId?: string
+  autoApproveLow?: boolean
   embedding?: {
     apiBaseUrl: string
     model: string

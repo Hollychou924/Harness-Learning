@@ -8,10 +8,11 @@ export interface ModelConfig {
   apiFormat: 'openai' | 'anthropic'
   contextLimit: number
   customProviderId?: string
+  autoApproveLow?: boolean
 }
 
 type Api = {
-  startTask: (args: { mode: 'work' | 'code'; message: string; workspaceDir?: string }) =>
+  startTask: (args: { mode: 'work' | 'code'; message: string; workspaceDir?: string; maxIterations?: number; autoApproveLow?: boolean }) =>
     Promise<{ taskId: string; error?: string }>
   onAgentEvent: (fn: (msg: StdoutMessage) => void) => () => void
   pauseTask: (taskId: string) => Promise<void>

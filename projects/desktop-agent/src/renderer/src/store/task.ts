@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { api } from '../api'
+import { useSettingsStore } from '../components/settings/settingsStore'
 import type { StdoutMessage } from '../../../agent/src/protocol'
 
 export type TaskStatus = 'idle' | 'executing' | 'completed' | 'failed'
@@ -323,7 +324,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       finishedAt: null,
       goal: goal || message
     })
-    const res = await api.startTask({ mode, message })
+    const settingsState = useSettingsStore.getState()
+    const res = await api.startTask({ mode, message, maxIterations: settingsState.maxIterations, autoApproveLow: settingsState.autoApproveLow })
     if (res.error) {
       set({ status: 'failed', error: res.error })
     } else {

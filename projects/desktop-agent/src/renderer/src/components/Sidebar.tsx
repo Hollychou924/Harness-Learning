@@ -12,10 +12,12 @@ import {
   History
 } from 'lucide-react'
 import { useTaskStore } from '../store/task'
+import { useSettingsStore } from './settings/settingsStore'
 import type { HistoryEntry } from '../store/task'
 
 export function Sidebar() {
   const { mode, setMode, history, message, startTask, reset, status } = useTaskStore()
+  const { openSettings } = useSettingsStore()
   return (
     <aside className="glass-soft w-56 flex-shrink-0 flex flex-col border-r border-white/40">
       {/* 红绿灯预留区 */}
@@ -101,7 +103,7 @@ export function Sidebar() {
           </div>
           <span className="text-sm font-semibold tracking-tight">小蓝鲸</span>
         </div>
-        <NavItem icon={<Settings size={15} />} label="设置" />
+        <NavItem icon={<Settings size={15} />} label="设置" onClick={() => openSettings()} />
         <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-[var(--ink-soft)]">
           <div className="w-6 h-6 rounded-full bg-gradient-to-br from-amber-300 to-pink-400" />
           <span>周浩</span>
@@ -142,9 +144,9 @@ function HistoryItem({ entry }: { entry: HistoryEntry }) {
   )
 }
 
-function NavItem({ icon, label }: { icon: React.ReactNode; label: string }) {
+function NavItem({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick?: () => void }) {
   return (
-    <button className="no-drag w-full h-8 px-2 rounded-lg flex items-center gap-2.5 text-[var(--ink-soft)] hover:bg-black/[0.04] hover:text-[var(--ink)] transition">
+    <button onClick={onClick} className="no-drag w-full h-8 px-2 rounded-lg flex items-center gap-2.5 text-[var(--ink-soft)] hover:bg-black/[0.04] hover:text-[var(--ink)] transition">
       {icon}
       <span>{label}</span>
     </button>

@@ -2,6 +2,7 @@ import { createInterface } from 'node:readline'
 import type { StdinMessage, StdoutMessage, AgentMessage } from './protocol.js'
 import { send } from './protocol.js'
 import { runReact } from './loop/react.js'
+import { resolveApproval } from './approval.js'
 
 // Agent 子进程入口：读 stdin JSON Lines，写 stdout JSON Lines
 // 不依赖任何 Electron API（依据 docs/03 第四章进程边界）
@@ -66,7 +67,7 @@ async function handleStdin(msg: StdinMessage): Promise<void> {
   }
 
   if (msg.type === 'approval_response') {
-    // 一期 Work 工具均为低风险自动执行，无审批请求
+    resolveApproval(msg.request_id, msg.approved)
     return
   }
 

@@ -16,6 +16,7 @@ interface ModelConfig {
   apiFormat: 'openai' | 'anthropic'
   contextLimit: number
   customProviderId?: string
+  autoApproveLow?: boolean
 }
 
 function getConfigPath(): string {
@@ -50,7 +51,8 @@ function buildAgentConfig(): AgentConfig {
       providerId: saved.providerId,
       apiFormat: saved.apiFormat,
       contextLimit: saved.contextLimit,
-      customProviderId: saved.customProviderId
+      customProviderId: saved.customProviderId,
+      autoApproveLow: saved.autoApproveLow ?? false
     }
   }
   // 兜底：环境变量
@@ -60,7 +62,8 @@ function buildAgentConfig(): AgentConfig {
     apiKey: process.env.ANTHROPIC_API_KEY || '',
     apiBaseUrl: process.env.ANTHROPIC_BASE_URL || undefined,
     maxIterations: Number(process.env.XLJ_MAX_ITER || 8),
-    workspaceDir: process.env.XLJ_WORKSPACE || undefined
+    workspaceDir: process.env.XLJ_WORKSPACE || undefined,
+    autoApproveLow: false
   }
 }
 
@@ -121,12 +124,14 @@ app.on('window-all-closed', () => {
 })
 
 // IPC 通道（依据 docs/09 第二章）
-ipcMain.handle('agent:startTask', async (_e, args: { mode: 'work' | 'code'; message: string; workspaceDir?: string }) => {
+ipcMain.handle('agent:startTask', async (_e, args: { mode: 'work' | 'code'; message: string; workspaceDir?: string; maxIterations?: number; autoApproveLow?: boolean }) => {
   const sessionId = randomUUID()
   const config = buildAgentConfig()
   if (!config.apiKey) {
     return { taskId: sessionId, error: '未检测到模型凭证，请在环境变量配置 ANTHROPIC_API_KEY' }
   }
+  if (args.maxIterations) config.maxIterations = args.maxIterations
+  if (args.autoApproveLow !== undefined) config.autoApproveLow = args.autoApproveLow
   agentBridge.startTask(sessionId, args.message, config, args.workspaceDir)
   return { taskId: sessionId }
 })
@@ -138,6 +143,8 @@ ipcMain.handle('config:get', async (_e, key: string) => {
   if (key === 'modelConfig') return cfg
   if (key === 'contextLimit') return cfg?.contextLimit || 200000
   if (key === 'customProviderId') return cfg?.customProviderId || null
+  if (key === 'autoApproveLow') return cfg?.autoApproveLow ?? false
+  if (key === 'maxIterations') return (cfg as Record<string, unknown> | null)?.maxIterations ?? null
   return null
 })
 

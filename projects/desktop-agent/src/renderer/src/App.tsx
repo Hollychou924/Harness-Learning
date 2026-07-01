@@ -1,6 +1,7 @@
 import { Sidebar } from './components/Sidebar'
 import { Workbench } from './components/Workbench'
 import { RightPanel } from './components/RightPanel'
+import { SettingsDialog } from './components/settings/SettingsDialog'
 
 export default function App() {
   return (
@@ -10,6 +11,7 @@ export default function App() {
         <Workbench />
       </main>
       <RightPanel />
+      <SettingsDialog />
     </div>
   )
 }
