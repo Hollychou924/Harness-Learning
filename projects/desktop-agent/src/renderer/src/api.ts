@@ -7,6 +7,7 @@ export interface ModelConfig {
   apiBaseUrl: string
   apiFormat: 'openai' | 'anthropic'
   contextLimit: number
+  customProviderId?: string
 }
 
 type Api = {

@@ -2,7 +2,10 @@ import type { AgentConfig, AgentMessage, StdoutMessage } from '../protocol.js'
 import { send } from '../protocol.js'
 import type { AgentTool } from '../tools/index.js'
 import { isSafe, isBlocked } from '../tools/index.js'
+import { makePlanExecuteHandler, clearPendingPlanRequestId } from '../tools/plan.js'
+import { makeTodoExecuteHandler } from '../tools/todo.js'
 import { AnthropicProvider, type LlmProvider } from '../providers/anthropic.js'
+import { OpenAIProvider } from '../providers/openai.js'
 import { buildSystemPrompt } from '../prompt/system.js'
 
 // ReAct 引擎（依据 docs/01 第三章，参考已验证实现）
@@ -22,7 +25,23 @@ export async function runReact(
   mode: 'work' | 'code' = 'work',
   taskId?: string
 ): Promise<ReactResult> {
-  const provider: LlmProvider = new AnthropicProvider(config)
+  const provider: LlmProvider = config.apiFormat === 'openai'
+    ? new OpenAIProvider(config)
+    : new AnthropicProvider(config)
+
+  // plan/todo 元工具：拦截执行，发出前端事件
+  const planExecute = makePlanExecuteHandler((plan, steps) => {
+    const requestId = `plan-${Date.now()}`
+    onEvent({
+      type: 'plan_proposed',
+      request_id: requestId,
+      plan,
+      steps
+    })
+  })
+  const todoExecute = makeTodoExecuteHandler((todos) => {
+    onEvent({ type: 'todo_update', todos })
+  })
   const { getAvailableTools } = await import('../tools/index.js')
   const tools = await getAvailableTools(workspaceDir)
 
@@ -126,9 +145,12 @@ export async function runReact(
     // 遇 high/critical 会请求审批；一期 Work 不提供 high 工具
     let result: string
     try {
-      // 黑名单兜底（虽然 Work 没有 shell 工具，保留判定入口）
       if (toolUse.name === 'shell' && typeof toolUse.args.command === 'string' && isBlocked(toolUse.args.command)) {
         result = JSON.stringify({ error: '危险命令已拒绝' })
+      } else if (toolUse.name === 'propose_plan') {
+        result = planExecute(toolUse.args)
+      } else if (toolUse.name === 'update_todo') {
+        result = todoExecute(toolUse.args)
       } else {
         result = await tool.execute(toolUse.args)
       }

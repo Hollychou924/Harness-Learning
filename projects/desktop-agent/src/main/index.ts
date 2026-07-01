@@ -15,6 +15,7 @@ interface ModelConfig {
   apiBaseUrl: string
   apiFormat: 'openai' | 'anthropic'
   contextLimit: number
+  customProviderId?: string
 }
 
 function getConfigPath(): string {
@@ -48,7 +49,8 @@ function buildAgentConfig(): AgentConfig {
       workspaceDir: process.env.XLJ_WORKSPACE || undefined,
       providerId: saved.providerId,
       apiFormat: saved.apiFormat,
-      contextLimit: saved.contextLimit
+      contextLimit: saved.contextLimit,
+      customProviderId: saved.customProviderId
     }
   }
   // 兜底：环境变量
@@ -135,6 +137,7 @@ ipcMain.handle('config:get', async (_e, key: string) => {
   if (key === 'model') return cfg?.model || process.env.XLJ_MODEL || 'claude-sonnet-4-5-20250929'
   if (key === 'modelConfig') return cfg
   if (key === 'contextLimit') return cfg?.contextLimit || 200000
+  if (key === 'customProviderId') return cfg?.customProviderId || null
   return null
 })
 

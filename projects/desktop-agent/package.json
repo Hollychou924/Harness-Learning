@@ -15,6 +15,7 @@
     "@anthropic-ai/sdk": "^0.30.0",
     "cheerio": "^1.0.0",
     "lucide-react": "^0.408.0",
+    "openai": "^6.45.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^9.0.1",

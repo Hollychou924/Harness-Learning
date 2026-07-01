@@ -5,6 +5,8 @@ export interface ProviderPreset {
   keyPlaceholder: string
   modelCandidates: string[]
   contextLimit: number
+  isMify?: boolean
+  builtinApiKey?: string
 }
 
 export const PROVIDER_PRESETS: Record<string, ProviderPreset> = {
@@ -88,6 +90,16 @@ export const PROVIDER_PRESETS: Record<string, ProviderPreset> = {
     modelCandidates: ['grok-4', 'grok-3-mini'],
     contextLimit: 131_072
   },
+  mify: {
+    label: 'Mify 推理网关',
+    apiFormat: 'openai',
+    baseUrl: 'http://model.mify.ai.srv/v1',
+    keyPlaceholder: 'Mify API Key（控制台创建）',
+    modelCandidates: [],
+    contextLimit: 128_000,
+    isMify: true,
+    builtinApiKey: 'sk-htOLGZ85ivhz1dAqInOcgw7QNvk74h0RWubl0IJy'
+  },
   custom: {
     label: '自定义模型',
     apiFormat: 'openai',
@@ -99,10 +111,37 @@ export const PROVIDER_PRESETS: Record<string, ProviderPreset> = {
 }
 
 export const BUILTIN_PROVIDER_ORDER: string[] = [
+  'mify',
   'anthropic',
-  ...Object.keys(PROVIDER_PRESETS).filter((id) => id !== 'anthropic' && id !== 'custom'),
+  ...Object.keys(PROVIDER_PRESETS).filter((id) => id !== 'mify' && id !== 'anthropic' && id !== 'custom'),
   'custom'
 ]
+
+export const MIFY_PROVIDER_ID_CHIPS: ReadonlyArray<{ id: string; label: string }> = [
+  { id: 'xiaomi', label: '小米 / 私部' },
+  { id: 'azure_openai', label: 'Azure OpenAI' },
+  { id: 'tongyi', label: '通义千问' },
+  { id: 'volcengine_maas', label: '火山引擎' },
+  { id: 'zhipuai', label: '智谱 AI' },
+  { id: 'siliconflow', label: '硅基流动' },
+  { id: 'vertex_ai', label: 'GCP Gemini/Claude' },
+  { id: 'minimax', label: 'MiniMax' },
+  { id: 'ppio', label: '派欧云' }
+]
+
+export const MIFY_PROVIDER_MODELS: Record<string, string[]> = {
+  xiaomi: ['mimo-v2-pro', 'mimo-v2-flash', 'mimo-v2-omni'],
+  azure_openai: ['gpt-5.4-pro', 'gpt-5.4'],
+  tongyi: ['qwen3.5-122b-a10b', 'qwen3.5-plus-2026-02-15'],
+  volcengine_maas: ['doubao-seed-2-0-code-preview-260215', 'doubao-seed-2-0-pro-260215'],
+  zhipuai: ['glm-5-turbo', 'glm-5'],
+  siliconflow: ['Pro/zai-org/GLM-5', 'Pro/moonshotai/Kimi-K2.5'],
+  vertex_ai: ['gemini-3.1-flash-lite-preview', 'gemini-3.1-pro-preview-pt', 'gemini-3.1-pro-preview'],
+  minimax: ['MiniMax-M2.7', 'MiniMax-M2.5'],
+  ppio: ['pa/claude-sonnet-4-5-20250929', 'pa/claude-haiku-4-5-20251001', 'pa/claude-opus-4-6', 'pa/claude-sonnet-4-6', 'grok-4', 'gpt-5-mini', 'gpt-5-nano']
+}
+
+export const MIFY_GATEWAY_DEFAULT_MODEL_ID = 'mimo-v2-pro'
 
 export function getContextLimit(providerKey: string): number {
   return PROVIDER_PRESETS[providerKey]?.contextLimit ?? 128_000

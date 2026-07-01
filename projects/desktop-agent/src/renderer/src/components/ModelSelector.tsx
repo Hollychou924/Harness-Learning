@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { ChevronDown, Check, X } from 'lucide-react'
 import { api, type ModelConfig } from '../api'
-import { PROVIDER_PRESETS, BUILTIN_PROVIDER_ORDER, getContextLimit } from './providerPresets'
+import { PROVIDER_PRESETS, BUILTIN_PROVIDER_ORDER, getContextLimit, MIFY_PROVIDER_ID_CHIPS, MIFY_PROVIDER_MODELS, MIFY_GATEWAY_DEFAULT_MODEL_ID } from './providerPresets'
 
 export function ModelSelector() {
   const [config, setConfig] = useState<ModelConfig | null>(null)
@@ -64,6 +64,7 @@ export function ModelSelector() {
                         }`}
                       >
                         <span className="flex-1 text-left">{preset.label}</span>
+                        {preset.builtinApiKey && <span className="text-[10px] text-green-500">内置Key</span>}
                         {isActive && <Check size={13} className="text-sky-500" />}
                       </button>
                     )
@@ -92,20 +93,37 @@ function ConfigEditor({
 }) {
   const providerId = (current?.providerId || 'anthropic') as string
   const preset = PROVIDER_PRESETS[providerId]
-  const [model, setModel] = useState(current?.model || preset.modelCandidates[0] || '')
-  const [apiKey, setApiKey] = useState(current?.apiKey || '')
+  const isMify = preset.isMify === true
+
+  const [customProviderId, setCustomProviderId] = useState(current?.customProviderId || (isMify ? 'xiaomi' : ''))
+  const mifyModels = isMify ? (MIFY_PROVIDER_MODELS[customProviderId] || []) : []
+  const [model, setModel] = useState(
+    current?.model ||
+    (isMify ? MIFY_GATEWAY_DEFAULT_MODEL_ID : preset.modelCandidates[0] || '')
+  )
+  const [apiKey, setApiKey] = useState(current?.apiKey || preset.builtinApiKey || '')
   const [apiBaseUrl, setApiBaseUrl] = useState(current?.apiBaseUrl || preset.baseUrl)
 
   const handleSave = () => {
-    if (!apiKey.trim()) return
+    if (!apiKey.trim() || !model.trim()) return
     onSave({
       providerId,
       model,
       apiKey: apiKey.trim(),
       apiBaseUrl: apiBaseUrl.trim(),
       apiFormat: preset.apiFormat,
-      contextLimit: getContextLimit(providerId)
+      contextLimit: getContextLimit(providerId),
+      ...(isMify ? { customProviderId } : {})
     })
+  }
+
+  // Mify 切换供应商时更新模型列表
+  const handleMifyProviderChange = (id: string) => {
+    setCustomProviderId(id)
+    const models = MIFY_PROVIDER_MODELS[id] || []
+    if (models.length > 0 && !models.includes(model)) {
+      setModel(models[0])
+    }
   }
 
   return (
@@ -117,35 +135,45 @@ function ConfigEditor({
         </button>
       </div>
 
-      {preset.modelCandidates.length > 0 && (
+      {isMify && (
         <div>
-          <label className="text-[10px] uppercase tracking-wide text-[var(--ink-soft)]">模型</label>
+          <label className="text-[10px] uppercase tracking-wide text-[var(--ink-soft)]">路由供应商</label>
+          <select
+            value={customProviderId}
+            onChange={(e) => handleMifyProviderChange(e.target.value)}
+            className="w-full mt-0.5 h-8 px-2 rounded-lg glass-soft text-sm outline-none"
+          >
+            {MIFY_PROVIDER_ID_CHIPS.map((chip) => (
+              <option key={chip.id} value={chip.id}>{chip.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      <div>
+        <label className="text-[10px] uppercase tracking-wide text-[var(--ink-soft)]">模型</label>
+        {isMify || preset.modelCandidates.length > 0 ? (
           <select
             value={model}
             onChange={(e) => setModel(e.target.value)}
             className="w-full mt-0.5 h-8 px-2 rounded-lg glass-soft text-sm outline-none"
           >
-            {preset.modelCandidates.map((m) => (
+            {(isMify ? mifyModels : preset.modelCandidates).map((m) => (
               <option key={m} value={m}>{m}</option>
             ))}
-            {!preset.modelCandidates.includes(model) && model && (
+            {!isMify && !preset.modelCandidates.includes(model) && model && (
               <option value={model}>{model}</option>
             )}
           </select>
-        </div>
-      )}
-
-      {preset.modelCandidates.length === 0 && (
-        <div>
-          <label className="text-[10px] uppercase tracking-wide text-[var(--ink-soft)]">模型 ID</label>
+        ) : (
           <input
             value={model}
             onChange={(e) => setModel(e.target.value)}
             placeholder="输入模型 ID"
             className="w-full mt-0.5 h-8 px-2 rounded-lg glass-soft text-sm outline-none"
           />
-        </div>
-      )}
+        )}
+      </div>
 
       <div>
         <label className="text-[10px] uppercase tracking-wide text-[var(--ink-soft)]">API Key</label>
@@ -156,6 +184,9 @@ function ConfigEditor({
           placeholder={preset.keyPlaceholder}
           className="w-full mt-0.5 h-8 px-2 rounded-lg glass-soft text-sm outline-none"
         />
+        {preset.builtinApiKey && (
+          <p className="text-[10px] text-green-500 mt-0.5">已预置内置 Key，可直接保存</p>
+        )}
       </div>
 
       <div>

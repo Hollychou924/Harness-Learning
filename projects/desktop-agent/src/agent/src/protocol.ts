@@ -13,6 +13,7 @@ export interface AgentConfig {
   providerId?: string
   apiFormat?: 'openai' | 'anthropic'
   contextLimit?: number
+  customProviderId?: string
   embedding?: {
     apiBaseUrl: string
     model: string

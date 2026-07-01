@@ -2,6 +2,8 @@ import { z } from 'zod'
 import { fetchPageTool } from './fetch_page.js'
 import { parsePageTool } from './parse_page.js'
 import { writeFileTool } from './write_file.js'
+import { planTool } from './plan.js'
+import { todoTool } from './todo.js'
 import { listFilesTool } from './list_files.js'
 import { readFileTool } from './read_file.js'
 
@@ -51,7 +53,9 @@ export async function getAvailableTools(workspaceDir?: string): Promise<AgentToo
     parsePageTool,
     listFilesTool(workspaceDir),
     readFileTool(workspaceDir),
-    writeFileTool(workspaceDir)
+    writeFileTool(workspaceDir),
+    planTool,
+    todoTool
   ]
 }
 
