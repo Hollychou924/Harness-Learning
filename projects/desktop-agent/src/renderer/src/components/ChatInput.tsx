@@ -136,12 +136,26 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
           </div>
         )}
 
-        {/* 输入区 */}
-        <div className="flex items-end gap-2 px-2.5 py-2">
-          {/* 左下 + 号 */}
+        {/* 输入框 */}
+        <div className="px-3 pt-2.5">
+          <textarea
+            ref={taRef}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            placeholder={placeholder || '描述你要做的事…'}
+            rows={1}
+            className="w-full bg-transparent resize-none outline-none py-1 text-sm leading-relaxed min-h-[36px] max-h-[160px]"
+          />
+        </div>
+
+        {/* 底部行：左下 + 号，右下 模型选择 + 发送 */}
+        <div className="flex items-center justify-between px-2.5 pb-2 pt-1">
+          {/* 左下：+ 号 */}
           <button
-            onClick={() => fileInputRef.current?.click()}
-            className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[var(--ink-soft)] hover:bg-black/[0.06] hover:text-[var(--ink)] transition mb-0.5"
+            onClick={handleFileSelect}
+            className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[var(--ink-soft)] hover:bg-black/[0.06] hover:text-[var(--ink)] transition"
             title="添加文件"
           >
             <Plus size={18} />
@@ -152,10 +166,8 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
             multiple
             className="hidden"
             onChange={(e) => {
-              // 降级：如果 IPC 不可用用原生 file input
               const files = e.target.files
               if (files && files.length > 0) {
-                // 尝试用 IPC，失败则用原生
                 api.openFiles().then((ipcFiles) => {
                   if (ipcFiles.length > 0) {
                     const newAtts: Attachment[] = ipcFiles.map((f, i) => ({
@@ -171,31 +183,17 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
             }}
           />
 
-          {/* 输入框 */}
-          <textarea
-            ref={taRef}
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
-            placeholder={placeholder || '描述你要做的事…'}
-            rows={1}
-            className="flex-1 bg-transparent resize-none outline-none py-1.5 text-sm leading-relaxed min-h-[36px] max-h-[160px]"
-          />
-        </div>
-
-        {/* 底部行：模型选择 + 发送 */}
-        <div className="flex items-center justify-between px-2.5 pb-2">
-          {/* 模型选择 */}
-          <div className="relative">
-            <button
-              onClick={() => setModelMenuOpen(!modelMenuOpen)}
-              className="flex items-center gap-1 text-[11px] text-[var(--ink-soft)] hover:text-[var(--ink)] transition px-1.5 py-1 rounded-lg hover:bg-black/[0.04]"
-            >
-              <span className="truncate max-w-[140px]">{modelLabel}</span>
-              {config?.model && <span className="text-[var(--ink-soft)]/60 hidden sm:inline">/ {config.model}</span>}
-              <ChevronDown size={11} />
-            </button>
+          {/* 右下：模型选择 + 发送 */}
+          <div className="flex items-center gap-2">
+            {/* 模型选择 */}
+            <div className="relative">
+              <button
+                onClick={() => setModelMenuOpen(!modelMenuOpen)}
+                className="flex items-center gap-1 text-[11px] text-[var(--ink-soft)] hover:text-[var(--ink)] transition px-1.5 py-1.5 rounded-lg hover:bg-black/[0.04]"
+              >
+                <span className="truncate max-w-[120px]">{modelLabel}</span>
+                <ChevronDown size={11} />
+              </button>
 
             {modelMenuOpen && (
               <>
@@ -223,20 +221,21 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
                 </div>
               </>
             )}
-          </div>
+            </div>
 
-          {/* 发送按钮 */}
-          <button
-            onClick={() => hasContent && onSend()}
-            disabled={!hasContent}
-            className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition ${
-              hasContent
-                ? 'bg-[#0071e3] text-white hover:brightness-110'
-                : 'bg-black/[0.06] text-[var(--ink-soft)]/40 cursor-not-allowed'
-            }`}
-          >
-            <ArrowUp size={16} />
-          </button>
+            {/* 发送按钮 */}
+            <button
+              onClick={() => hasContent && onSend()}
+              disabled={!hasContent}
+              className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition ${
+                hasContent
+                  ? 'bg-[#0071e3] text-white hover:brightness-110'
+                  : 'bg-black/[0.06] text-[var(--ink-soft)]/40 cursor-not-allowed'
+              }`}
+            >
+              <ArrowUp size={16} />
+            </button>
+          </div>
         </div>
       </div>
 
