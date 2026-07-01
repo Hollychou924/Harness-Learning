@@ -27,10 +27,10 @@ let mainWindow: BrowserWindow | null = null
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
-    width: 1180,
-    height: 760,
-    minWidth: 920,
-    minHeight: 600,
+    width: 1280,
+    height: 800,
+    minWidth: 1080,
+    minHeight: 640,
     show: false,
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 13 },

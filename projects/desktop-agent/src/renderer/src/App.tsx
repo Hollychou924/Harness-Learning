@@ -1,5 +1,6 @@
 import { Sidebar } from './components/Sidebar'
 import { Workbench } from './components/Workbench'
+import { RightPanel } from './components/RightPanel'
 
 export default function App() {
   return (
@@ -8,6 +9,7 @@ export default function App() {
       <main className="flex-1 flex flex-col min-w-0">
         <Workbench />
       </main>
+      <RightPanel />
     </div>
   )
 }

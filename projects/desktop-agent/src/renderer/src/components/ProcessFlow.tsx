@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { ChevronRight, Loader2, Check, AlertCircle, Brain } from 'lucide-react'
 import { useTaskStore } from '../store/task'
 import { ToolLog } from './ToolLog'
+import { FileWriteCard } from './FileWriteCard'
 
 // 任务执行过程流：思考过程 + 工具步骤，默认折叠技术细节
 export function ProcessFlow() {
   const { status, thinking, toolLogs, error } = useTaskStore()
   const doneCount = toolLogs.filter((t) => t.result).length
   const runningCount = toolLogs.filter((t) => !t.result).length
+  const fileWrites = toolLogs.filter((t) => t.name === 'write_file' && t.result)
 
   return (
     <div className="space-y-2">
@@ -16,6 +18,15 @@ export function ProcessFlow() {
 
       {/* 思考过程（可折叠） */}
       {thinking.length > 0 && <ThinkingBlock items={thinking} executing={status === 'executing'} />}
+
+      {/* 文件写入产物卡：突出 +N 行，像竞品 IDE 那样 */}
+      {fileWrites.length > 0 && (
+        <div className="space-y-1.5">
+          {fileWrites.map((t, i) => (
+            <FileWriteCard key={i} entry={t} />
+          ))}
+        </div>
+      )}
 
       {/* 工具步骤流 */}
       {toolLogs.length > 0 && (

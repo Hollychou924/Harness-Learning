@@ -1,0 +1,250 @@
+import { useEffect, useState } from 'react'
+import {
+  Check,
+  Loader2,
+  AlertCircle,
+  Target,
+  ListChecks,
+  Coins,
+  Clock,
+  FileCode,
+  FileText,
+  Eye,
+  GitCompare,
+  Flag
+} from 'lucide-react'
+import { useTaskStore } from '../store/task'
+import type { ArtifactEntry } from '../store/task'
+
+// 右栏：目标 + 进度清单 + 用量 + 产物，参考竞品 IDE 的"任务控制台"
+export function RightPanel() {
+  const { status, goal, steps, artifacts, usage, startedAt, finishedAt, error, message } =
+    useTaskStore()
+  const hasTask = status !== 'idle'
+
+  if (!hasTask) {
+    return (
+      <aside className="glass-soft w-72 flex-shrink-0 flex flex-col border-l border-white/40">
+        <div className="drag h-9" />
+        <div className="flex-1 flex flex-col items-center justify-center px-6 text-center select-none">
+          <div className="w-10 h-10 rounded-xl glass flex items-center justify-center mb-3">
+            <Flag size={16} className="text-[var(--ink-soft)]" />
+          </div>
+          <p className="text-sm text-[var(--ink-soft)]">还没有任务</p>
+          <p className="text-xs text-[var(--ink-soft)] mt-1 opacity-70">
+            发送一条指令后，这里会显示目标和进度
+          </p>
+        </div>
+      </aside>
+    )
+  }
+
+  const total = steps.length > 0 ? steps[0].total : 0
+  const doneCount = steps.filter((s) => s.done).length
+  const isComplete = status === 'completed'
+  const isFailed = status === 'failed'
+
+  return (
+    <aside className="glass-soft w-72 flex-shrink-0 flex flex-col border-l border-white/40">
+      <div className="drag h-9" />
+
+      <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-3">
+        {/* 目标卡 */}
+        <section className="glass rounded-xl p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <Target size={14} className="text-[var(--ink-soft)]" />
+            <span className="text-xs font-semibold tracking-wide text-[var(--ink-soft)] uppercase">
+              目标
+            </span>
+            <StatusBadge status={status} className="ml-auto" />
+          </div>
+          <p className="text-sm leading-relaxed text-[var(--ink)] line-clamp-4">
+            {goal || message || '（未设定）'}
+          </p>
+        </section>
+
+        {/* 进度清单 */}
+        <section className="glass rounded-xl p-3">
+          <div className="flex items-center gap-2 mb-2.5">
+            <ListChecks size={14} className="text-[var(--ink-soft)]" />
+            <span className="text-xs font-semibold tracking-wide text-[var(--ink-soft)] uppercase">
+              进度
+            </span>
+            {total > 0 && (
+              <span className="ml-auto text-xs text-[var(--ink-soft)]">
+                {doneCount}/{total}
+              </span>
+            )}
+          </div>
+          {steps.length === 0 ? (
+            <p className="text-xs text-[var(--ink-soft)] py-1">
+              {isFailed ? '任务未完成' : '等待 Agent 拆解步骤…'}
+            </p>
+          ) : (
+            <ul className="space-y-1.5">
+              {steps.map((s) => (
+                <li key={s.step} className="flex items-start gap-2 text-sm">
+                  <StepIcon done={s.done} active={status === 'executing' && !s.done} />
+                  <span
+                    className={`leading-snug ${
+                      s.done ? 'text-[var(--ink)]' : 'text-[var(--ink-soft)]'
+                    }`}
+                  >
+                    {s.summary || `步骤 ${s.step}`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {/* 产物 */}
+        {artifacts.length > 0 && (
+          <section className="glass rounded-xl p-3">
+            <div className="flex items-center gap-2 mb-2.5">
+              <FileCode size={14} className="text-[var(--ink-soft)]" />
+              <span className="text-xs font-semibold tracking-wide text-[var(--ink-soft)] uppercase">
+                产物
+              </span>
+              <span className="ml-auto text-xs text-[var(--ink-soft)]">
+                {artifacts.length}
+              </span>
+            </div>
+            <ul className="space-y-1">
+              {artifacts.map((a, i) => (
+                <ArtifactItem key={i} art={a} />
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {/* 用量与计时 */}
+        <section className="glass rounded-xl p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <Clock size={14} className="text-[var(--ink-soft)]" />
+            <span className="text-xs font-semibold tracking-wide text-[var(--ink-soft)] uppercase">
+              用量
+            </span>
+          </div>
+          <UsageRow
+            icon={<Coins size={13} />}
+            label="Tokens"
+            value={formatTokens(usage.inputTokens + usage.outputTokens)}
+          />
+          <UsageRow
+            icon={<Clock size={13} />}
+            label="耗时"
+            value={<Duration start={startedAt} end={finishedAt} running={status === 'executing'} />}
+          />
+        </section>
+
+        {error && (
+          <div className="flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-600">
+            <AlertCircle size={13} className="mt-0.5 flex-shrink-0" />
+            <span className="leading-relaxed">{error}</span>
+          </div>
+        )}
+      </div>
+    </aside>
+  )
+}
+
+function StatusBadge({ status, className = '' }: { status: string; className?: string }) {
+  const map: Record<string, { label: string; cls: string }> = {
+    executing: { label: '执行中', cls: 'bg-sky-100 text-sky-600' },
+    completed: { label: '已完成', cls: 'bg-green-100 text-green-600' },
+    failed: { label: '失败', cls: 'bg-red-100 text-red-600' },
+    idle: { label: '待机', cls: 'bg-black/5 text-[var(--ink-soft)]' }
+  }
+  const m = map[status] || map.idle
+  return (
+    <span
+      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${m.cls} ${className}`}
+    >
+      {m.label}
+    </span>
+  )
+}
+
+function StepIcon({ done, active }: { done: boolean; active: boolean }) {
+  if (done) return <Check size={14} className="mt-0.5 text-green-500 flex-shrink-0" />
+  if (active)
+    return <Loader2 size={14} className="mt-0.5 text-sky-500 animate-spin flex-shrink-0" />
+  return (
+    <span className="mt-1 w-3 h-3 rounded-full border border-black/20 flex-shrink-0" />
+  )
+}
+
+function ArtifactItem({ art }: { art: ArtifactEntry }) {
+  const meta = ARTIFACT_META[art.type] || ARTIFACT_META.file
+  const name = art.filePath.split('/').pop() || art.filePath
+  return (
+    <li className="flex items-center gap-2 text-xs">
+      <span className="text-[var(--ink-soft)] flex-shrink-0">{meta.icon}</span>
+      <span className="truncate text-[var(--ink)]" title={art.filePath}>
+        {name}
+      </span>
+      {art.added != null && (
+        <span className="ml-auto text-green-600 font-mono">+{art.added}</span>
+      )}
+      {art.removed != null && art.removed > 0 && (
+        <span className="text-red-500 font-mono">-{art.removed}</span>
+      )}
+    </li>
+  )
+}
+
+function UsageRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className="text-[var(--ink-soft)] flex-shrink-0">{icon}</span>
+      <span className="text-[var(--ink-soft)]">{label}</span>
+      <span className="ml-auto font-mono text-[var(--ink)]">{value}</span>
+    </div>
+  )
+}
+
+const ARTIFACT_META: Record<string, { icon: React.ReactNode }> = {
+  diff: { icon: <GitCompare size={13} /> },
+  report: { icon: <FileText size={13} /> },
+  file: { icon: <FileCode size={13} /> },
+  preview: { icon: <Eye size={13} /> },
+  evidence: { icon: <FileText size={13} /> },
+  task_summary: { icon: <Flag size={13} /> }
+}
+
+function formatTokens(n: number): string {
+  if (n <= 0) return '—'
+  if (n < 1000) return `${n}`
+  if (n < 1000000) return `${(n / 1000).toFixed(1)}K`
+  return `${(n / 1000000).toFixed(2)}M`
+}
+
+function formatDuration(start: number, end: number): string {
+  const sec = Math.max(0, Math.floor((end - start) / 1000))
+  if (sec < 60) return `${sec}s`
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  return `${m}m ${s}s`
+}
+
+// 执行中时每秒自刷新一次
+function Duration({
+  start,
+  end,
+  running
+}: {
+  start: number | null
+  end: number | null
+  running: boolean
+}) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!running) return
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [running])
+  if (!start) return <span>—</span>
+  const finish = end || now
+  return <>{formatDuration(start, finish)}</>
+}

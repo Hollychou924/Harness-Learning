@@ -6,7 +6,7 @@ import { ResultView } from './ResultView'
 import { ProcessFlow } from './ProcessFlow'
 
 export function Workbench() {
-  const { status, mode } = useTaskStore()
+  const { status, mode, goal, message, summary } = useTaskStore()
   const [model, setModel] = useState('claude-3-5-sonnet')
   const [hasKey, setHasKey] = useState(true)
 
@@ -16,13 +16,29 @@ export function Workbench() {
   }, [])
 
   const greeting = greetingText()
+  const taskTitle = status !== 'idle' ? goal || message : ''
 
   return (
     <div className="flex-1 flex flex-col min-w-0">
-      {/* 顶部栏：工作区名 + 模型，可拖拽 */}
-      <div className="drag h-14 flex items-center justify-between px-6 border-b border-black/[0.06]">
-        <div className="no-drag text-sm font-medium">{mode === 'work' ? 'Work 工作台' : 'Code 工作台'}</div>
-        <div className="no-drag text-xs text-[var(--ink-soft)]">{model}</div>
+      {/* 顶部栏：工作区名 + 任务标题 + 模型，可拖拽 */}
+      <div className="drag h-14 flex items-center justify-between px-6 border-b border-black/[0.06] gap-4">
+        <div className="no-drag flex items-center gap-3 min-w-0">
+          <span className="text-sm font-medium flex-shrink-0">
+            {mode === 'work' ? 'Work 工作台' : 'Code 工作台'}
+          </span>
+          {taskTitle && (
+            <>
+              <span className="text-black/10">/</span>
+              <span
+                className="text-sm text-[var(--ink-soft)] truncate"
+                title={taskTitle}
+              >
+                {taskTitle}
+              </span>
+            </>
+          )}
+        </div>
+        <div className="no-drag text-xs text-[var(--ink-soft)] flex-shrink-0">{model}</div>
       </div>
 
       {/* 主区域 */}
@@ -30,7 +46,7 @@ export function Workbench() {
         {status === 'idle' ? (
           <HomeView greeting={greeting} hasKey={hasKey} />
         ) : (
-          <RunningView />
+          <RunningView summary={summary} status={status} />
         )}
       </div>
 
@@ -110,11 +126,19 @@ function HomeView({ greeting, hasKey }: { greeting: string; hasKey: boolean }) {
   )
 }
 
-function RunningView() {
-  const { status, chunks } = useTaskStore()
+function RunningView({ summary, status }: { summary: string; status: string }) {
+  const { chunks } = useTaskStore()
   return (
     <div className="max-w-3xl mx-auto px-6 py-6 space-y-4">
       <ProcessFlow />
+      {status === 'completed' && summary && (
+        <div className="glass rounded-2xl p-4">
+          <div className="text-xs text-[var(--ink-soft)] mb-1.5 flex items-center gap-1.5">
+            <span>✅ 任务总结</span>
+          </div>
+          <p className="text-sm leading-relaxed text-[var(--ink)]">{summary}</p>
+        </div>
+      )}
       {(chunks || status === 'completed') && (
         <ResultView content={chunks} />
       )}
