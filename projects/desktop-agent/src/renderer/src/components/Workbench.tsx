@@ -1,10 +1,8 @@
-import { useEffect, useState } from 'react'
 import { useTaskStore } from '../store/task'
 import { api } from '../api'
 import { Composer } from './Composer'
 import { ResultView } from './ResultView'
 import { ProcessFlow } from './ProcessFlow'
-import { ModelSelector } from './ModelSelector'
 
 export function Workbench() {
   const { status, mode, goal, message, summary } = useTaskStore()
@@ -31,7 +29,6 @@ export function Workbench() {
             </>
           )}
         </div>
-        <ModelSelector />
       </div>
 
       {/* 主区域 */}
@@ -59,11 +56,7 @@ function greetingText(): string {
 
 
 function HomeView({ greeting }: { greeting: string }) {
-  const { message, setMessage, startTask, mode } = useTaskStore()
-  const [hasKey, setHasKey] = useState(false)
-  useEffect(() => {
-    api.configGet('hasApiKey').then((v) => setHasKey(Boolean(v)))
-  }, [])
+  const { mode } = useTaskStore()
   const quickActions = [
     { label: '网页读取', desc: '抓取网页内容' },
     { label: '调研分析', desc: '多源整理成报告' },
@@ -77,34 +70,6 @@ function HomeView({ greeting }: { greeting: string }) {
         <h1 className="text-2xl font-semibold tracking-tight">{greeting}</h1>
         <p className="text-sm text-[var(--ink-soft)] mt-1.5">你的桌面生产力 Agent</p>
       </div>
-
-      {/* 大输入框 */}
-      <div className="w-full max-w-2xl glass rounded-2xl p-1.5 flex items-end gap-2 shadow-lg">
-        <textarea
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              void startTask()
-            }
-          }}
-          placeholder="描述你要做的事，比如：把这3个网页整理成带来源的报告 https://... https://... https://..."
-          className="flex-1 bg-transparent resize-none outline-none px-3 py-2.5 text-sm leading-relaxed max-h-40 min-h-[44px]"
-          rows={2}
-        />
-        <button
-          onClick={() => void startTask()}
-          disabled={!message.trim() || !hasKey}
-          className="h-9 px-4 mb-1 mr-1 rounded-xl bg-[#0071e3] text-white text-sm font-medium disabled:opacity-40 hover:brightness-110 transition flex items-center gap-1.5"
-        >
-          发送
-        </button>
-      </div>
-
-      {!hasKey && (
-        <p className="text-xs text-amber-500 mt-3">未配置模型，请点击右上角选择供应商并填写 API Key</p>
-      )}
 
       {/* 快捷能力 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 w-full max-w-2xl mt-6">
@@ -124,9 +89,19 @@ function HomeView({ greeting }: { greeting: string }) {
 }
 
 function RunningView({ summary, status }: { summary: string; status: string }) {
-  const { chunks, cancelTask } = useTaskStore()
+  const { goal, message, chunks, cancelTask } = useTaskStore()
+  const userQuery = goal || message
   return (
     <div className="max-w-3xl mx-auto px-6 py-6 space-y-4">
+      {/* 用户消息：右侧气泡 */}
+      {userQuery && (
+        <div className="flex justify-end">
+          <div className="glass rounded-2xl rounded-tr-md px-4 py-2.5 max-w-[80%]">
+            <p className="text-sm leading-relaxed text-[var(--ink)] whitespace-pre-wrap">{userQuery}</p>
+          </div>
+        </div>
+      )}
+
       {status === 'executing' && (
         <div className="flex justify-end">
           <button
@@ -137,17 +112,15 @@ function RunningView({ summary, status }: { summary: string; status: string }) {
           </button>
         </div>
       )}
+
+      {/* 执行过程 + 回复：左侧 */}
       <ProcessFlow />
-      {status === 'completed' && summary && !chunks && (
-        <div className="glass rounded-2xl p-4">
-          <div className="text-xs text-[var(--ink-soft)] mb-1.5 flex items-center gap-1.5">
-            <span>✅ 任务总结</span>
-          </div>
-          <p className="text-sm leading-relaxed text-[var(--ink)]">{summary}</p>
-        </div>
-      )}
       {(chunks || status === 'completed') && (
-        <ResultView content={chunks} />
+        <div className="flex justify-start">
+          <div className="max-w-[85%]">
+            <ResultView content={chunks} />
+          </div>
+        </div>
       )}
     </div>
   )

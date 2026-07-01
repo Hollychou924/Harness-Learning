@@ -1,5 +1,4 @@
 import {
-  Sparkles,
   Search,
   Wrench,
   Bot,
@@ -95,14 +94,8 @@ export function Sidebar() {
         <NavItem icon={<Bot size={15} />} label="自动化" />
       </nav>
 
-      {/* Logo + 底部 */}
+      {/* 底部 */}
       <div className="px-3 py-3 border-t border-white/40 space-y-1">
-        <div className="flex items-center gap-2 px-1 pb-1.5">
-          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-sky-400 to-indigo-500 flex items-center justify-center shadow-sm">
-            <Sparkles size={13} className="text-white" />
-          </div>
-          <span className="text-sm font-semibold tracking-tight">小蓝鲸</span>
-        </div>
         <NavItem icon={<Settings size={15} />} label="设置" onClick={() => openSettings()} />
         <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-[var(--ink-soft)]">
           <div className="w-6 h-6 rounded-full bg-gradient-to-br from-amber-300 to-pink-400" />
