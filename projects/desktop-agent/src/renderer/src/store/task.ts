@@ -35,6 +35,15 @@ export interface HistoryEntry {
   tokens: number
 }
 
+export interface ApprovalRequest {
+  requestId: string
+  toolName: string
+  args: Record<string, unknown>
+  riskLevel: 'low' | 'medium' | 'high' | 'critical'
+  impact: string
+  canRollback: boolean
+}
+
 export interface TaskState {
   status: TaskStatus
   taskId: string | null
@@ -52,10 +61,14 @@ export interface TaskState {
   startedAt: number | null
   finishedAt: number | null
   history: HistoryEntry[]
+  approvalPending: ApprovalRequest | null
   setMode: (m: 'work' | 'code') => void
   setMessage: (s: string) => void
   setGoal: (s: string) => void
   startTask: () => Promise<void>
+  cancelTask: () => Promise<void>
+  appendInput: (text: string) => Promise<void>
+  respondApproval: (approved: boolean) => Promise<void>
   reset: () => void
   loadHistory: () => void
   appendEvent: (msg: StdoutMessage) => void
@@ -98,7 +111,8 @@ const initial = {
   usage: { inputTokens: 0, outputTokens: 0 },
   error: null as string | null,
   startedAt: null as number | null,
-  finishedAt: null as number | null
+  finishedAt: null as number | null,
+  approvalPending: null as ApprovalRequest | null
 }
 
 export const useTaskStore = create<TaskState>((set, get) => ({
@@ -108,7 +122,26 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   setMessage: (s) => set({ message: s }),
   setGoal: (s) => set({ goal: s }),
   loadHistory: () => set({ history: loadHistoryFromStorage() }),
-  reset: () => set({ ...initial }),
+  reset: () => set({ ...initial, history: get().history }),
+  cancelTask: async () => {
+    const { taskId } = get()
+    if (taskId) await api.cancelTask(taskId)
+    set({ status: 'idle', finishedAt: Date.now() })
+  },
+  appendInput: async (text: string) => {
+    const { taskId } = get()
+    if (taskId && text.trim()) {
+      await api.appendInput(taskId, text)
+      set({ message: '' })
+    }
+  },
+  respondApproval: async (approved: boolean) => {
+    const { approvalPending } = get()
+    if (approvalPending) {
+      await api.sendApproval(approvalPending.requestId, approved)
+      set({ approvalPending: null })
+    }
+  },
   appendEvent: (msg) => {
     switch (msg.type) {
       case 'chunk':
@@ -168,8 +201,21 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         set({ status: 'completed', summary: msg.summary, finishedAt: Date.now() })
         pushHistory(set, get)
         break
+      case 'approval_request':
+        set({
+          approvalPending: {
+            requestId: msg.request_id,
+            toolName: msg.tool_name,
+            args: msg.args,
+            riskLevel: msg.risk_level,
+            impact: msg.impact,
+            canRollback: msg.can_rollback
+          }
+        })
+        break
       case 'status':
         if (msg.status === 'EXECUTING') set({ status: 'executing' })
+        if (msg.status === 'PAUSED') set({ status: 'idle' })
         break
       default:
         break

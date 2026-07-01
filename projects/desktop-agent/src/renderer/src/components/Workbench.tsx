@@ -127,9 +127,19 @@ function HomeView({ greeting, hasKey }: { greeting: string; hasKey: boolean }) {
 }
 
 function RunningView({ summary, status }: { summary: string; status: string }) {
-  const { chunks } = useTaskStore()
+  const { chunks, cancelTask } = useTaskStore()
   return (
     <div className="max-w-3xl mx-auto px-6 py-6 space-y-4">
+      {status === 'executing' && (
+        <div className="flex justify-end">
+          <button
+            onClick={() => cancelTask()}
+            className="h-8 px-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600 hover:bg-red-100 transition"
+          >
+            停止任务
+          </button>
+        </div>
+      )}
       <ProcessFlow />
       {status === 'completed' && summary && (
         <div className="glass rounded-2xl p-4">

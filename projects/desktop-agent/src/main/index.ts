@@ -101,3 +101,31 @@ ipcMain.handle('shell:openExternal', async (_e, url: string) => {
     await shell.openExternal(url)
   }
 })
+
+// 任务控制通道（依据 docs/09 第二章，转发为 stdin task_control）
+ipcMain.handle('agent:pause', async (_e, args: { taskId: string }) => {
+  agentBridge.send({ type: 'task_control', task_id: args.taskId, action: 'pause' })
+})
+
+ipcMain.handle('agent:resume', async (_e, args: { taskId: string }) => {
+  agentBridge.send({ type: 'task_control', task_id: args.taskId, action: 'resume' })
+})
+
+ipcMain.handle('agent:cancel', async (_e, args: { taskId: string }) => {
+  agentBridge.send({ type: 'task_control', task_id: args.taskId, action: 'cancel' })
+})
+
+ipcMain.handle('agent:rollback', async (_e, args: { taskId: string }) => {
+  agentBridge.send({ type: 'task_control', task_id: args.taskId, action: 'rollback' })
+  return { success: true }
+})
+
+// 权限审批通道（转发为 stdin approval_response）
+ipcMain.handle('agent:approval', async (_e, args: { requestId: string; approved: boolean }) => {
+  agentBridge.send({ type: 'approval_response', request_id: args.requestId, approved: args.approved })
+})
+
+// 追加指令通道（转发为 stdin append_input）
+ipcMain.handle('agent:appendInput', async (_e, args: { taskId: string; message: string }) => {
+  agentBridge.send({ type: 'append_input', task_id: args.taskId, message: args.message })
+})

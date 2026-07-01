@@ -3,6 +3,7 @@ import { ChevronRight, Loader2, Check, AlertCircle, Brain, FilePlus } from 'luci
 import { useTaskStore, getMergedToolLogs, getMergedFileChanges, type MergedToolGroup } from '../store/task'
 import { ToolCard } from './toolCards'
 import { ToolCardShell } from './ToolCardShell'
+import { ApprovalCard } from './ApprovalCard'
 
 export function ProcessFlow() {
   const { status, thinking, toolLogs, chunks, error } = useTaskStore()
@@ -42,6 +43,8 @@ export function ProcessFlow() {
           <p className="text-sm leading-relaxed text-[var(--ink)]">{chunks}</p>
         </div>
       )}
+
+      <ApprovalCard />
 
       {error && (
         <div className="flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-600">

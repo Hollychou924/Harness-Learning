@@ -1,6 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
-// preload 用 CJS 打包，不 import ESM 模块，类型内联声明避免解析问题
 type StdoutMessage = Record<string, unknown>
 
 const api = {
@@ -11,6 +10,18 @@ const api = {
     ipcRenderer.on('agent:event', listener)
     return () => ipcRenderer.removeListener('agent:event', listener)
   },
+  pauseTask: (taskId: string) =>
+    ipcRenderer.invoke('agent:pause', { taskId }) as Promise<void>,
+  resumeTask: (taskId: string) =>
+    ipcRenderer.invoke('agent:resume', { taskId }) as Promise<void>,
+  cancelTask: (taskId: string) =>
+    ipcRenderer.invoke('agent:cancel', { taskId }) as Promise<void>,
+  rollbackTask: (taskId: string) =>
+    ipcRenderer.invoke('agent:rollback', { taskId }) as Promise<{ success: boolean }>,
+  sendApproval: (requestId: string, approved: boolean) =>
+    ipcRenderer.invoke('agent:approval', { requestId, approved }) as Promise<void>,
+  appendInput: (taskId: string, message: string) =>
+    ipcRenderer.invoke('agent:appendInput', { taskId, message }) as Promise<void>,
   configGet: (key: string) => ipcRenderer.invoke('config:get', key) as Promise<unknown>,
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url) as Promise<void>
 }
