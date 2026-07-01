@@ -12,7 +12,7 @@ export function Workbench() {
   const taskTitle = status !== 'idle' ? goal || message : ''
 
   return (
-    <div className="flex-1 flex flex-col min-w-0">
+    <div className="flex-1 flex flex-col min-w-0 min-h-0">
       {/* 顶部栏：工作区名 + 任务标题 + 模型，可拖拽 */}
       <div className="drag h-14 flex items-center justify-between px-6 border-b border-black/[0.06] gap-4">
         <div className="no-drag flex items-center gap-3 min-w-0">
@@ -35,7 +35,7 @@ export function Workbench() {
       </div>
 
       {/* 主区域 */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto min-h-0">
         {status === 'idle' ? (
           <HomeView greeting={greeting} />
         ) : (
@@ -138,7 +138,7 @@ function RunningView({ summary, status }: { summary: string; status: string }) {
         </div>
       )}
       <ProcessFlow />
-      {status === 'completed' && summary && (
+      {status === 'completed' && summary && !chunks && (
         <div className="glass rounded-2xl p-4">
           <div className="text-xs text-[var(--ink-soft)] mb-1.5 flex items-center gap-1.5">
             <span>✅ 任务总结</span>

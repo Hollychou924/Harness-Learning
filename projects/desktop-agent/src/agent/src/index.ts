@@ -50,7 +50,6 @@ async function handleStdin(msg: StdinMessage): Promise<void> {
         file_path: 'inline'
       })
 
-      onEvent({ type: 'chunk', text: result.finalText })
       onEvent({ type: 'completed', task_id: session_id, summary: result.finalText })
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e)
