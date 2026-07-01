@@ -1,8 +1,8 @@
 import { useTaskStore } from '../store/task'
-import { api } from '../api'
 import { Composer } from './Composer'
 import { ResultView } from './ResultView'
 import { ProcessFlow } from './ProcessFlow'
+import { ChatInput } from './ChatInput'
 
 export function Workbench() {
   const { status, mode, goal, message, summary } = useTaskStore()
@@ -11,7 +11,7 @@ export function Workbench() {
 
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
-      {/* 顶部栏：工作区名 + 任务标题 + 模型，可拖拽 */}
+      {/* 顶部栏 */}
       <div className="drag h-14 flex items-center justify-between px-6 border-b border-black/[0.06] gap-4">
         <div className="no-drag flex items-center gap-3 min-w-0">
           <span className="text-sm font-medium flex-shrink-0">
@@ -20,10 +20,7 @@ export function Workbench() {
           {taskTitle && (
             <>
               <span className="text-black/10">/</span>
-              <span
-                className="text-sm text-[var(--ink-soft)] truncate"
-                title={taskTitle}
-              >
+              <span className="text-sm text-[var(--ink-soft)] truncate" title={taskTitle}>
                 {taskTitle}
               </span>
             </>
@@ -40,7 +37,7 @@ export function Workbench() {
         )}
       </div>
 
-      {/* 底部输入区 */}
+      {/* 底部输入区：仅非 idle 时常驻 */}
       <Composer />
     </div>
   )
@@ -54,9 +51,8 @@ function greetingText(): string {
   return '晚上好呀，今天辛苦啦'
 }
 
-
 function HomeView({ greeting }: { greeting: string }) {
-  const { mode } = useTaskStore()
+  const { message, setMessage, startTask } = useTaskStore()
   const quickActions = [
     { label: '网页读取', desc: '抓取网页内容' },
     { label: '调研分析', desc: '多源整理成报告' },
@@ -65,14 +61,24 @@ function HomeView({ greeting }: { greeting: string }) {
   ]
   return (
     <div className="flex flex-col items-center justify-center min-h-full px-6 py-10">
+      {/* 欢迎语 */}
       <div className="text-center mb-8 select-none">
         <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-400 to-indigo-500 mx-auto mb-4 shadow-lg shadow-sky-200" />
         <h1 className="text-2xl font-semibold tracking-tight">{greeting}</h1>
         <p className="text-sm text-[var(--ink-soft)] mt-1.5">你的桌面生产力 Agent</p>
       </div>
 
+      {/* 中间输入框 */}
+      <div className="w-full max-w-3xl">
+        <ChatInput
+          value={message}
+          onChange={setMessage}
+          onSend={() => void startTask()}
+        />
+      </div>
+
       {/* 快捷能力 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 w-full max-w-2xl mt-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 w-full max-w-3xl mt-6">
         {quickActions.map((q) => (
           <button
             key={q.label}
