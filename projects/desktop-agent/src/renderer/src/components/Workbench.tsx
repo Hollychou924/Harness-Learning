@@ -145,18 +145,22 @@ function ConversationView({ status }: { status: string }) {
     }
   }, [messages.length, chunks, status])
 
-  // 历史消息里排除最后一条本轮 user（避免和输入区重复展示）
-  const historyMsgs = messages.slice(0, -1)
+  // 恢复历史对话(idle)：全量展示，不排除任何消息
+  // 本轮执行中(executing/completed)：排除最后一条 user(本轮刚发的)，单独展示 + 实时回复
+  const isLiveTurn = status === 'executing' || status === 'completed'
   const lastMsg = messages[messages.length - 1]
   const isLastUser = lastMsg?.role === 'user'
+  // 只有"本轮刚发了 user 且还没收到 assistant 回复"时才排除最后一条
+  const excludeLast = isLiveTurn && isLastUser
+  const historyMsgs = excludeLast ? messages.slice(0, -1) : messages
 
   return (
     <div ref={scrollRef} className="max-w-3xl mx-auto px-6 py-6 space-y-4 overflow-y-auto h-full">
       {historyMsgs.map((m, i) => (
         <MessageBubble key={i} msg={m} />
       ))}
-      {/* 本轮用户消息 */}
-      {isLastUser && (
+      {/* 本轮用户消息(仅执行中单独展示，避免与输入区重复) */}
+      {excludeLast && (
         <div className="flex justify-end">
           <div className="glass rounded-2xl rounded-tr-md px-4 py-2.5 max-w-[80%]">
             <p className="text-sm leading-relaxed text-[var(--ink)] whitespace-pre-wrap">{lastMsg.content}</p>
@@ -164,9 +168,8 @@ function ConversationView({ status }: { status: string }) {
         </div>
       )}
       {/* 本轮执行过程 + 实时回复 */}
-      {(status === 'executing' || status === 'completed') && <ProcessFlow />}
-      {status === 'executing' && chunks && <ResultView content={chunks} />}
-      {status === 'completed' && chunks && <ResultView content={chunks} />}
+      {isLiveTurn && <ProcessFlow />}
+      {isLiveTurn && chunks && <ResultView content={chunks} />}
       {status === 'idle' && (
         <p className="text-center text-xs text-[var(--ink-soft)] py-2">在下方输入继续对话，上下文已完整保留</p>
       )}
