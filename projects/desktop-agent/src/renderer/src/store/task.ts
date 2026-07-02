@@ -333,21 +333,30 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   setMode: (m) => {
     const cur = get()
     if (cur.mode === m) return
-    // 保存当前模式状态
+    // 保存当前模式状态（含 messages，切回来能恢复对话）
     modeSnapshots.set(cur.mode, {
       status: cur.status, taskId: cur.taskId, message: cur.message, goal: cur.goal,
       chunks: cur.chunks, summary: cur.summary, thinking: cur.thinking, toolLogs: cur.toolLogs,
       steps: cur.steps, artifacts: cur.artifacts, usage: cur.usage, error: cur.error,
       startedAt: cur.startedAt, finishedAt: cur.finishedAt, todos: cur.todos,
-      subtasks: cur.subtasks, attachments: cur.attachments,
+      subtasks: cur.subtasks, attachments: cur.attachments, messages: cur.messages,
       approvalPending: null, pendingPlan: null
     })
     // 恢复目标模式状态
     const snap = modeSnapshots.get(m)
     if (snap) {
-      set({ mode: m, ...snap })
+      // 切换模式时强制回到 idle：执行中的任务不应跨模式保留假状态，避免界面卡死无响应
+      set({
+        mode: m,
+        ...snap,
+        status: 'idle',
+        approvalPending: null,
+        pendingPlan: null,
+        startedAt: null,
+        finishedAt: null
+      })
     } else {
-      set({ mode: m, ...initial, history: cur.history, projects: cur.projects, sessions: cur.sessions, activeProjectId: cur.activeProjectId, activeSessionId: cur.activeSessionId })
+      set({ mode: m, ...initial, messages: [], history: cur.history, projects: cur.projects, sessions: cur.sessions, activeProjectId: cur.activeProjectId, activeSessionId: cur.activeSessionId })
     }
   },
   setMessage: (s) => set({ message: s }),
