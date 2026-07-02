@@ -50,6 +50,8 @@ export interface Project {
   pinnedAt?: number
   /** 排序序号（拖拽调整） */
   order: number
+  /** 绑定的本地文件夹绝对路径（从零新建或选已有文件夹）；无则走默认产出目录 */
+  folderPath?: string
 }
 
 export interface Session {
@@ -184,7 +186,7 @@ export interface TaskState {
   loadHistory: () => void
   deleteHistory: (id: string) => void
   // ---- 项目管理 ----
-  createProject: (name: string, icon?: string) => string
+  createProject: (name: string, icon?: string, folderPath?: string) => string
   renameProject: (id: string, name: string) => void
   deleteProject: (id: string) => void
   togglePinProject: (id: string) => void
@@ -199,11 +201,17 @@ export interface TaskState {
   unarchiveSession: (id: string) => void
   setActiveSession: (id: string) => void
   reorderSessions: (orderedIds: string[]) => void
+  /** 侧栏组织模式：'project'(按项目分组) | 'time'(按时间排列) */
+  sidebarMode: 'project' | 'time'
+  setSidebarMode: (m: 'project' | 'time') => void
+  /** 批量归档某项目下所有对话 */
+  archiveAllInProject: (projectId: string) => void
+  updateSessionProject: (sessionId: string, projectId: string) => void
   appendEvent: (msg: StdoutMessage) => void
 }
 
 // 各模式的状态快照，切换 Work/Code 时保存/恢复
-const modeSnapshots = new Map<'work' | 'code', Partial<TaskState>>()
+const modeSnapshots = new Map<'work' | 'code', Omit<Partial<TaskState>, 'mode'>>()
 
 const HISTORY_KEY = 'xld.history.v1'
 const HISTORY_MAX = 20
@@ -242,7 +250,14 @@ function loadProjectsFromStorage(): Project[] {
     const raw = localStorage.getItem(PROJECTS_KEY)
     if (raw) {
       const arr = JSON.parse(raw) as Project[]
-      if (Array.isArray(arr)) return arr
+      if (Array.isArray(arr)) {
+        const migrated = arr.map((p) =>
+          p.id === DEFAULT_PROJECT_ID && p.name === '默认项目'
+            ? { ...p, name: '对话', icon: '💬' }
+            : p
+        )
+        return migrated
+      }
     }
   } catch {
     /* ignore */
@@ -250,8 +265,8 @@ function loadProjectsFromStorage(): Project[] {
   const now = Date.now()
   return [{
     id: DEFAULT_PROJECT_ID,
-    name: '默认项目',
-    icon: '📁',
+    name: '对话',
+    icon: '💬',
     createdAt: now,
     updatedAt: now,
     pinned: false,
@@ -297,6 +312,25 @@ function loadSessionsFromStorage(): Session[] {
 function saveSessionsToStorage(s: Session[]) {
   try {
     localStorage.setItem(SESSIONS_KEY, JSON.stringify(s))
+  } catch {
+    /* ignore */
+  }
+}
+
+const SIDEBAR_MODE_KEY = 'xld.sidebarMode.v1'
+
+function loadSidebarMode(): 'project' | 'time' {
+  try {
+    const v = localStorage.getItem(SIDEBAR_MODE_KEY)
+    return v === 'time' ? 'time' : 'project'
+  } catch {
+    return 'project'
+  }
+}
+
+function saveSidebarMode(m: 'project' | 'time') {
+  try {
+    localStorage.setItem(SIDEBAR_MODE_KEY, m)
   } catch {
     /* ignore */
   }
@@ -351,6 +385,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   sessions: loadSessionsFromStorage(),
   activeProjectId: loadActiveProject(),
   activeSessionId: null,
+  sidebarMode: loadSidebarMode(),
   setMode: (m) => {
     const cur = get()
     if (cur.mode === m) return
@@ -381,14 +416,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     if (snap) {
       // 切换模式时强制回到 idle：执行中的任务不应跨模式保留假状态，避免界面卡死无响应
       set({
-        mode: m,
         ...snap,
-        runningTasks: get().runningTasks,
-        approvalPending: null,
-        pendingPlan: null
+        mode: m,
+        runningTasks: get().runningTasks
       })
     } else {
-      set({ mode: m, ...initial, messages: [], runningTasks: get().runningTasks, history: cur.history, projects: cur.projects, sessions: cur.sessions, activeProjectId: cur.activeProjectId, activeSessionId: cur.activeSessionId })
+      set({ ...initial, messages: [], mode: m, runningTasks: get().runningTasks, history: cur.history, projects: cur.projects, sessions: cur.sessions, activeProjectId: cur.activeProjectId, activeSessionId: cur.activeSessionId })
     }
   },
   setMessage: (s) => set({ message: s }),
@@ -401,7 +434,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     set({ history: next })
   },
   // ---- 项目管理 ----
-  createProject: (name, icon = '📁') => {
+  createProject: (name, icon = '📁', folderPath) => {
     const now = Date.now()
     const project: Project = {
       id: uid('proj'),
@@ -410,7 +443,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       createdAt: now,
       updatedAt: now,
       pinned: false,
-      order: get().projects.length
+      order: get().projects.length,
+      folderPath
     }
     const next = [...get().projects, project]
     saveProjectsToStorage(next)
@@ -520,6 +554,23 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const reordered = orderedIds.map((id, i) => ({ ...(map.get(id) as Session), order: i })).filter(Boolean)
     const rest = get().sessions.filter((s) => !orderedIds.includes(s.id))
     const next = [...reordered, ...rest]
+    saveSessionsToStorage(next)
+    set({ sessions: next })
+  },
+  setSidebarMode: (m) => {
+    saveSidebarMode(m)
+    set({ sidebarMode: m })
+  },
+  archiveAllInProject: (projectId) => {
+    const now = Date.now()
+    const next = get().sessions.map((s) =>
+      s.projectId === projectId && !s.archived ? { ...s, archived: true, archivedAt: now, updatedAt: now } : s
+    )
+    saveSessionsToStorage(next)
+    set({ sessions: next })
+  },
+  updateSessionProject: (sessionId, projectId) => {
+    const next = get().sessions.map((s) => s.id === sessionId ? { ...s, projectId, updatedAt: Date.now() } : s)
     saveSessionsToStorage(next)
     set({ sessions: next })
   },
@@ -765,7 +816,10 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     // 释放附件 Object URL
     for (const a of attachments) { if (a.objectUrl) URL.revokeObjectURL(a.objectUrl) }
 
-    const res = await api.startTask({ mode, message, maxIterations: settingsState.maxIterations, autoApproveLow: settingsState.autoApproveLow, sessionId, history, attachments: sendAttachments })
+    // 取当前项目绑定的文件夹作为工作区目录；无绑定则走主进程默认产出目录
+    const curProject = get().projects.find((p) => p.id === get().activeProjectId)
+    const workspaceDir = curProject?.folderPath || undefined
+    const res = await api.startTask({ mode, message, workspaceDir, maxIterations: settingsState.maxIterations, autoApproveLow: settingsState.autoApproveLow, sessionId, history, attachments: sendAttachments })
     if (res.error) {
       set({ status: 'failed', error: res.error })
     } else {
