@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { api } from '../api'
 import { useSettingsStore } from '../components/settings/settingsStore'
-import type { StdoutMessage } from '../../../agent/src/protocol'
+import type { StdoutMessage, AgentMessage } from '../../../agent/src/protocol'
 
 export type TaskStatus = 'idle' | 'executing' | 'completed' | 'failed'
 
@@ -34,6 +34,43 @@ export interface HistoryEntry {
   finishedAt: number
   stepCount: number
   tokens: number
+}
+
+// ---- 项目 & 会话（对话）管理模型 ----
+export interface Project {
+  id: string
+  name: string
+  /** 项目图标 emoji，默认 📁 */
+  icon: string
+  createdAt: number
+  updatedAt: number
+  /** 是否置顶（置顶项目排在最前） */
+  pinned: boolean
+  /** 置顶时间戳，用于多项目置顶时的排序 */
+  pinnedAt?: number
+  /** 排序序号（拖拽调整） */
+  order: number
+}
+
+export interface Session {
+  id: string
+  title: string
+  mode: 'work' | 'code'
+  status: TaskStatus
+  /** 所属项目 id；旧数据迁移到默认项目 */
+  projectId: string
+  createdAt: number
+  updatedAt: number
+  stepCount: number
+  tokens: number
+  /** 是否置顶 */
+  pinned: boolean
+  pinnedAt?: number
+  /** 是否归档（归档后折叠到「已归档」分组） */
+  archived: boolean
+  archivedAt?: number
+  /** 手动排序序号（拖拽调整） */
+  order: number
 }
 
 export interface ApprovalRequest {
@@ -100,6 +137,12 @@ export interface TaskState {
   startedAt: number | null
   finishedAt: number | null
   history: HistoryEntry[]
+  /** 当前对话的完整消息流（用于上下文恢复与全量传入） */
+  messages: AgentMessage[]
+  projects: Project[]
+  sessions: Session[]
+  activeProjectId: string
+  activeSessionId: string | null
   approvalPending: ApprovalRequest | null
   pendingPlan: PendingPlan | null
   todos: TodoItem[]
@@ -110,6 +153,7 @@ export interface TaskState {
   setMessage: (s: string) => void
   setGoal: (s: string) => void
   startTask: () => Promise<void>
+  continueSession: (sessionId: string) => Promise<void>
   cancelTask: () => Promise<void>
   appendInput: (text: string) => Promise<void>
   respondApproval: (approved: boolean) => Promise<void>
@@ -117,6 +161,22 @@ export interface TaskState {
   reset: () => void
   loadHistory: () => void
   deleteHistory: (id: string) => void
+  // ---- 项目管理 ----
+  createProject: (name: string, icon?: string) => string
+  renameProject: (id: string, name: string) => void
+  deleteProject: (id: string) => void
+  togglePinProject: (id: string) => void
+  setActiveProject: (id: string) => void
+  reorderProjects: (orderedIds: string[]) => void
+  // ---- 会话管理 ----
+  createSession: (projectId?: string) => string
+  renameSession: (id: string, title: string) => void
+  deleteSession: (id: string) => void
+  togglePinSession: (id: string) => void
+  archiveSession: (id: string) => void
+  unarchiveSession: (id: string) => void
+  setActiveSession: (id: string) => void
+  reorderSessions: (orderedIds: string[]) => void
   appendEvent: (msg: StdoutMessage) => void
 }
 
@@ -125,6 +185,16 @@ const modeSnapshots = new Map<'work' | 'code', Partial<TaskState>>()
 
 const HISTORY_KEY = 'xld.history.v1'
 const HISTORY_MAX = 20
+const PROJECTS_KEY = 'xld.projects.v1'
+const SESSIONS_KEY = 'xld.sessions.v1'
+const ACTIVE_PROJECT_KEY = 'xld.activeProject.v1'
+
+/** 默认项目 id，旧历史与无项目归属的对话都放这里 */
+export const DEFAULT_PROJECT_ID = 'default'
+
+function uid(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
+}
 
 function loadHistoryFromStorage(): HistoryEntry[] {
   try {
@@ -142,6 +212,87 @@ function saveHistoryToStorage(h: HistoryEntry[]) {
     localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, HISTORY_MAX)))
   } catch {
     /* ignore quota errors */
+  }
+}
+
+function loadProjectsFromStorage(): Project[] {
+  try {
+    const raw = localStorage.getItem(PROJECTS_KEY)
+    if (raw) {
+      const arr = JSON.parse(raw) as Project[]
+      if (Array.isArray(arr)) return arr
+    }
+  } catch {
+    /* ignore */
+  }
+  const now = Date.now()
+  return [{
+    id: DEFAULT_PROJECT_ID,
+    name: '默认项目',
+    icon: '📁',
+    createdAt: now,
+    updatedAt: now,
+    pinned: false,
+    order: 0
+  }]
+}
+
+function saveProjectsToStorage(p: Project[]) {
+  try {
+    localStorage.setItem(PROJECTS_KEY, JSON.stringify(p))
+  } catch {
+    /* ignore */
+  }
+}
+
+function loadSessionsFromStorage(): Session[] {
+  try {
+    const raw = localStorage.getItem(SESSIONS_KEY)
+    if (raw) {
+      const arr = JSON.parse(raw) as Session[]
+      if (Array.isArray(arr)) return arr
+    }
+  } catch {
+    /* ignore */
+  }
+  const old = loadHistoryFromStorage()
+  return old.map((h, i) => ({
+    id: h.id,
+    title: h.title,
+    mode: h.mode,
+    status: h.status,
+    projectId: DEFAULT_PROJECT_ID,
+    createdAt: h.finishedAt,
+    updatedAt: h.finishedAt,
+    stepCount: h.stepCount,
+    tokens: h.tokens,
+    pinned: false,
+    archived: false,
+    order: i
+  }))
+}
+
+function saveSessionsToStorage(s: Session[]) {
+  try {
+    localStorage.setItem(SESSIONS_KEY, JSON.stringify(s))
+  } catch {
+    /* ignore */
+  }
+}
+
+function loadActiveProject(): string {
+  try {
+    return localStorage.getItem(ACTIVE_PROJECT_KEY) || DEFAULT_PROJECT_ID
+  } catch {
+    return DEFAULT_PROJECT_ID
+  }
+}
+
+function saveActiveProject(id: string) {
+  try {
+    localStorage.setItem(ACTIVE_PROJECT_KEY, id)
+  } catch {
+    /* ignore */
   }
 }
 
@@ -165,12 +316,18 @@ const initial = {
   pendingPlan: null as PendingPlan | null,
   todos: [] as TodoItem[],
   subtasks: [] as SubtaskEntry[],
-  attachments: [] as Attachment[]
+  attachments: [] as Attachment[],
+  messages: [] as AgentMessage[]
 }
 
 export const useTaskStore = create<TaskState>((set, get) => ({
   ...initial,
   history: loadHistoryFromStorage(),
+  messages: [],
+  projects: loadProjectsFromStorage(),
+  sessions: loadSessionsFromStorage(),
+  activeProjectId: loadActiveProject(),
+  activeSessionId: null,
   setMode: (m) => {
     const cur = get()
     if (cur.mode === m) return
@@ -188,7 +345,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     if (snap) {
       set({ mode: m, ...snap })
     } else {
-      set({ mode: m, ...initial, history: cur.history, mode: m })
+      set({ mode: m, ...initial, history: cur.history, projects: cur.projects, sessions: cur.sessions, activeProjectId: cur.activeProjectId, activeSessionId: cur.activeSessionId })
     }
   },
   setMessage: (s) => set({ message: s }),
@@ -200,7 +357,130 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     saveHistoryToStorage(next)
     set({ history: next })
   },
-  reset: () => set({ ...initial, history: get().history, mode: get().mode, approvalPending: null, pendingPlan: null, todos: [], subtasks: [], attachments: [] }),
+  // ---- 项目管理 ----
+  createProject: (name, icon = '📁') => {
+    const now = Date.now()
+    const project: Project = {
+      id: uid('proj'),
+      name: name.trim() || '新项目',
+      icon,
+      createdAt: now,
+      updatedAt: now,
+      pinned: false,
+      order: get().projects.length
+    }
+    const next = [...get().projects, project]
+    saveProjectsToStorage(next)
+    saveActiveProject(project.id)
+    set({ projects: next, activeProjectId: project.id, activeSessionId: null, ...initial })
+    return project.id
+  },
+  renameProject: (id, name) => {
+    const next = get().projects.map((p) =>
+      p.id === id ? { ...p, name: name.trim() || p.name, updatedAt: Date.now() } : p
+    )
+    saveProjectsToStorage(next)
+    set({ projects: next })
+  },
+  deleteProject: (id) => {
+    if (id === DEFAULT_PROJECT_ID) return
+    const nextProjects = get().projects.filter((p) => p.id !== id)
+    const removedSessions = get().sessions.filter((s) => s.projectId === id)
+    const nextSessions = get().sessions.filter((s) => s.projectId !== id)
+    saveProjectsToStorage(nextProjects)
+    saveSessionsToStorage(nextSessions)
+    removedSessions.forEach((s) => void api.deleteSessionMessages(s.id))
+    const active = get().activeProjectId === id ? DEFAULT_PROJECT_ID : get().activeProjectId
+    saveActiveProject(active)
+    set({ projects: nextProjects, sessions: nextSessions, activeProjectId: active })
+  },
+  togglePinProject: (id) => {
+    const now = Date.now()
+    const next = get().projects.map((p) =>
+      p.id === id ? { ...p, pinned: !p.pinned, pinnedAt: !p.pinned ? now : undefined, updatedAt: now } : p
+    )
+    saveProjectsToStorage(next)
+    set({ projects: next })
+  },
+  setActiveProject: (id) => {
+    saveActiveProject(id)
+    set({ activeProjectId: id, activeSessionId: null })
+  },
+  reorderProjects: (orderedIds) => {
+    const map = new Map(get().projects.map((p) => [p.id, p]))
+    const next = orderedIds.map((id, i) => ({ ...(map.get(id) as Project), order: i })).filter(Boolean)
+    saveProjectsToStorage(next)
+    set({ projects: next })
+  },
+  // ---- 会话管理 ----
+  createSession: (projectId) => {
+    const pid = projectId || get().activeProjectId
+    const now = Date.now()
+    const session: Session = {
+      id: uid('sess'),
+      title: '新对话',
+      mode: get().mode,
+      status: 'idle',
+      projectId: pid,
+      createdAt: now,
+      updatedAt: now,
+      stepCount: 0,
+      tokens: 0,
+      pinned: false,
+      archived: false,
+      order: 0
+    }
+    const next = [session, ...get().sessions]
+    saveSessionsToStorage(next)
+    set({ sessions: next, activeSessionId: session.id })
+    return session.id
+  },
+  renameSession: (id, title) => {
+    const next = get().sessions.map((s) =>
+      s.id === id ? { ...s, title: title.trim() || s.title, updatedAt: Date.now() } : s
+    )
+    saveSessionsToStorage(next)
+    set({ sessions: next })
+  },
+  deleteSession: (id) => {
+    const next = get().sessions.filter((s) => s.id !== id)
+    saveSessionsToStorage(next)
+    void api.deleteSessionMessages(id)
+    set({ sessions: next, activeSessionId: get().activeSessionId === id ? null : get().activeSessionId })
+  },
+  togglePinSession: (id) => {
+    const now = Date.now()
+    const next = get().sessions.map((s) =>
+      s.id === id ? { ...s, pinned: !s.pinned, pinnedAt: !s.pinned ? now : undefined, updatedAt: now } : s
+    )
+    saveSessionsToStorage(next)
+    set({ sessions: next })
+  },
+  archiveSession: (id) => {
+    const now = Date.now()
+    const next = get().sessions.map((s) =>
+      s.id === id ? { ...s, archived: true, archivedAt: now, updatedAt: now } : s
+    )
+    saveSessionsToStorage(next)
+    set({ sessions: next })
+  },
+  unarchiveSession: (id) => {
+    const next = get().sessions.map((s) =>
+      s.id === id ? { ...s, archived: false, archivedAt: undefined, updatedAt: Date.now() } : s
+    )
+    saveSessionsToStorage(next)
+    set({ sessions: next })
+  },
+  setActiveSession: (id) => set({ activeSessionId: id }),
+  reorderSessions: (orderedIds) => {
+    const map = new Map(get().sessions.map((s) => [s.id, s]))
+    const reordered = orderedIds.map((id, i) => ({ ...(map.get(id) as Session), order: i })).filter(Boolean)
+    const rest = get().sessions.filter((s) => !orderedIds.includes(s.id))
+    const next = [...reordered, ...rest]
+    saveSessionsToStorage(next)
+    set({ sessions: next })
+  },
+  reset: () => set({ ...initial, history: get().history, projects: get().projects, sessions: get().sessions, activeProjectId: get().activeProjectId, activeSessionId: get().activeSessionId, mode: get().mode, approvalPending: null, pendingPlan: null, todos: [], subtasks: [], attachments: [] }),
   cancelTask: async () => {
     const { taskId } = get()
     if (taskId) await api.cancelTask(taskId)
@@ -282,10 +562,35 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       case 'error':
         set({ error: msg.message, status: 'failed', finishedAt: Date.now() })
         break
-      case 'completed':
-        set({ status: 'completed', summary: msg.summary, finishedAt: Date.now() })
+      case 'completed': {
+        // 把本轮 assistant 回复 + 工具调用累积进 messages，并落盘（实现"像没离开过一样"的上下文恢复）
+        const cur = get()
+        const assistantText = cur.chunks || msg.summary || ''
+        const toolLogs = cur.toolLogs
+        let nextMessages = [...cur.messages]
+        if (toolLogs.length > 0) {
+          // 有工具调用：assistant 消息带 tool_calls，每个工具结果单独一条 tool 消息
+          const toolCalls = toolLogs.map((t) => ({
+            id: t.id,
+            type: 'function' as const,
+            function: { name: t.name, arguments: JSON.stringify(t.args) }
+          }))
+          nextMessages.push({ role: 'assistant', content: assistantText, tool_calls: toolCalls })
+          for (const t of toolLogs) {
+            nextMessages.push({ role: 'tool', tool_call_id: t.id, content: t.result || '{}' })
+          }
+        } else if (assistantText) {
+          // 纯文本回复
+          nextMessages.push({ role: 'assistant', content: assistantText })
+        }
+        set({ status: 'completed', summary: msg.summary, finishedAt: Date.now(), messages: nextMessages })
         pushHistory(set, get)
+        // 全量落盘，下次继续对话时完整恢复
+        if (cur.taskId) {
+          void api.saveSessionMessages(cur.taskId, nextMessages)
+        }
         break
+      }
       case 'approval_request':
         set({
           approvalPending: {
@@ -346,8 +651,15 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     }
   },
   startTask: async () => {
-    const { mode, message, goal } = get()
+    const { mode, message, goal, activeSessionId, messages } = get()
     if (!message.trim()) return
+    // 继续已有对话：用原 sessionId + 全量历史；新建对话：无 sessionId 无 history
+    const isContinue = Boolean(activeSessionId && messages.length > 0)
+    const sessionId = isContinue ? (activeSessionId as string) : undefined
+    // 历史只取 user/assistant/tool（不含 system，agent 会自己加 system prompt）
+    const history = isContinue ? messages.filter((m) => m.role !== 'system') : undefined
+    // 把本轮用户消息加入消息流
+    const userMsg: AgentMessage = { role: 'user', content: message }
     set({
       status: 'executing',
       chunks: '',
@@ -365,15 +677,37 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       usage: { inputTokens: 0, outputTokens: 0 },
       startedAt: Date.now(),
       finishedAt: null,
-      goal: goal || message
+      goal: goal || message,
+      messages: [...messages, userMsg]
     })
     const settingsState = useSettingsStore.getState()
-    const res = await api.startTask({ mode, message, maxIterations: settingsState.maxIterations, autoApproveLow: settingsState.autoApproveLow })
+    const res = await api.startTask({ mode, message, maxIterations: settingsState.maxIterations, autoApproveLow: settingsState.autoApproveLow, sessionId, history })
     if (res.error) {
       set({ status: 'failed', error: res.error })
     } else {
-      set({ taskId: res.taskId })
+      set({ taskId: res.taskId, activeSessionId: res.taskId })
+      // 新对话立刻落盘用户消息，防止丢失
+      if (!isContinue) {
+        void api.saveSessionMessages(res.taskId, [{ role: 'user', content: message }])
+      }
     }
+  },
+  continueSession: async (sessionId) => {
+    // 从磁盘恢复该会话的完整消息流，让界面"像没离开过一样"
+    const stored = (await api.loadSessionMessages(sessionId)) as AgentMessage[]
+    const sess = get().sessions.find((s) => s.id === sessionId)
+    set({
+      ...initial,
+      messages: stored || [],
+      mode: sess?.mode || get().mode,
+      activeSessionId: sessionId,
+      activeProjectId: sess?.projectId || get().activeProjectId,
+      taskId: sessionId,
+      goal: sess?.title || '',
+      projects: get().projects,
+      sessions: get().sessions,
+      history: get().history
+    })
   }
 }))
 
@@ -394,7 +728,36 @@ function pushHistory(
   }
   const next = [entry, ...s.history.filter((h) => h.id !== entry.id)].slice(0, HISTORY_MAX)
   saveHistoryToStorage(next)
-  set({ history: next })
+
+  // 同步写入会话列表：若该任务已有会话则更新，否则新建一条归到当前项目
+  const existing = s.sessions.find((sess) => sess.id === entry.id)
+  const now = Date.now()
+  let nextSessions: Session[]
+  if (existing) {
+    nextSessions = s.sessions.map((sess) =>
+      sess.id === entry.id
+        ? { ...sess, title: entry.title, status: entry.status, updatedAt: now, stepCount: entry.stepCount, tokens: entry.tokens }
+        : sess
+    )
+  } else {
+    const newSession: Session = {
+      id: entry.id,
+      title: entry.title,
+      mode: entry.mode,
+      status: entry.status,
+      projectId: s.activeProjectId,
+      createdAt: entry.finishedAt,
+      updatedAt: entry.finishedAt,
+      stepCount: entry.stepCount,
+      tokens: entry.tokens,
+      pinned: false,
+      archived: false,
+      order: 0
+    }
+    nextSessions = [newSession, ...s.sessions]
+  }
+  saveSessionsToStorage(nextSessions)
+  set({ history: next, sessions: nextSessions })
 }
 
 // ============================================================

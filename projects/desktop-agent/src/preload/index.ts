@@ -3,8 +3,14 @@ import { contextBridge, ipcRenderer } from 'electron'
 type StdoutMessage = Record<string, unknown>
 
 const api = {
-  startTask: (args: { mode: 'work' | 'code'; message: string; workspaceDir?: string }) =>
+  startTask: (args: { mode: 'work' | 'code'; message: string; workspaceDir?: string; maxIterations?: number; autoApproveLow?: boolean; sessionId?: string; history?: unknown[] }) =>
     ipcRenderer.invoke('agent:startTask', args) as Promise<{ taskId: string; error?: string }>,
+  saveSessionMessages: (sessionId: string, messages: unknown[]) =>
+    ipcRenderer.invoke('session:saveMessages', { sessionId, messages }) as Promise<{ success: boolean; error?: string }>,
+  loadSessionMessages: (sessionId: string) =>
+    ipcRenderer.invoke('session:loadMessages', sessionId) as Promise<unknown[]>,
+  deleteSessionMessages: (sessionId: string) =>
+    ipcRenderer.invoke('session:deleteMessages', sessionId) as Promise<{ success: boolean; error?: string }>,
   onAgentEvent: (fn: (msg: StdoutMessage) => void) => {
     const listener = (_e: unknown, msg: StdoutMessage) => fn(msg)
     ipcRenderer.on('agent:event', listener)

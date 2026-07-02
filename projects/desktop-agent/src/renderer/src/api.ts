@@ -45,8 +45,11 @@ export interface TraceDetail {
 }
 
 type Api = {
-  startTask: (args: { mode: 'work' | 'code'; message: string; workspaceDir?: string; maxIterations?: number; autoApproveLow?: boolean }) =>
+  startTask: (args: { mode: 'work' | 'code'; message: string; workspaceDir?: string; maxIterations?: number; autoApproveLow?: boolean; sessionId?: string; history?: unknown[] }) =>
     Promise<{ taskId: string; error?: string }>
+  saveSessionMessages: (sessionId: string, messages: unknown[]) => Promise<{ success: boolean; error?: string }>
+  loadSessionMessages: (sessionId: string) => Promise<unknown[]>
+  deleteSessionMessages: (sessionId: string) => Promise<{ success: boolean; error?: string }>
   onAgentEvent: (fn: (msg: StdoutMessage) => void) => () => void
   pauseTask: (taskId: string) => Promise<void>
   resumeTask: (taskId: string) => Promise<void>
@@ -66,6 +69,9 @@ type Api = {
 const noop = () => {}
 const empty: Api = {
   startTask: async () => ({ taskId: '', error: 'preload 未就绪' }),
+  saveSessionMessages: async () => ({ success: false }),
+  loadSessionMessages: async () => [],
+  deleteSessionMessages: async () => ({ success: false }),
   onAgentEvent: () => noop,
   pauseTask: async () => {},
   resumeTask: async () => {},

@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, shell, nativeTheme, dialog } from 'electro
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
-import { readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
 import { agentBridge } from './agent-bridge.js'
 import { startTrace, logAgentEvent, logUserAction, listTraces, getTrace } from './trace-logger.js'
 import type { StdoutMessage, AgentConfig } from '../agent/src/protocol.js'
@@ -22,6 +22,15 @@ interface ModelConfig {
 
 function getConfigPath(): string {
   return join(app.getPath('userData'), 'model-config.json')
+}
+
+// 会话消息持久化目录：~/Library/Application Support/小蓝鲸/sessions/<id>.json
+function getSessionsDir(): string {
+  return join(app.getPath('userData'), 'sessions')
+}
+
+function getSessionPath(sessionId: string): string {
+  return join(getSessionsDir(), `${sessionId}.json`)
 }
 
 function loadConfig(): ModelConfig | null {
@@ -132,8 +141,8 @@ app.on('window-all-closed', () => {
 })
 
 // IPC 通道（依据 docs/09 第二章）
-ipcMain.handle('agent:startTask', async (_e, args: { mode: 'work' | 'code'; message: string; workspaceDir?: string; maxIterations?: number; autoApproveLow?: boolean }) => {
-  const sessionId = randomUUID()
+ipcMain.handle('agent:startTask', async (_e, args: { mode: 'work' | 'code'; message: string; workspaceDir?: string; maxIterations?: number; autoApproveLow?: boolean; sessionId?: string; history?: unknown[] }) => {
+  const sessionId = args.sessionId || randomUUID()
   const config = buildAgentConfig()
   if (!config.apiKey) {
     return { taskId: sessionId, error: '未检测到模型凭证，请在环境变量配置 ANTHROPIC_API_KEY' }
@@ -153,7 +162,7 @@ ipcMain.handle('agent:startTask', async (_e, args: { mode: 'work' | 'code'; mess
     providerId: config.providerId,
     customProviderId: config.customProviderId
   })
-  agentBridge.startTask(sessionId, args.message, config, args.workspaceDir)
+  agentBridge.startTask(sessionId, args.message, config, args.workspaceDir, args.history)
   return { taskId: sessionId }
 })
 
@@ -161,7 +170,22 @@ ipcMain.handle('config:get', async (_e, key: string) => {
   const cfg = loadConfig()
   if (key === 'hasApiKey') return Boolean(cfg?.apiKey || process.env.ANTHROPIC_API_KEY)
   if (key === 'model') return cfg?.model || process.env.XLJ_MODEL || 'claude-sonnet-4-5-20250929'
-  if (key === 'modelConfig') return cfg
+  if (key === 'modelConfig') {
+    if (cfg) return cfg
+    const envKey = process.env.ANTHROPIC_API_KEY
+    if (envKey) {
+      return {
+        providerId: 'anthropic',
+        model: process.env.XLJ_MODEL || 'claude-sonnet-4-5-20250929',
+        apiKey: envKey,
+        apiBaseUrl: process.env.ANTHROPIC_BASE_URL || '',
+        apiFormat: 'anthropic',
+        contextLimit: 200000,
+        autoApproveLow: false
+      }
+    }
+    return null
+  }
   if (key === 'contextLimit') return cfg?.contextLimit || 200000
   if (key === 'customProviderId') return cfg?.customProviderId || null
   if (key === 'autoApproveLow') return cfg?.autoApproveLow ?? false
@@ -215,6 +239,43 @@ ipcMain.handle('agent:planResponse', async (_e, args: { requestId: string; decis
 ipcMain.handle('agent:appendInput', async (_e, args: { taskId: string; message: string; mode?: 'inject' | 'queue' }) => {
   if (activeTraceId) logUserAction(activeTraceId, 'append_input', { taskId: args.taskId, message: args.message, mode: args.mode })
   agentBridge.send({ type: 'append_input', task_id: args.taskId, message: args.message, mode: args.mode })
+})
+
+// 会话消息持久化：保存 / 读取 / 删除
+ipcMain.handle('session:saveMessages', async (_e, args: { sessionId: string; messages: unknown[] }) => {
+  try {
+    const dir = getSessionsDir()
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+    writeFileSync(getSessionPath(args.sessionId), JSON.stringify(args.messages), 'utf-8')
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : String(e) }
+  }
+})
+
+ipcMain.handle('session:loadMessages', async (_e, sessionId: string) => {
+  try {
+    const p = getSessionPath(sessionId)
+    if (!existsSync(p)) return []
+    const raw = readFileSync(p, 'utf-8')
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? arr : []
+  } catch {
+    return []
+  }
+})
+
+ipcMain.handle('session:deleteMessages', async (_e, sessionId: string) => {
+  try {
+    const p = getSessionPath(sessionId)
+    if (existsSync(p)) {
+      const { unlinkSync } = await import('node:fs')
+      unlinkSync(p)
+    }
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : String(e) }
+  }
 })
 
 ipcMain.handle('trace:list', async (_e, limit?: number) => {

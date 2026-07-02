@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { useTaskStore } from '../store/task'
 import { Composer } from './Composer'
 import { ResultView } from './ResultView'
@@ -5,7 +6,7 @@ import { ProcessFlow } from './ProcessFlow'
 import { ChatInput } from './ChatInput'
 
 export function Workbench() {
-  const { status, mode, goal, message, summary } = useTaskStore()
+  const { status, mode, goal, message, summary, messages } = useTaskStore()
   const greeting = greetingText()
   const taskTitle = status !== 'idle' ? goal || message : ''
 
@@ -30,7 +31,9 @@ export function Workbench() {
 
       {/* 主区域 */}
       <div className="flex-1 overflow-y-auto min-h-0">
-        {status === 'idle' ? (
+        {messages.length > 0 ? (
+          <ConversationView status={status} />
+        ) : status === 'idle' ? (
           <HomeView greeting={greeting} />
         ) : (
           <RunningView summary={summary} status={status} />
@@ -126,4 +129,75 @@ function RunningView({ summary, status }: { summary: string; status: string }) {
       )}
     </div>
   )
+}
+
+/* ============================================================
+ * 对话视图：历史消息（气泡）+ 本轮实时执行
+ * 点击历史对话后，从这里"像没离开过一样"继续聊
+ * ============================================================ */
+function ConversationView({ status }: { status: string }) {
+  const { messages, chunks, goal, message } = useTaskStore()
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [messages.length, chunks, status])
+
+  // 历史消息里排除最后一条本轮 user（避免和输入区重复展示）
+  const historyMsgs = messages.slice(0, -1)
+  const lastMsg = messages[messages.length - 1]
+  const isLastUser = lastMsg?.role === 'user'
+
+  return (
+    <div ref={scrollRef} className="max-w-3xl mx-auto px-6 py-6 space-y-4 overflow-y-auto h-full">
+      {historyMsgs.map((m, i) => (
+        <MessageBubble key={i} msg={m} />
+      ))}
+      {/* 本轮用户消息 */}
+      {isLastUser && (
+        <div className="flex justify-end">
+          <div className="glass rounded-2xl rounded-tr-md px-4 py-2.5 max-w-[80%]">
+            <p className="text-sm leading-relaxed text-[var(--ink)] whitespace-pre-wrap">{lastMsg.content}</p>
+          </div>
+        </div>
+      )}
+      {/* 本轮执行过程 + 实时回复 */}
+      {(status === 'executing' || status === 'completed') && <ProcessFlow />}
+      {status === 'executing' && chunks && <ResultView content={chunks} />}
+      {status === 'completed' && chunks && <ResultView content={chunks} />}
+      {status === 'idle' && (
+        <p className="text-center text-xs text-[var(--ink-soft)] py-2">在下方输入继续对话，上下文已完整保留</p>
+      )}
+    </div>
+  )
+}
+
+function MessageBubble({ msg }: { msg: { role: string; content: string; tool_calls?: unknown[] } }) {
+  if (msg.role === 'user') {
+    return (
+      <div className="flex justify-end">
+        <div className="glass rounded-2xl rounded-tr-md px-4 py-2.5 max-w-[80%]">
+          <p className="text-sm leading-relaxed text-[var(--ink)] whitespace-pre-wrap">{msg.content}</p>
+        </div>
+      </div>
+    )
+  }
+  if (msg.role === 'assistant') {
+    return (
+      <div className="flex justify-start">
+        <div className="w-full max-w-[85%]">
+          {msg.content && <ResultView content={msg.content} />}
+          {msg.tool_calls && msg.tool_calls.length > 0 && (
+            <div className="text-[11px] text-[var(--ink-soft)] mt-1 px-1">
+              ↳ 使用了 {msg.tool_calls.length} 个工具
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+  // tool 消息不单独展示（已在 assistant 气泡里标注）
+  return null
 }
