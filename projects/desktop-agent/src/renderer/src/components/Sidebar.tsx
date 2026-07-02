@@ -15,9 +15,7 @@ import {
   ChevronDown,
   ChevronRight,
   MoreHorizontal,
-  X,
-  LayoutGrid,
-  List
+  X
 } from 'lucide-react'
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useTaskStore, type Session, type Project, DEFAULT_PROJECT_ID } from '../store/task'
@@ -52,7 +50,7 @@ function saveCollapsed(map: Record<string, boolean>) {
 
 export function Sidebar() {
   const store = useTaskStore()
-  const { mode, setMode, message, startTask, reset, projects, sessions, activeProjectId, activeSessionId, sidebarMode } = store
+  const { mode, setMode, message, startTask, reset, projects, sessions, activeProjectId, activeSessionId } = store
   const { openSettings } = useSettingsStore()
   const [search, setSearch] = useState('')
   const [showArchived, setShowArchived] = useState(false)
@@ -189,13 +187,6 @@ export function Sidebar() {
     )
   }
 
-  // ===== 时间模式：所有非归档对话按时间分组 =====
-  const timeGroups = useMemo(() => {
-    let list = sessions.filter((s) => !s.archived)
-    if (searchMatch) list = list.filter((s) => searchMatch.has(s.id))
-    return groupByTime(list)
-  }, [sessions, searchMatch])
-
   return (
     <aside className="glass-soft w-60 flex-shrink-0 flex flex-col border-r border-white/40">
       <div className="drag h-9" />
@@ -220,86 +211,46 @@ export function Sidebar() {
         </button>
       </div>
 
-      {/* 组织模式切换 + 搜索 */}
+      {/* 新建项目 + 搜索（新建项目常驻可见，不依赖是否已有项目） */}
       <div className="px-3 pb-2 flex items-center gap-1.5">
-        <div className="flex gap-0.5 p-0.5 rounded-md bg-black/[0.04] flex-shrink-0">
-          <button onClick={() => store.setSidebarMode('project')} title="按项目分组"
-            className={`w-7 h-6 rounded flex items-center justify-center transition ${sidebarMode === 'project' ? 'bg-white shadow-sm text-[var(--ink)]' : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'}`}>
-            <LayoutGrid size={13} />
-          </button>
-          <button onClick={() => store.setSidebarMode('time')} title="按时间排列"
-            className={`w-7 h-6 rounded flex items-center justify-center transition ${sidebarMode === 'time' ? 'bg-white shadow-sm text-[var(--ink)]' : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'}`}>
-            <List size={13} />
-          </button>
-        </div>
+        <button onClick={() => setNewProjectOpen(true)} title="新建项目"
+          className="no-drag w-7 h-7 rounded-md bg-black/[0.04] hover:bg-black/[0.08] flex items-center justify-center text-[var(--ink-soft)] hover:text-[var(--ink)] transition flex-shrink-0">
+          <FolderPlus size={14} />
+        </button>
         <div className="relative flex-1">
           <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--ink-soft)]" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索"
-            className="no-drag w-full h-6 pl-6 pr-5 text-xs rounded-md bg-black/[0.04] outline-none focus:bg-black/[0.06] transition placeholder:text-[var(--ink-soft)]/60" />
+            className="no-drag w-full h-7 pl-6 pr-5 text-xs rounded-md bg-black/[0.04] outline-none focus:bg-black/[0.06] transition placeholder:text-[var(--ink-soft)]/60" />
           {search && <button onClick={() => setSearch('')} className="absolute right-1 top-1/2 -translate-y-1/2 text-[var(--ink-soft)] hover:text-[var(--ink)]"><X size={11} /></button>}
         </div>
       </div>
 
-      {/* 置顶区（仅项目模式，有置顶对话时显示，可拖入） */}
-      {sidebarMode === 'project' && (
-        <PinnedDropZone sessions={pinnedSessionsAll(sessions, searchMatch)} activeId={activeSessionId}
-          onClick={(id) => void store.continueSession(id)} onDrop={handleDropToPinned}
-          onDragOver={(e) => { e.preventDefault(); setDragOverId('__pinned__') }}
-          isDragOver={dragOverId === '__pinned__'} />
-      )}
+      {/* 置顶对话区（可拖入自动置顶） */}
+      <PinnedDropZone sessions={pinnedSessionsAll(sessions, searchMatch)} activeId={activeSessionId}
+        onClick={(id) => void store.continueSession(id)} onDrop={handleDropToPinned}
+        onDragOver={(e) => { e.preventDefault(); setDragOverId('__pinned__') }}
+        isDragOver={dragOverId === '__pinned__'} />
 
-      {/* 主体列表 */}
+      {/* 主体列表：按项目分组，项目下对话按时间倒序（最新在前） */}
       <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-1">
-        {sidebarMode === 'project' ? (
-          <>
-            {pinnedProjects.length > 0 && (
-              <div className="space-y-0.5">
-                <SectionLabel label="置顶项目" />
-                {pinnedProjects.map(renderProjectBlock)}
-              </div>
-            )}
-            <div className="space-y-0.5">
-              {otherProjects.length > 0 && <SectionLabel label="项目" action={
-                <button onClick={() => setNewProjectOpen(true)} className="text-[var(--ink-soft)] hover:text-[var(--ink)]"><FolderPlus size={12} /></button>
-              } />}
-              {otherProjects.map(renderProjectBlock)}
-            </div>
-            {defaultProject && (
-              <div className="space-y-0.5">
-                <SectionLabel label="对话" />
-                {renderProjectBlock(defaultProject)}
-              </div>
-            )}
-            {sortedProjects.length === 0 && (
-              <p className="px-2 py-3 text-xs text-[var(--ink-soft)] opacity-70 text-center">还没有项目，新建一个开始吧</p>
-            )}
-          </>
-        ) : (
-          /* 时间模式 */
-          <div className="space-y-2">
-            {timeGroups.length === 0 && (
-              <p className="px-2 py-3 text-xs text-[var(--ink-soft)] opacity-70 text-center">{search ? '没有匹配的对话' : '还没有对话'}</p>
-            )}
-            {timeGroups.map((g) => (
-              <div key={g.key} className="space-y-0.5">
-                <SectionLabel label={g.label} />
-                {g.sessions.map((s) => {
-                  const proj = projects.find((p) => p.id === s.projectId)
-                  return (
-                    <SessionRow key={s.id} session={s} active={s.id === activeSessionId}
-                      onClick={() => void store.continueSession(s.id)}
-                      onDragStart={(e) => handleDragStart(e, s.id)}
-                      onDragOver={(e) => handleDragOver(e, s.id)}
-                      onDrop={(e) => handleDrop(e, s.id, s.projectId)}
-                      isDragging={dragSessionId === s.id}
-                      isDragOver={dragOverId === s.id}
-                      showProject={proj && proj.id !== DEFAULT_PROJECT_ID ? proj.name : undefined}
-                    />
-                  )
-                })}
-              </div>
-            ))}
+        {pinnedProjects.length > 0 && (
+          <div className="space-y-0.5">
+            <SectionLabel label="置顶项目" />
+            {pinnedProjects.map(renderProjectBlock)}
           </div>
+        )}
+        <div className="space-y-0.5">
+          {otherProjects.length > 0 && <SectionLabel label="项目" />}
+          {otherProjects.map(renderProjectBlock)}
+        </div>
+        {defaultProject && (
+          <div className="space-y-0.5">
+            <SectionLabel label="对话" />
+            {renderProjectBlock(defaultProject)}
+          </div>
+        )}
+        {sortedProjects.length === 0 && (
+          <p className="px-2 py-3 text-xs text-[var(--ink-soft)] opacity-70 text-center">还没有项目，点上方 + 新建一个</p>
         )}
       </div>
 
@@ -527,31 +478,6 @@ function NameDialog({ title, initial, placeholder, confirmLabel, onCancel, onCon
       </div>
     </div>
   )
-}
-
-interface TimeGroup { key: string; label: string; sessions: Session[] }
-
-function groupByTime(sessions: Session[]): TimeGroup[] {
-  const pinned = sessions.filter((s) => s.pinned).sort((a, b) => (b.pinnedAt ?? 0) - (a.pinnedAt ?? 0))
-  const normal = sessions.filter((s) => !s.pinned).sort((a, b) => b.updatedAt - a.updatedAt)
-  const groups: TimeGroup[] = []
-  if (pinned.length) groups.push({ key: 'pinned', label: '置顶', sessions: pinned })
-
-  const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-  const yesterday = today - 86400000
-  const weekAgo = today - 6 * 86400000
-  const buckets: Record<string, Session[]> = { 今天: [], 昨天: [], '近 7 天': [], 更早: [] }
-  for (const s of normal) {
-    if (s.updatedAt >= today) buckets['今天'].push(s)
-    else if (s.updatedAt >= yesterday) buckets['昨天'].push(s)
-    else if (s.updatedAt >= weekAgo) buckets['近 7 天'].push(s)
-    else buckets['更早'].push(s)
-  }
-  for (const [label, items] of Object.entries(buckets)) {
-    if (items.length) groups.push({ key: label, label, sessions: items })
-  }
-  return groups
 }
 
 function timeAgo(ts: number): string {

@@ -201,9 +201,6 @@ export interface TaskState {
   unarchiveSession: (id: string) => void
   setActiveSession: (id: string) => void
   reorderSessions: (orderedIds: string[]) => void
-  /** 侧栏组织模式：'project'(按项目分组) | 'time'(按时间排列) */
-  sidebarMode: 'project' | 'time'
-  setSidebarMode: (m: 'project' | 'time') => void
   /** 批量归档某项目下所有对话 */
   archiveAllInProject: (projectId: string) => void
   updateSessionProject: (sessionId: string, projectId: string) => void
@@ -317,25 +314,6 @@ function saveSessionsToStorage(s: Session[]) {
   }
 }
 
-const SIDEBAR_MODE_KEY = 'xld.sidebarMode.v1'
-
-function loadSidebarMode(): 'project' | 'time' {
-  try {
-    const v = localStorage.getItem(SIDEBAR_MODE_KEY)
-    return v === 'time' ? 'time' : 'project'
-  } catch {
-    return 'project'
-  }
-}
-
-function saveSidebarMode(m: 'project' | 'time') {
-  try {
-    localStorage.setItem(SIDEBAR_MODE_KEY, m)
-  } catch {
-    /* ignore */
-  }
-}
-
 function loadActiveProject(): string {
   try {
     return localStorage.getItem(ACTIVE_PROJECT_KEY) || DEFAULT_PROJECT_ID
@@ -385,7 +363,6 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   sessions: loadSessionsFromStorage(),
   activeProjectId: loadActiveProject(),
   activeSessionId: null,
-  sidebarMode: loadSidebarMode(),
   setMode: (m) => {
     const cur = get()
     if (cur.mode === m) return
@@ -556,10 +533,6 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const next = [...reordered, ...rest]
     saveSessionsToStorage(next)
     set({ sessions: next })
-  },
-  setSidebarMode: (m) => {
-    saveSidebarMode(m)
-    set({ sidebarMode: m })
   },
   archiveAllInProject: (projectId) => {
     const now = Date.now()
