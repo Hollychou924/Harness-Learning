@@ -651,7 +651,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     }
   },
   startTask: async () => {
-    const { mode, message, goal, activeSessionId, messages } = get()
+    const { mode, message, goal, activeSessionId, messages, attachments } = get()
     if (!message.trim()) return
     // 继续已有对话：用原 sessionId + 全量历史；新建对话：无 sessionId 无 history
     const isContinue = Boolean(activeSessionId && messages.length > 0)
@@ -681,7 +681,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       messages: [...messages, userMsg]
     })
     const settingsState = useSettingsStore.getState()
-    const res = await api.startTask({ mode, message, maxIterations: settingsState.maxIterations, autoApproveLow: settingsState.autoApproveLow, sessionId, history })
+    const res = await api.startTask({ mode, message, maxIterations: settingsState.maxIterations, autoApproveLow: settingsState.autoApproveLow, sessionId, history, attachments })
     if (res.error) {
       set({ status: 'failed', error: res.error })
     } else {

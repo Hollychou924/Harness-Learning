@@ -107,7 +107,7 @@ export async function runReact(
       if (hasImages && !imagesDisabled && isImageUnsupportedError(msg)) {
         imagesDisabled = true
         onEvent({ type: 'thinking', text: '当前模型不支持图片，已自动移除图片并用纯文字重试' })
-        const lastUser = messages.findLast((m) => m.role === 'user')
+        const lastUser = messages.slice().reverse().find((m: AgentMessage) => m.role === 'user')
         if (lastUser) {
           lastUser.attachments = undefined
           if (!lastUser.content) {
