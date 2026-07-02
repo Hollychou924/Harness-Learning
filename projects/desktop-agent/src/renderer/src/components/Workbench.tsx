@@ -1,9 +1,14 @@
 import { useEffect, useRef } from 'react'
 import { useTaskStore } from '../store/task'
+import { getFinalAnswerOfTurn } from '../store/turns'
 import { Composer } from './Composer'
 import { ResultView } from './ResultView'
 import { ProcessFlow } from './ProcessFlow'
+import { TurnItemsView } from './TurnItemsView'
+import { TurnNavigator } from './TurnNavigator'
 import { ChatInput } from './ChatInput'
+import { useSettingsStore } from './settings/settingsStore'
+import type { Turn } from '../../../agent/src/items'
 
 export function Workbench() {
   const { status, mode, goal, message, summary, messages } = useTaskStore()
@@ -98,7 +103,8 @@ function HomeView({ greeting }: { greeting: string }) {
 }
 
 function RunningView({ summary, status }: { summary: string; status: string }) {
-  const { goal, message, chunks, cancelTask } = useTaskStore()
+  const { goal, message, currentTurn, cancelTask } = useTaskStore()
+  const chunks = getFinalAnswerOfTurn(currentTurn)
   const userQuery = goal || message
   return (
     <div className="max-w-3xl mx-auto px-6 py-6 space-y-4">
@@ -132,75 +138,74 @@ function RunningView({ summary, status }: { summary: string; status: string }) {
 }
 
 /* ============================================================
- * 对话视图：历史消息（气泡）+ 本轮实时执行
+ * 对话视图：按轮次(Turn)渲染历史 + 本轮实时执行
+ * 每一轮的思考/工具调用细节都在，翻回历史依然能展开看，不再只剩一句"用了N个工具"
  * 点击历史对话后，从这里"像没离开过一样"继续聊
  * ============================================================ */
 function ConversationView({ status }: { status: string }) {
-  const { messages, chunks, goal, message } = useTaskStore()
+  const { turns, currentTurn, goal, message } = useTaskStore()
+  const { showThinking } = useSettingsStore()
+  const chunks = getFinalAnswerOfTurn(currentTurn)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [messages.length, chunks, status])
+  }, [turns.length, chunks, status])
 
-  // 恢复历史对话(idle)：全量展示，不排除任何消息
-  // 本轮执行中(executing/completed)：排除最后一条 user(本轮刚发的)，单独展示 + 实时回复
   const isLiveTurn = status === 'executing' || status === 'completed'
-  const lastMsg = messages[messages.length - 1]
-  const isLastUser = lastMsg?.role === 'user'
-  // 只有"本轮刚发了 user 且还没收到 assistant 回复"时才排除最后一条
-  const excludeLast = isLiveTurn && isLastUser
-  const historyMsgs = excludeLast ? messages.slice(0, -1) : messages
+
+  // 点击导航条刻度：滚动定位到对应轮次，并高亮闪一下
+  const handleJump = (turnId: string) => {
+    const container = scrollRef.current
+    if (!container) return
+    const target = container.querySelector(`[data-turn-id="${turnId}"]`)
+    if (target instanceof HTMLElement) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      target.classList.add('turn-jump-highlight')
+      window.setTimeout(() => target.classList.remove('turn-jump-highlight'), 1200)
+    }
+  }
 
   return (
-    <div ref={scrollRef} className="max-w-3xl mx-auto px-6 py-6 space-y-4 overflow-y-auto h-full">
-      {historyMsgs.map((m, i) => (
-        <MessageBubble key={i} msg={m} />
-      ))}
-      {/* 本轮用户消息(仅执行中单独展示，避免与输入区重复) */}
-      {excludeLast && (
-        <div className="flex justify-end">
-          <div className="glass rounded-2xl rounded-tr-md px-4 py-2.5 max-w-[80%]">
-            <p className="text-sm leading-relaxed text-[var(--ink)] whitespace-pre-wrap">{lastMsg.content}</p>
-          </div>
-        </div>
-      )}
-      {/* 本轮执行过程 + 实时回复 */}
-      {isLiveTurn && <ProcessFlow />}
-      {isLiveTurn && chunks && <ResultView content={chunks} />}
-      {status === 'idle' && (
-        <p className="text-center text-xs text-[var(--ink-soft)] py-2">在下方输入继续对话，上下文已完整保留</p>
-      )}
+    <div className="flex h-full">
+      {/* 左侧跨轮导航条：超过 3 轮才出现 */}
+      <TurnNavigator turns={turns} onJump={handleJump} />
+      <div ref={scrollRef} className="flex-1 max-w-3xl mx-auto px-6 py-6 space-y-4 overflow-y-auto h-full">
+        {turns.map((t) => (
+          <HistoryTurnView key={t.id} turn={t} showThinking={showThinking} />
+        ))}
+        {/* 本轮执行过程 + 实时回复 */}
+        {isLiveTurn && <ProcessFlow />}
+        {isLiveTurn && chunks && <ResultView content={chunks} />}
+        {status === 'idle' && (
+          <p className="text-center text-xs text-[var(--ink-soft)] py-2">在下方输入继续对话，上下文已完整保留</p>
+        )}
+      </div>
     </div>
   )
 }
 
-function MessageBubble({ msg }: { msg: { role: string; content: string; tool_calls?: unknown[] } }) {
-  if (msg.role === 'user') {
-    return (
-      <div className="flex justify-end">
-        <div className="glass rounded-2xl rounded-tr-md px-4 py-2.5 max-w-[80%]">
-          <p className="text-sm leading-relaxed text-[var(--ink)] whitespace-pre-wrap">{msg.content}</p>
+/** 一轮历史：用户消息气泡(右) + 思考/工具活动(左，可展开) + 最终回复(左) */
+function HistoryTurnView({ turn, showThinking }: { turn: Turn; showThinking: boolean }) {
+  const userText = turn.items
+    .filter((it) => it.type === 'userMessage')
+    .flatMap((it) => it.content.filter((c) => c.type === 'text').map((c) => c.text || ''))
+    .join('')
+  const finalAnswer = getFinalAnswerOfTurn(turn)
+
+  return (
+    <div data-turn-id={turn.id} className="space-y-3 turn-target">
+      {userText && (
+        <div className="flex justify-end">
+          <div className="glass rounded-2xl rounded-tr-md px-4 py-2.5 max-w-[80%]">
+            <p className="text-sm leading-relaxed text-[var(--ink)] whitespace-pre-wrap">{userText}</p>
+          </div>
         </div>
-      </div>
-    )
-  }
-  if (msg.role === 'assistant') {
-    return (
-      <div className="flex justify-start">
-        <div className="w-full max-w-[85%]">
-          {msg.content && <ResultView content={msg.content} />}
-          {msg.tool_calls && msg.tool_calls.length > 0 && (
-            <div className="text-[11px] text-[var(--ink-soft)] mt-1 px-1">
-              ↳ 使用了 {msg.tool_calls.length} 个工具
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
-  // tool 消息不单独展示（已在 assistant 气泡里标注）
-  return null
+      )}
+      <TurnItemsView turn={turn} showThinking={showThinking} />
+      {finalAnswer && <ResultView content={finalAnswer} />}
+    </div>
+  )
 }

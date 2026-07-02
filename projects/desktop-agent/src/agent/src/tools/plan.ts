@@ -1,4 +1,5 @@
 import type { AgentTool } from './index.js'
+import type { PlanStepItem } from '../items.js'
 
 let pendingPlanRequestId: string | null = null
 
@@ -36,23 +37,26 @@ export const planTool: AgentTool = {
   },
   riskLevel: 'low',
   execute: async () => {
-    // plan 工具不执行实际操作，结果由 loop 层拦截并发送 plan_proposed 事件
-    // 如果 execute 被直接调用（不该发生），返回占位
+    // plan 工具不执行实际操作，结果由 loop 层拦截并构造 plan 条目
     return JSON.stringify({ status: 'pending_review' })
   }
 }
 
-export function makePlanExecuteHandler(onPlanProposed: (plan: string, steps: Array<{ step: number; title: string; status: 'pending' | 'in_progress' | 'completed' | 'removed' }>) => void) {
-  return (args: Record<string, unknown>): string => {
-    const plan = typeof args.plan === 'string' ? args.plan : ''
-    const rawSteps = Array.isArray(args.steps) ? args.steps : []
-    const steps = rawSteps.map((s, i) => ({
-      step: i + 1,
-      title: typeof (s as Record<string, unknown>).title === 'string' ? (s as Record<string, unknown>).title as string : '',
-      status: 'pending' as const
-    }))
-    pendingPlanRequestId = `plan-${Date.now()}`
-    onPlanProposed(plan, steps)
-    return JSON.stringify({ status: 'submitted', request_id: pendingPlanRequestId })
-  }
+export interface ParsedPlan {
+  plan: string
+  steps: PlanStepItem[]
+  requestId: string
+}
+
+/** 从工具调用参数中解析出计划内容，不发事件、不等待，由调用方(loop)负责后续 */
+export function parsePlanArgs(args: Record<string, unknown>): ParsedPlan {
+  const plan = typeof args.plan === 'string' ? args.plan : ''
+  const rawSteps = Array.isArray(args.steps) ? args.steps : []
+  const steps: PlanStepItem[] = rawSteps.map((s, i) => ({
+    step: i + 1,
+    title: typeof (s as Record<string, unknown>).title === 'string' ? (s as Record<string, unknown>).title as string : '',
+    status: 'pending'
+  }))
+  pendingPlanRequestId = `plan-${Date.now()}`
+  return { plan, steps, requestId: pendingPlanRequestId }
 }

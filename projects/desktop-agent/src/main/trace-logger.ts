@@ -1,10 +1,12 @@
 import { app } from 'electron'
 import { join } from 'node:path'
-import { mkdirSync, appendFileSync, writeFileSync, readFileSync, existsSync, readdirSync, statSync } from 'node:fs'
+import { mkdirSync, appendFileSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import type { StdoutMessage } from '../agent/src/protocol.js'
 
 // 全链路 trace 日志：每条请求一个 traceId（复用 session_id），写入磁盘 JSONL
 // 集中在主进程收集，agent 子进程事件 + 用户操作全部记录
+// 2026-07-02 起随 Turn/Item 协议同步改造：记录的事件形状与 StdoutMessage 一致，
+// 供阶段4的时间轴回放面板直接复用，不用另起一套采集逻辑
 
 export interface TraceEvent {
   ts: number
@@ -123,29 +125,37 @@ export function appendEvent(traceId: string, event: TraceEvent): void {
   }
 }
 
-// 将 agent stdout 事件映射为 trace 事件
+// 将 agent stdout 事件（Turn/Item 模型）映射为 trace 事件
 export function logAgentEvent(traceId: string, msg: StdoutMessage): void {
   const ts = Date.now()
   let phase = 'execution'
-  let type = msg.type
+  const type = msg.type
   let data: Record<string, unknown> = {}
 
   switch (msg.type) {
-    case 'thinking':
-      phase = 'thinking'
-      data = { text: msg.text }
+    case 'turn_started':
+      phase = 'turn'
+      data = { turnId: msg.turn_id }
       break
-    case 'chunk':
-      phase = 'model_output'
-      data = { text: msg.text }
+    case 'turn_completed':
+      phase = 'turn'
+      data = { turnId: msg.turn_id, status: msg.status }
       break
-    case 'tool_call':
-      phase = 'tool'
-      data = { name: msg.name, args: msg.args, id: msg.id }
+    case 'item_started':
+      phase = itemPhase(msg.item.type)
+      data = { turnId: msg.turn_id, item: msg.item }
       break
-    case 'tool_result':
-      phase = 'tool'
-      data = { name: msg.name, result: msg.result.slice(0, 2000) }
+    case 'item_delta':
+      phase = 'stream'
+      data = { turnId: msg.turn_id, itemId: msg.item_id, target: msg.target, delta: msg.delta }
+      break
+    case 'item_completed':
+      phase = itemPhase(msg.item.type)
+      data = { turnId: msg.turn_id, item: msg.item }
+      break
+    case 'item_status_changed':
+      phase = 'item'
+      data = { turnId: msg.turn_id, itemId: msg.item_id, status: msg.status }
       break
     case 'approval_request':
       phase = 'permission'
@@ -182,10 +192,6 @@ export function logAgentEvent(traceId: string, msg: StdoutMessage): void {
       phase = 'model_call'
       data = { inputTokens: msg.inputTokens, outputTokens: msg.outputTokens }
       break
-    case 'step_progress':
-      phase = 'progress'
-      data = { step: msg.step, total: msg.total, summary: msg.summary }
-      break
     case 'artifact':
       phase = 'artifact'
       data = { artifactType: msg.artifact_type, filePath: msg.file_path }
@@ -214,6 +220,17 @@ export function logAgentEvent(traceId: string, msg: StdoutMessage): void {
 
   appendEvent(traceId, { ts, phase, type, data })
   updateMeta(traceId, (m) => { m.eventCount++ })
+}
+
+function itemPhase(itemType: string): string {
+  switch (itemType) {
+    case 'reasoning': return 'thinking'
+    case 'toolCall': return 'tool'
+    case 'agentMessage': return 'model_output'
+    case 'plan': return 'plan'
+    case 'approval': return 'permission'
+    default: return 'item'
+  }
 }
 
 export function logUserAction(traceId: string, action: string, data: Record<string, unknown>): void {

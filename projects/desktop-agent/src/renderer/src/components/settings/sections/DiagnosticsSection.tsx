@@ -186,14 +186,16 @@ function getEventSummary(event: TraceEvent): { title: string; badge?: string; de
   switch (event.type) {
     case 'task_started':
       return { title: '任务发起', badge: String(d.mode || ''), detail: JSON.stringify(d, null, 2), expandable: true }
-    case 'thinking':
-      return { title: String(d.text || ''), expandable: false }
-    case 'chunk':
-      return { title: '模型输出', detail: String(d.text || ''), expandable: true }
-    case 'tool_call':
-      return { title: `调用工具: ${d.name}`, badge: String(d.id || ''), detail: JSON.stringify(d.args, null, 2), expandable: true }
-    case 'tool_result':
-      return { title: `工具结果: ${d.name}`, detail: String(d.result || ''), expandable: true }
+    case 'turn_started':
+      return { title: '新一轮开始', badge: String(d.turnId || ''), expandable: false }
+    case 'turn_completed':
+      return { title: `一轮结束: ${d.status}`, badge: String(d.turnId || ''), expandable: false }
+    case 'item_started':
+      return itemSummary(d.item as ItemLike, '开始')
+    case 'item_completed':
+      return itemSummary(d.item as ItemLike, '完成')
+    case 'item_delta':
+      return { title: '流式增量', badge: String((d.target as { field?: string })?.field || ''), expandable: false }
     case 'approval_request':
       return { title: `权限审批: ${d.toolName}`, badge: String(d.riskLevel || ''), detail: JSON.stringify({ impact: d.impact, args: d.args }, null, 2), expandable: true }
     case 'approval_response':
@@ -212,8 +214,6 @@ function getEventSummary(event: TraceEvent): { title: string; badge?: string; de
       return { title: `子任务失败: ${d.title}`, detail: String(d.error || ''), expandable: true }
     case 'usage':
       return { title: 'Token 用量', badge: `↑${d.inputTokens} ↓${d.outputTokens}`, expandable: false }
-    case 'step_progress':
-      return { title: `步骤 ${d.step}/${d.total}`, badge: String(d.summary || ''), expandable: false }
     case 'artifact':
       return { title: `产物: ${d.artifactType}`, expandable: false }
     case 'error':
@@ -226,6 +226,42 @@ function getEventSummary(event: TraceEvent): { title: string; badge?: string; de
       return { title: '追加输入', detail: String(d.message || ''), expandable: true }
     default:
       return { title: event.type, detail: JSON.stringify(d, null, 2), expandable: true }
+  }
+}
+
+interface ItemLike {
+  type: string
+  id: string
+  toolName?: string
+  text?: string
+  status?: string
+  error?: string
+  resultSummary?: string
+}
+
+/** 把 item_started/item_completed 里的条目转成时间线一句话摘要，认识 Turn/Item 协议的各种条目类型 */
+function itemSummary(item: ItemLike | undefined, phase: string): { title: string; badge?: string; detail?: string; expandable: boolean } {
+  if (!item) return { title: `条目${phase}`, expandable: false }
+  switch (item.type) {
+    case 'userMessage':
+      return { title: '用户消息', expandable: false }
+    case 'agentMessage':
+      return { title: phase === '完成' ? `回复：${(item.text || '').slice(0, 40)}` : '回复生成中', expandable: phase === '完成' }
+    case 'reasoning':
+      return { title: `思考${phase}`, expandable: false }
+    case 'toolCall':
+      return {
+        title: `工具 ${phase}: ${item.toolName || ''}`,
+        badge: item.status,
+        detail: item.resultSummary || item.error,
+        expandable: Boolean(item.resultSummary || item.error)
+      }
+    case 'plan':
+      return { title: '计划提案', expandable: false }
+    case 'approval':
+      return { title: '审批请求', badge: item.status, expandable: false }
+    default:
+      return { title: `${item.type}${phase}`, expandable: false }
   }
 }
 

@@ -2,21 +2,23 @@ import { create } from 'zustand'
 import { api } from '../api'
 import { useSettingsStore } from '../components/settings/settingsStore'
 import type { StdoutMessage, AgentMessage } from '../../../agent/src/protocol'
+import type { Turn } from '../../../agent/src/items'
+import { reduceTurnsEvent, getFinalAnswerOfTurn, deriveAgentMessages, type TurnsReducerState } from './turns'
 
 export type TaskStatus = 'idle' | 'executing' | 'completed' | 'failed'
 
-export interface ToolLogEntry {
-  name: string
-  args: Record<string, unknown>
-  result?: string
-  id: string
-}
-
-export interface StepEntry {
-  step: number
-  total: number
-  summary: string
-  done: boolean
+/** 判断一条 stdout 消息是否属于 Turn/Item 事件模型，走 reduceTurnsEvent 统一处理 */
+function isTurnItemEvent(
+  msg: StdoutMessage
+): msg is Extract<StdoutMessage, { type: 'turn_started' | 'turn_completed' | 'item_started' | 'item_delta' | 'item_completed' | 'item_status_changed' }> {
+  return (
+    msg.type === 'turn_started' ||
+    msg.type === 'turn_completed' ||
+    msg.type === 'item_started' ||
+    msg.type === 'item_delta' ||
+    msg.type === 'item_completed' ||
+    msg.type === 'item_status_changed'
+  )
 }
 
 export interface ArtifactEntry {
@@ -127,11 +129,11 @@ export interface SubtaskEntry {
 /** 单任务运行时状态（隔离存储，切走不清除，切回来恢复） */
 export interface TaskRuntime {
   status: TaskStatus
-  chunks: string
+  /** 已完成的轮次(每轮含思考/工具调用/最终回复等条目，历史翻看细节靠这个) */
+  turns: Turn[]
+  /** 正在流式生成中的当前轮次，完成后归入 turns */
+  currentTurn: Turn | null
   summary: string
-  thinking: string[]
-  toolLogs: ToolLogEntry[]
-  steps: StepEntry[]
   artifacts: ArtifactEntry[]
   usage: { inputTokens: number; outputTokens: number }
   error: string | null
@@ -149,18 +151,18 @@ export interface TaskState {
   mode: 'work' | 'code'
   message: string
   goal: string
-  chunks: string
+  /** 已完成的轮次序列，是对话展示的主数据源，每个条目(思考/工具/文件变更)独立可回看 */
+  turns: Turn[]
+  /** 正在流式生成中的当前轮次 */
+  currentTurn: Turn | null
   summary: string
-  thinking: string[]
-  toolLogs: ToolLogEntry[]
-  steps: StepEntry[]
   artifacts: ArtifactEntry[]
   usage: { inputTokens: number; outputTokens: number }
   error: string | null
   startedAt: number | null
   finishedAt: number | null
   history: HistoryEntry[]
-  /** 当前对话的完整消息流（用于上下文恢复与全量传入） */
+  /** 由 turns 派生的精简对话历史，仅用于喂给 LLM 和判断"是否有历史对话" */
   messages: AgentMessage[]
   runningTasks: Record<string, TaskRuntime>
   projects: Project[]
@@ -336,11 +338,9 @@ const initial = {
   mode: 'work' as 'work' | 'code',
   message: '',
   goal: '',
-  chunks: '',
+  turns: [] as Turn[],
+  currentTurn: null as Turn | null,
   summary: '',
-  thinking: [] as string[],
-  toolLogs: [] as ToolLogEntry[],
-  steps: [] as StepEntry[],
   artifacts: [] as ArtifactEntry[],
   usage: { inputTokens: 0, outputTokens: 0 },
   error: null as string | null,
@@ -372,8 +372,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         runningTasks: {
           ...s.runningTasks,
           [cur.taskId as string]: {
-            status: s.status, chunks: s.chunks, summary: s.summary, thinking: s.thinking,
-            toolLogs: s.toolLogs, steps: s.steps, artifacts: s.artifacts, usage: s.usage,
+            status: s.status, turns: s.turns, currentTurn: s.currentTurn, summary: s.summary, artifacts: s.artifacts, usage: s.usage,
             error: s.error, startedAt: s.startedAt, finishedAt: s.finishedAt,
             approvalPending: s.approvalPending, pendingPlan: s.pendingPlan, todos: s.todos, subtasks: s.subtasks
           }
@@ -382,8 +381,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     }
     modeSnapshots.set(cur.mode, {
       status: cur.status, taskId: cur.taskId, message: cur.message, goal: cur.goal,
-      chunks: cur.chunks, summary: cur.summary, thinking: cur.thinking, toolLogs: cur.toolLogs,
-      steps: cur.steps, artifacts: cur.artifacts, usage: cur.usage, error: cur.error,
+      turns: cur.turns, currentTurn: cur.currentTurn, summary: cur.summary,
+      artifacts: cur.artifacts, usage: cur.usage, error: cur.error,
       startedAt: cur.startedAt, finishedAt: cur.finishedAt, todos: cur.todos,
       subtasks: cur.subtasks, attachments: cur.attachments, messages: cur.messages,
       approvalPending: null, pendingPlan: null
@@ -588,39 +587,40 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     // 不可见任务：只更新隔离存储 runningTasks，不碰全局展示状态
     if (!isVisible || !evTaskId) {
       const rt = cur.runningTasks[evTaskId || '']
-      const base = rt || {
-        status: 'executing' as TaskStatus, chunks: '', summary: '', thinking: [],
-        toolLogs: [], steps: [], artifacts: [], usage: { inputTokens: 0, outputTokens: 0 },
+      const base: TaskRuntime = rt || {
+        status: 'executing', turns: [], currentTurn: null, summary: '',
+        artifacts: [], usage: { inputTokens: 0, outputTokens: 0 },
         error: null, startedAt: Date.now(), finishedAt: null,
         approvalPending: null, pendingPlan: null, todos: [], subtasks: []
       }
+
+      if (isTurnItemEvent(msg)) {
+        const reduced = reduceTurnsEvent({ turns: base.turns, currentTurn: base.currentTurn }, msg)
+        const patch: Partial<TaskRuntime> = { turns: reduced.turns, currentTurn: reduced.currentTurn, status: 'executing' }
+        set((st) => ({ runningTasks: { ...st.runningTasks, [evTaskId as string]: { ...base, ...patch } } }))
+        return
+      }
+
       let patch: Partial<TaskRuntime> = {}
       switch (msg.type) {
-        case 'chunk': patch = { chunks: base.chunks + msg.text, status: 'executing' }; break
-        case 'thinking': patch = { thinking: [...base.thinking, msg.text], status: 'executing' }; break
-        case 'tool_call': patch = { toolLogs: [...base.toolLogs, { name: msg.name, args: msg.args, id: msg.id }], status: 'executing' }; break
-        case 'tool_result': patch = { toolLogs: base.toolLogs.map((t) => t.id === msg.id && !t.result ? { ...t, result: msg.result } : t) }; break
-        case 'step_progress': { const next = [...base.steps]; const idx = next.findIndex((e) => e.step === msg.step && e.total === msg.total); if (idx >= 0) next[idx] = { ...next[idx], summary: msg.summary, done: true }; else next.push({ step: msg.step, total: msg.total, summary: msg.summary, done: true }); patch = { steps: next.sort((a, b) => a.step - b.step) }; break }
         case 'artifact': patch = { artifacts: [...base.artifacts, { type: msg.artifact_type, filePath: msg.file_path }] }; break
         case 'usage': patch = { usage: { inputTokens: base.usage.inputTokens + msg.inputTokens, outputTokens: base.usage.outputTokens + msg.outputTokens } }; break
         case 'error': patch = { error: msg.message, status: 'failed', finishedAt: Date.now() }; break
         case 'completed': {
-          // 后台任务完成：累积消息落盘，但不更新全局展示
-          const assistantText = base.chunks || msg.summary || ''
+          // 后台任务完成：累积轮次落盘，但不更新全局展示
+          const assistantText = getFinalAnswerOfTurn(base.currentTurn) || msg.summary || ''
+          const finishedTurns = base.turns
           void api.loadSessionMessages(evTaskId as string).then((stored) => {
             const msgs = (stored as AgentMessage[]) || []
-            let nextMessages = [...msgs]
-            if (base.toolLogs.length > 0) {
-              const toolCalls = base.toolLogs.map((t) => ({ id: t.id, type: 'function' as const, function: { name: t.name, arguments: JSON.stringify(t.args) } }))
-              nextMessages.push({ role: 'assistant', content: assistantText, tool_calls: toolCalls })
-              for (const t of base.toolLogs) nextMessages.push({ role: 'tool', tool_call_id: t.id, content: t.result || '{}' })
-            } else if (assistantText) { nextMessages.push({ role: 'assistant', content: assistantText }) }
+            const derivedTail = deriveAgentMessages(finishedTurns)
+            const nextMessages = [...msgs, ...derivedTail]
             void api.saveSessionMessages(evTaskId as string, nextMessages)
+            void api.saveSessionTurns(evTaskId as string, finishedTurns)
             // 更新会话列表标题/状态
             const gs = get()
             const sess = gs.sessions.find((x) => x.id === evTaskId)
             if (sess) {
-              const nextSessions = gs.sessions.map((x) => x.id === evTaskId ? { ...x, status: 'completed' as TaskStatus, updatedAt: Date.now(), stepCount: base.steps.length, tokens: base.usage.inputTokens + base.usage.outputTokens, title: assistantText.slice(0, 40) || x.title } : x)
+              const nextSessions = gs.sessions.map((x) => x.id === evTaskId ? { ...x, status: 'completed' as TaskStatus, updatedAt: Date.now(), stepCount: finishedTurns.length, tokens: base.usage.inputTokens + base.usage.outputTokens, title: assistantText.slice(0, 40) || x.title } : x)
               saveSessionsToStorage(nextSessions)
               set({ sessions: nextSessions })
             }
@@ -639,45 +639,18 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     // 可见任务：走原有逻辑更新全局展示，同时同步到 runningTasks
     const syncRT = (extra?: Partial<TaskRuntime>) => {
       const st = get()
-      const old = st.runningTasks[evTaskId] || { status: 'executing' as TaskStatus, chunks: '', summary: '', thinking: [], toolLogs: [], steps: [], artifacts: [], usage: { inputTokens: 0, outputTokens: 0 }, error: null, startedAt: Date.now(), finishedAt: null, approvalPending: null, pendingPlan: null, todos: [], subtasks: [] }
-      set({ runningTasks: { ...st.runningTasks, [evTaskId]: { ...old, status: st.status, chunks: st.chunks, summary: st.summary, thinking: st.thinking, toolLogs: st.toolLogs, steps: st.steps, artifacts: st.artifacts, usage: st.usage, error: st.error, startedAt: st.startedAt, finishedAt: st.finishedAt, approvalPending: st.approvalPending, pendingPlan: st.pendingPlan, todos: st.todos, subtasks: st.subtasks, ...extra } } })
+      const old: TaskRuntime = st.runningTasks[evTaskId] || { status: 'executing', turns: [], currentTurn: null, summary: '', artifacts: [], usage: { inputTokens: 0, outputTokens: 0 }, error: null, startedAt: Date.now(), finishedAt: null, approvalPending: null, pendingPlan: null, todos: [], subtasks: [] }
+      set({ runningTasks: { ...st.runningTasks, [evTaskId]: { ...old, status: st.status, turns: st.turns, currentTurn: st.currentTurn, summary: st.summary, artifacts: st.artifacts, usage: st.usage, error: st.error, startedAt: st.startedAt, finishedAt: st.finishedAt, approvalPending: st.approvalPending, pendingPlan: st.pendingPlan, todos: st.todos, subtasks: st.subtasks, ...extra } } })
+    }
+
+    if (isTurnItemEvent(msg)) {
+      const reduced = reduceTurnsEvent({ turns: cur.turns, currentTurn: cur.currentTurn }, msg)
+      set({ turns: reduced.turns, currentTurn: reduced.currentTurn, status: 'executing' })
+      syncRT()
+      return
     }
 
     switch (msg.type) {
-      case 'chunk':
-        set((s) => ({ chunks: s.chunks + msg.text, status: 'executing' }))
-        syncRT()
-        break
-      case 'thinking':
-        set((s) => ({ thinking: [...s.thinking, msg.text], status: 'executing' }))
-        syncRT()
-        break
-      case 'tool_call':
-        set((s) => ({ toolLogs: [...s.toolLogs, { name: msg.name, args: msg.args, id: msg.id }], status: 'executing' }))
-        syncRT()
-        break
-      case 'tool_result':
-        set((s) => ({ toolLogs: s.toolLogs.map((t) => t.id === msg.id && !t.result ? { ...t, result: msg.result } : t) }))
-        syncRT()
-        break
-      case 'step_progress':
-        set((s) => {
-          const existing = s.steps.findIndex((e) => e.step === msg.step && e.total === msg.total)
-          const next = [...s.steps]
-          if (existing >= 0) {
-            next[existing] = { ...next[existing], summary: msg.summary, done: true }
-          } else {
-            next.push({ step: msg.step, total: msg.total, summary: msg.summary, done: true })
-            for (let i = 1; i < msg.step; i++) {
-              if (!next.find((e) => e.step === i)) {
-                next.push({ step: i, total: msg.total, summary: '', done: true })
-              }
-            }
-          }
-          return { steps: next.sort((a, b) => a.step - b.step) }
-        })
-        syncRT()
-        break
       case 'artifact':
         set((s) => ({ artifacts: [...s.artifacts, { type: msg.artifact_type, filePath: msg.file_path }] }))
         syncRT()
@@ -692,17 +665,15 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         break
       case 'completed': {
         const cur2 = get()
-        const assistantText = cur2.chunks || msg.summary || ''
-        const toolLogs = cur2.toolLogs
-        let nextMessages = [...cur2.messages]
-        if (toolLogs.length > 0) {
-          const toolCalls = toolLogs.map((t) => ({ id: t.id, type: 'function' as const, function: { name: t.name, arguments: JSON.stringify(t.args) } }))
-          nextMessages.push({ role: 'assistant', content: assistantText, tool_calls: toolCalls })
-          for (const t of toolLogs) nextMessages.push({ role: 'tool', tool_call_id: t.id, content: t.result || '{}' })
-        } else if (assistantText) { nextMessages.push({ role: 'assistant', content: assistantText }) }
+        const assistantText = getFinalAnswerOfTurn(cur2.currentTurn) || msg.summary || ''
+        const derivedTail = deriveAgentMessages(cur2.turns)
+        const nextMessages = [...cur2.messages, ...derivedTail]
         set({ status: 'completed', summary: msg.summary, finishedAt: Date.now(), messages: nextMessages })
         pushHistory(set, get)
-        if (evTaskId) void api.saveSessionMessages(evTaskId, nextMessages)
+        if (evTaskId) {
+          void api.saveSessionMessages(evTaskId, nextMessages)
+          void api.saveSessionTurns(evTaskId, get().turns)
+        }
         { const rt = { ...get().runningTasks }; delete rt[evTaskId]; set({ runningTasks: rt }) }
         break
       }
@@ -747,11 +718,9 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const userMsg: AgentMessage = { role: 'user', content: message }
     set({
       status: 'executing',
-      chunks: '',
+      turns: isContinue ? get().turns : [],
+      currentTurn: null,
       summary: '',
-      thinking: [],
-      toolLogs: [],
-      steps: [],
       artifacts: [],
       error: null,
       approvalPending: null,
@@ -766,7 +735,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       messages: [...messages, userMsg]
     })
     // 注册到隔离存储，切走后事件继续写入对应任务
-    set((st) => ({ runningTasks: { ...st.runningTasks, [get().taskId as string]: { status: 'executing', chunks: '', summary: '', thinking: [], toolLogs: [], steps: [], artifacts: [], usage: { inputTokens: 0, outputTokens: 0 }, error: null, startedAt: Date.now(), finishedAt: null, approvalPending: null, pendingPlan: null, todos: [], subtasks: [] } } }))
+    set((st) => ({ runningTasks: { ...st.runningTasks, [get().taskId as string]: { status: 'executing', turns: get().turns, currentTurn: null, summary: '', artifacts: [], usage: { inputTokens: 0, outputTokens: 0 }, error: null, startedAt: Date.now(), finishedAt: null, approvalPending: null, pendingPlan: null, todos: [], subtasks: [] } } }))
     const settingsState = useSettingsStore.getState()
     // 发送前把 objectUrl 图片转成 dataUrl(agent 子进程需要 base64)
     const sendAttachments = await Promise.all(attachments.map(async (a) => {
@@ -811,22 +780,24 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         runningTasks: {
           ...s.runningTasks,
           [cur.taskId as string]: {
-            status: s.status, chunks: s.chunks, summary: s.summary, thinking: s.thinking,
-            toolLogs: s.toolLogs, steps: s.steps, artifacts: s.artifacts, usage: s.usage,
+            status: s.status, turns: s.turns, currentTurn: s.currentTurn, summary: s.summary, artifacts: s.artifacts, usage: s.usage,
             error: s.error, startedAt: s.startedAt, finishedAt: s.finishedAt,
             approvalPending: s.approvalPending, pendingPlan: s.pendingPlan, todos: s.todos, subtasks: s.subtasks
           }
         }
       }))
     }
-    // 切到目标：优先从 runningTasks 恢复运行时（任务还在跑），否则读盘恢复历史
+    // 切到目标：优先从 runningTasks 恢复运行时（任务还在跑），否则读盘恢复历史(消息+轮次)
     const rt = get().runningTasks[sessionId]
     const sess = get().sessions.find((s) => s.id === sessionId)
     if (rt && rt.status === 'executing') {
       set({ ...initial, ...rt, messages: cur.messages, mode: sess?.mode || cur.mode, activeSessionId: sessionId, activeProjectId: sess?.projectId || cur.activeProjectId, taskId: sessionId, goal: sess?.title || '', runningTasks: get().runningTasks, projects: get().projects, sessions: get().sessions, history: get().history })
     } else {
-      const stored = (await api.loadSessionMessages(sessionId)) as AgentMessage[]
-      set({ ...initial, messages: stored || [], mode: sess?.mode || cur.mode, activeSessionId: sessionId, activeProjectId: sess?.projectId || cur.activeProjectId, taskId: sessionId, goal: sess?.title || '', runningTasks: get().runningTasks, projects: get().projects, sessions: get().sessions, history: get().history })
+      const [stored, storedTurns] = await Promise.all([
+        api.loadSessionMessages(sessionId) as Promise<AgentMessage[]>,
+        api.loadSessionTurns(sessionId) as Promise<Turn[]>
+      ])
+      set({ ...initial, messages: stored || [], turns: storedTurns || [], mode: sess?.mode || cur.mode, activeSessionId: sessionId, activeProjectId: sess?.projectId || cur.activeProjectId, taskId: sessionId, goal: sess?.title || '', runningTasks: get().runningTasks, projects: get().projects, sessions: get().sessions, history: get().history })
     }
   }
 }))
@@ -843,7 +814,7 @@ function pushHistory(
     mode: s.mode,
     status: s.status,
     finishedAt: s.finishedAt || Date.now(),
-    stepCount: s.steps.length,
+    stepCount: s.turns.length,
     tokens: s.usage.inputTokens + s.usage.outputTokens
   }
   const next = [entry, ...s.history.filter((h) => h.id !== entry.id)].slice(0, HISTORY_MAX)
@@ -878,102 +849,4 @@ function pushHistory(
   }
   saveSessionsToStorage(nextSessions)
   set({ history: next, sessions: nextSessions })
-}
-
-// ============================================================
-// 合并逻辑 + Turn 分段（纯计算 selector，不改 store 数据结构）
-// ============================================================
-
-/** 合并后的工具日志分组：连续同类工具合并为一条 */
-export interface MergedToolGroup {
-  id: string
-  name: string
-  count: number
-  entries: ToolLogEntry[]
-  firstEntry: ToolLogEntry
-  lastEntry: ToolLogEntry
-  allDone: boolean
-  anyError: boolean
-}
-
-/** 连续同类工具调用合并 */
-export function getMergedToolLogs(toolLogs: ToolLogEntry[]): MergedToolGroup[] {
-  const groups: MergedToolGroup[] = []
-  for (const entry of toolLogs) {
-    const last = groups[groups.length - 1]
-    if (last && last.name === entry.name && last.allDone) {
-      last.count++
-      last.entries.push(entry)
-      last.lastEntry = entry
-      last.allDone = last.entries.every((e) => e.result)
-      last.anyError = last.anyError || Boolean(entry.result?.includes('"error"'))
-    } else {
-      groups.push({
-        id: entry.id,
-        name: entry.name,
-        count: 1,
-        entries: [entry],
-        firstEntry: entry,
-        lastEntry: entry,
-        allDone: Boolean(entry.result),
-        anyError: Boolean(entry.result?.includes('"error"'))
-      })
-    }
-  }
-  return groups
-}
-
-/** 文件变更按路径合并 */
-export interface MergedFileChange {
-  path: string
-  name: string
-  totalLines: number
-  entries: ToolLogEntry[]
-}
-
-export function getMergedFileChanges(toolLogs: ToolLogEntry[]): MergedFileChange[] {
-  const writes = toolLogs.filter((t) => t.name === 'write_file' && t.result && !t.result.includes('"error"'))
-  const byPath = new Map<string, MergedFileChange>()
-  for (const entry of writes) {
-    const rawPath = typeof entry.args.path === 'string' ? entry.args.path : ''
-    const normalized = rawPath.replace(/\\/g, '/').replace(/\/+$/, '')
-    const content = typeof entry.args.content === 'string' ? entry.args.content : ''
-    const lines = content === '' ? 0 : content.split('\n').length
-    const existing = byPath.get(normalized)
-    if (existing) {
-      existing.totalLines += lines
-      existing.entries.push(entry)
-    } else {
-      byPath.set(normalized, {
-        path: rawPath,
-        name: normalized.split('/').pop() || normalized || '未命名',
-        totalLines: lines,
-        entries: [entry]
-      })
-    }
-  }
-  return Array.from(byPath.values())
-}
-
-/** Turn 三段拆分 */
-export interface TurnSections {
-  processBlocks: MergedToolGroup[]
-  finalAnswer: string
-  fileChanges: MergedFileChange[]
-}
-
-export function getTurnSections(state: {
-  thinking: string[]
-  chunks: string
-  toolLogs: ToolLogEntry[]
-  status: TaskStatus
-}): TurnSections {
-  const merged = getMergedToolLogs(state.toolLogs)
-  const fileChanges = getMergedFileChanges(state.toolLogs)
-  const finalAnswer = state.status === 'completed' ? state.chunks : ''
-  return {
-    processBlocks: merged,
-    finalAnswer,
-    fileChanges
-  }
 }

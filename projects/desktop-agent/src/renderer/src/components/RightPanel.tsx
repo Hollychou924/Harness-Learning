@@ -16,10 +16,11 @@ import {
 import { useTaskStore } from '../store/task'
 import { api } from '../api'
 import type { ArtifactEntry } from '../store/task'
+import type { ToolCallItem } from '../../../agent/src/items'
 
 // 右栏：目标 + 进度清单 + 用量 + 产物，参考竞品 IDE 的"任务控制台"
 export function RightPanel() {
-  const { status, goal, steps, artifacts, usage, startedAt, finishedAt, error, message } =
+  const { status, goal, turns, currentTurn, artifacts, usage, startedAt, finishedAt, error, message } =
     useTaskStore()
   const hasTask = status !== 'idle'
 
@@ -27,7 +28,11 @@ export function RightPanel() {
     return null
   }
 
-  const total = steps.length > 0 ? steps[0].total : 0
+  // 进度清单：用当前轮次的工具调用条目当"步骤"展示(每次工具调用算一步)
+  const latestTurn = currentTurn || turns[turns.length - 1] || null
+  const toolItems = (latestTurn?.items ?? []).filter((it): it is ToolCallItem => it.type === 'toolCall')
+  const steps = toolItems.map((t, i) => ({ step: i + 1, total: toolItems.length, summary: t.toolName, done: t.status === 'completed' || t.status === 'failed' }))
+  const total = steps.length
   const doneCount = steps.filter((s) => s.done).length
   const isComplete = status === 'completed'
   const isFailed = status === 'failed'

@@ -52,4 +52,13 @@ body {
 .drag { -webkit-app-region: drag; }
 .no-drag { -webkit-app-region: no-drag; }
 
+/* 跳转定位高亮：点击导航条后目标轮次闪一下天蓝色背景 */
+.turn-jump-highlight {
+  animation: turn-jump-flash 1.2s ease-out;
+}
+@keyframes turn-jump-flash {
+  0% { background: rgba(14, 165, 233, 0.18); }
+  100% { background: transparent; }
+}
+
 /* 报告内链接 */

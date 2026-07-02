@@ -1,5 +1,8 @@
 // 小蓝鲸 Agent 子进程与主进程的 stdio JSON Lines 协议
-// 与 docs/09-electron-ipc-contract.md 第三章对应
+// 2026-07-02 起改为 Turn/Item 事件模型（复刻并超越 Codex 展示逻辑 · 阶段1）
+// 每轮对话(Turn)由一串条目(Item)组成，条目独立带 id/状态/时间戳，流式增量精确定位到条目的具体字段/分段
+
+import type { Item, ItemStatus, DeltaTarget, Turn } from './items.js'
 
 export type TaskMode = 'work' | 'code'
 
@@ -33,7 +36,6 @@ export interface AgentMessage {
   attachments?: MessageAttachment[]
 }
 
-
 // 多模态附件：图片/文本，随用户消息一起传给模型
 export interface MessageAttachment {
   type: 'image' | 'text' | 'file'
@@ -54,21 +56,26 @@ export type StdinMessage =
   | { type: 'append_input'; task_id: string; message: string; mode?: 'inject' | 'queue' }
   | { type: 'plan_response'; request_id: string; decision: 'approve' | 'reject_stop' | 'reject_revise'; feedback?: string }
 
-// Agent -> 主进程 (stdout)
+// Agent -> 主进程 (stdout)：Turn/Item 事件模型
 export type StdoutMessage =
-  | { type: 'chunk'; text: string }
-  | { type: 'thinking'; text: string }
-  | { type: 'tool_call'; name: string; args: Record<string, unknown>; id: string }
-  | { type: 'tool_result'; name: string; result: string; id: string }
+  // 一轮对话开始/结束
+  | { type: 'turn_started'; turn_id: string }
+  | { type: 'turn_completed'; turn_id: string; status: 'completed' | 'failed' | 'cancelled' }
+  // 条目生命周期：出现 -> (流式增量)* -> 定稿
+  | { type: 'item_started'; turn_id: string; item: Item }
+  | { type: 'item_delta'; turn_id: string; item_id: string; target: DeltaTarget; delta: string }
+  | { type: 'item_completed'; turn_id: string; item: Item }
+  | { type: 'item_status_changed'; turn_id: string; item_id: string; status: ItemStatus }
+  // 审批/计划的用户决策结果（决策本身也会同步进对应 item，这里额外发一份用于旧组件兼容）
   | { type: 'approval_request'; request_id: string; tool_name: string; args: Record<string, unknown>; risk_level: 'low' | 'medium' | 'high' | 'critical'; impact: string; can_rollback: boolean }
+  | { type: 'plan_proposed'; request_id: string; plan: string; steps: PlanStep[] }
+  | { type: 'todo_update'; todos: TodoItem[] }
+  // 用量与产物
   | { type: 'usage'; inputTokens: number; outputTokens: number }
   | { type: 'status'; status: string; message?: string }
-  | { type: 'step_progress'; task_id: string; step: number; total: number; summary: string }
   | { type: 'artifact'; artifact_type: 'diff' | 'report' | 'file' | 'preview' | 'evidence' | 'task_summary'; file_path: string }
   | { type: 'error'; message: string }
   | { type: 'completed'; task_id: string; summary: string }
-  | { type: 'plan_proposed'; request_id: string; plan: string; steps: PlanStep[] }
-  | { type: 'todo_update'; todos: TodoItem[] }
   | { type: 'subtask_started'; subtask_id: string; title: string; agent_id?: string }
   | { type: 'subtask_completed'; subtask_id: string; title: string; duration_ms: number; tool_count: number; tokens: number }
   | { type: 'subtask_failed'; subtask_id: string; title: string; error: string }
@@ -88,3 +95,5 @@ export interface TodoItem {
 export function send(msg: StdoutMessage): void {
   process.stdout.write(JSON.stringify(msg) + '\n')
 }
+
+export type { Item, ItemStatus, DeltaTarget, Turn }

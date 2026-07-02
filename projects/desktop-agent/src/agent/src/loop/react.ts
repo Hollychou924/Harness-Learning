@@ -1,21 +1,37 @@
 import type { AgentConfig, AgentMessage, StdoutMessage, MessageAttachment } from '../protocol.js'
-import { send } from '../protocol.js'
-import type { AgentTool } from '../tools/index.js'
+import type { Item, ItemStatus, ToolCallItem, ToolKind } from '../items.js'
 import { isSafe, isBlocked } from '../tools/index.js'
-import { makePlanExecuteHandler, clearPendingPlanRequestId } from '../tools/plan.js'
+import { parsePlanArgs, clearPendingPlanRequestId } from '../tools/plan.js'
 import { makeTodoExecuteHandler } from '../tools/todo.js'
-import { requestApproval } from '../approval.js'
+import { waitForApproval } from '../approval.js'
 import { randomUUID } from 'node:crypto'
 import { AnthropicProvider, type LlmProvider } from '../providers/anthropic.js'
 import { OpenAIProvider } from '../providers/openai.js'
 import { buildSystemPrompt } from '../prompt/system.js'
+import { summarizeToolResult } from './tool-summary.js'
 
 // ReAct 引擎（依据 docs/01 第三章，参考已验证实现）
 // maxIterations 硬上限，到顶兜底收尾，禁止无限转
 // 空回复重试一次，工具后报错合成收尾
+// 2026-07-02 起改为 Turn/Item 事件模型：本轮内每个思考/工具调用/审批都是独立条目，带 id 可追溯
 export interface ReactResult {
   messages: AgentMessage[]
   finalText: string
+}
+
+const TOOL_KIND_MAP: Record<string, ToolKind> = {
+  fetch_page: 'fetch_page',
+  parse_page: 'parse_page',
+  list_files: 'list_files',
+  read_file: 'read_file',
+  write_file: 'write_file',
+  create_docx: 'create_docx',
+  create_xlsx: 'create_xlsx',
+  shell: 'shell'
+}
+
+function toolKindOf(name: string): ToolKind {
+  return TOOL_KIND_MAP[name] || (name.startsWith('mcp__') ? 'mcp' : 'unknown')
 }
 
 export async function runReact(
@@ -32,16 +48,6 @@ export async function runReact(
     ? new OpenAIProvider(config)
     : new AnthropicProvider(config)
 
-  // plan/todo 元工具：拦截执行，发出前端事件
-  const planExecute = makePlanExecuteHandler((plan, steps) => {
-    const requestId = `plan-${Date.now()}`
-    onEvent({
-      type: 'plan_proposed',
-      request_id: requestId,
-      plan,
-      steps
-    })
-  })
   const todoExecute = makeTodoExecuteHandler((todos) => {
     onEvent({ type: 'todo_update', todos })
   })
@@ -72,26 +78,75 @@ export async function runReact(
     }
   ]
 
+  const turnId = `turn-${randomUUID()}`
+  onEvent({ type: 'turn_started', turn_id: turnId })
+
+  // 每一轮自包含：把用户本次的输入也作为条目发出，历史翻看/时间轴回放时知道"这一轮问了什么"
+  const userMessageItemId = `userMessage-${randomUUID()}`
+  const userMessageItem: Item = {
+    type: 'userMessage',
+    id: userMessageItemId,
+    content: [
+      { type: 'text', text: userMessage },
+      ...imageAttachments.map((a) => ({ type: 'image' as const, url: a.dataUrl || '' }))
+    ]
+  }
+  onEvent({ type: 'item_started', turn_id: turnId, item: userMessageItem })
+  onEvent({ type: 'item_completed', turn_id: turnId, item: userMessageItem })
+
   // 标记本轮用户消息是否含图片（用于不支持图片时的退回重试）
   const hasImages = imageAttachments.length > 0
 
   let finalText = ''
   let emptyRetried = false
   let imagesDisabled = false
+  /** 上一个失败的工具调用条目 id，用于把下一次同名重试串成"失败→重试→成功"链条 */
+  let lastFailedToolItemId: string | null = null
+
+  function emitReasoning(text: string): void {
+    const itemId = `reasoning-${randomUUID()}`
+    const now = Date.now()
+    const item: Item = {
+      type: 'reasoning',
+      id: itemId,
+      summary: [text],
+      content: [text],
+      status: 'completed',
+      startedAt: now,
+      finishedAt: now
+    }
+    onEvent({ type: 'item_started', turn_id: turnId, item })
+    onEvent({ type: 'item_completed', turn_id: turnId, item })
+  }
 
   for (let iter = 0; iter < config.maxIterations; iter++) {
-    onEvent({ type: 'thinking', text: `第 ${iter + 1} 轮思考` })
+    emitReasoning(`第 ${iter + 1} 轮思考`)
 
     let assistantText = ''
     let toolUse: { id: string; name: string; args: Record<string, unknown> } | null = null
     let inputTokens = 0
     let outputTokens = 0
+    let agentMessageItemId: string | null = null
 
     try {
       for await (const ev of provider.stream(messages, config, tools)) {
         if (ev.type === 'text' && ev.text) {
+          if (!agentMessageItemId) {
+            agentMessageItemId = `agentMessage-${randomUUID()}`
+            onEvent({
+              type: 'item_started',
+              turn_id: turnId,
+              item: { type: 'agentMessage', id: agentMessageItemId, text: '', phase: 'final_answer' }
+            })
+          }
           assistantText += ev.text
-          onEvent({ type: 'chunk', text: ev.text })
+          onEvent({
+            type: 'item_delta',
+            turn_id: turnId,
+            item_id: agentMessageItemId,
+            target: { field: 'agentMessageText' },
+            delta: ev.text
+          })
         } else if (ev.type === 'tool_use' && ev.toolUse) {
           toolUse = ev.toolUse
         } else if (ev.type === 'usage' && ev.usage) {
@@ -106,7 +161,7 @@ export async function runReact(
       // 图片兼容退回：模型不支持图片时，移除图片后重试一次本轮
       if (hasImages && !imagesDisabled && isImageUnsupportedError(msg)) {
         imagesDisabled = true
-        onEvent({ type: 'thinking', text: '当前模型不支持图片，已自动移除图片并用纯文字重试' })
+        emitReasoning('当前模型不支持图片，已自动移除图片并用纯文字重试')
         const lastUser = messages.slice().reverse().find((m: AgentMessage) => m.role === 'user')
         if (lastUser) {
           lastUser.attachments = undefined
@@ -120,10 +175,20 @@ export async function runReact(
       onEvent({ type: 'error', message: `模型调用失败：${msg}` })
       // 工具后报错兜底：合成收尾，不让对话悬空
       if (finalText) {
+        onEvent({ type: 'turn_completed', turn_id: turnId, status: 'completed' })
         onEvent({ type: 'completed', task_id: taskId || '', summary: finalText })
         return { messages, finalText }
       }
+      onEvent({ type: 'turn_completed', turn_id: turnId, status: 'failed' })
       throw e
+    }
+
+    if (agentMessageItemId) {
+      onEvent({
+        type: 'item_completed',
+        turn_id: turnId,
+        item: { type: 'agentMessage', id: agentMessageItemId, text: assistantText, phase: 'final_answer' }
+      })
     }
 
     if (inputTokens || outputTokens) {
@@ -134,10 +199,10 @@ export async function runReact(
     if (!assistantText && !toolUse) {
       if (!emptyRetried) {
         emptyRetried = true
-        onEvent({ type: 'thinking', text: '模型返回空，重试一次' })
+        emitReasoning('模型返回空，重试一次')
         continue
       }
-      onEvent({ type: 'thinking', text: '模型再次返回空，结束' })
+      emitReasoning('模型再次返回空，结束')
       break
     }
 
@@ -154,9 +219,39 @@ export async function runReact(
 
     // 有工具调用，执行工具
     const tool = tools.find((t) => t.name === toolUse.name)
+    const toolItemId = `toolCall-${randomUUID()}`
+    const toolKind = toolKindOf(toolUse.name)
+    const toolStartedAt = Date.now()
+
+    const startingToolItem: ToolCallItem = {
+      type: 'toolCall',
+      id: toolItemId,
+      kind: toolKind,
+      toolName: toolUse.name,
+      args: toolUse.args,
+      status: 'running',
+      startedAt: toolStartedAt,
+      ...(lastFailedToolItemId ? { retryOfItemId: lastFailedToolItemId } : {})
+    }
+    onEvent({ type: 'item_started', turn_id: turnId, item: startingToolItem })
+
+    function finishToolItem(status: ItemStatus, result?: string, errorMsg?: string): void {
+      const finishedAt = Date.now()
+      const item: ToolCallItem = {
+        ...startingToolItem,
+        status,
+        result,
+        error: errorMsg,
+        resultSummary: result ? summarizeToolResult(toolUse!.name, toolUse!.args, result) : undefined,
+        finishedAt
+      }
+      onEvent({ type: 'item_completed', turn_id: turnId, item })
+      lastFailedToolItemId = status === 'failed' ? toolItemId : null
+    }
+
     if (!tool) {
       const errMsg = `工具 ${toolUse.name} 不存在`
-      onEvent({ type: 'tool_result', name: toolUse.name, result: JSON.stringify({ error: errMsg }), id: toolUse.id })
+      finishToolItem('failed', undefined, errMsg)
       messages.push({
         role: 'assistant',
         content: assistantText,
@@ -176,8 +271,6 @@ export async function runReact(
       continue
     }
 
-    onEvent({ type: 'tool_call', name: toolUse.name, args: toolUse.args, id: toolUse.id })
-
     // 权限判定：根据 autoApproveLow 开关和工具风险等级决定是否需要审批
     const autoApprove = config.autoApproveLow !== false
     const needsApproval = !autoApprove
@@ -186,16 +279,38 @@ export async function runReact(
 
     if (needsApproval) {
       const approvalId = `approval-${randomUUID()}`
-      const approved = await requestApproval({
+      const approvalItemId = `approvalItem-${randomUUID()}`
+      const approvalItem: Item = {
+        type: 'approval',
+        id: approvalItemId,
         requestId: approvalId,
         toolName: toolUse.name,
         args: toolUse.args,
         riskLevel: tool.riskLevel,
         impact: tool.description.slice(0, 120),
-        canRollback: tool.riskLevel !== 'critical'
+        canRollback: tool.riskLevel !== 'critical',
+        decision: 'pending'
+      }
+      onEvent({ type: 'item_started', turn_id: turnId, item: approvalItem })
+      onEvent({
+        type: 'approval_request',
+        request_id: approvalId,
+        tool_name: toolUse.name,
+        args: toolUse.args,
+        risk_level: tool.riskLevel,
+        impact: tool.description.slice(0, 120),
+        can_rollback: tool.riskLevel !== 'critical'
       })
+
+      const approved = await waitForApproval(approvalId)
+      onEvent({
+        type: 'item_completed',
+        turn_id: turnId,
+        item: { ...approvalItem, decision: approved ? 'approved' : 'rejected' }
+      })
+
       if (!approved) {
-        onEvent({ type: 'tool_result', name: toolUse.name, result: JSON.stringify({ error: '用户拒绝执行此操作' }), id: toolUse.id })
+        finishToolItem('failed', undefined, '用户拒绝执行此操作')
         messages.push({
           role: 'assistant',
           content: assistantText,
@@ -207,11 +322,21 @@ export async function runReact(
     }
 
     let result: string
+    let toolFailed = false
     try {
       if (toolUse.name === 'shell' && typeof toolUse.args.command === 'string' && isBlocked(toolUse.args.command)) {
         result = JSON.stringify({ error: '危险命令已拒绝' })
+        toolFailed = true
       } else if (toolUse.name === 'propose_plan') {
-        result = planExecute(toolUse.args)
+        const { plan, steps, requestId } = parsePlanArgs(toolUse.args)
+        const planItemId = `planItem-${randomUUID()}`
+        onEvent({
+          type: 'item_started',
+          turn_id: turnId,
+          item: { type: 'plan', id: planItemId, plan, steps, decision: 'pending', requestId }
+        })
+        onEvent({ type: 'plan_proposed', request_id: requestId, plan, steps })
+        result = JSON.stringify({ status: 'submitted', request_id: requestId })
       } else if (toolUse.name === 'update_todo') {
         result = todoExecute(toolUse.args)
       } else {
@@ -219,9 +344,19 @@ export async function runReact(
       }
     } catch (e) {
       result = JSON.stringify({ error: e instanceof Error ? e.message : String(e) })
+      toolFailed = true
     }
 
-    onEvent({ type: 'tool_result', name: toolUse.name, result, id: toolUse.id })
+    if (!toolFailed) {
+      try {
+        const parsed = JSON.parse(result)
+        toolFailed = Boolean(parsed && typeof parsed === 'object' && 'error' in parsed)
+      } catch {
+        // 非 JSON 结果视为成功
+      }
+    }
+
+    finishToolItem(toolFailed ? 'failed' : 'completed', result)
 
     messages.push({
       role: 'assistant',
@@ -246,9 +381,10 @@ export async function runReact(
     finalText = '任务已执行完毕，但未生成最终文本。请查看上方工具日志了解执行详情。'
   }
 
+  clearPendingPlanRequestId()
+  onEvent({ type: 'turn_completed', turn_id: turnId, status: 'completed' })
   return { messages, finalText }
 }
-
 
 // 判断错误是否因为模型不支持图片输入
 function isImageUnsupportedError(msg: string): boolean {

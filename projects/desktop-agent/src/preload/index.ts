@@ -11,6 +11,10 @@ const api = {
     ipcRenderer.invoke('session:loadMessages', sessionId) as Promise<unknown[]>,
   deleteSessionMessages: (sessionId: string) =>
     ipcRenderer.invoke('session:deleteMessages', sessionId) as Promise<{ success: boolean; error?: string }>,
+  saveSessionTurns: (sessionId: string, turns: unknown[]) =>
+    ipcRenderer.invoke('session:saveTurns', { sessionId, turns }) as Promise<{ success: boolean; error?: string }>,
+  loadSessionTurns: (sessionId: string) =>
+    ipcRenderer.invoke('session:loadTurns', sessionId) as Promise<unknown[]>,
   onAgentEvent: (fn: (msg: StdoutMessage) => void) => {
     const listener = (_e: unknown, msg: StdoutMessage) => fn(msg)
     ipcRenderer.on('agent:event', listener)
@@ -37,7 +41,9 @@ const api = {
   openPath: (filePath: string) => ipcRenderer.invoke('shell:openPath', filePath) as Promise<void>,
   traceList: (limit?: number) => ipcRenderer.invoke('trace:list', limit) as Promise<unknown[]>,
   traceGet: (traceId: string) => ipcRenderer.invoke('trace:get', traceId) as Promise<unknown>,
-  openFiles: () => ipcRenderer.invoke('dialog:openFiles') as Promise<unknown[]>
+  openFiles: () => ipcRenderer.invoke('dialog:openFiles') as Promise<unknown[]>,
+  pickFolder: () => ipcRenderer.invoke('project:select') as Promise<string | null>,
+  createProjectFolder: (name: string) => ipcRenderer.invoke('project:create', name) as Promise<string | null>
 }
 
 contextBridge.exposeInMainWorld('api', api)

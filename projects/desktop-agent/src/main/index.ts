@@ -34,6 +34,10 @@ function getSessionPath(sessionId: string): string {
   return join(getSessionsDir(), `${sessionId}.json`)
 }
 
+function getSessionTurnsPath(sessionId: string): string {
+  return join(getSessionsDir(), `${sessionId}.turns.json`)
+}
+
 function loadConfig(): ModelConfig | null {
   try {
     const p = getConfigPath()
@@ -284,9 +288,38 @@ ipcMain.handle('session:deleteMessages', async (_e, sessionId: string) => {
       const { unlinkSync } = await import('node:fs')
       unlinkSync(p)
     }
+    const turnsPath = getSessionTurnsPath(sessionId)
+    if (existsSync(turnsPath)) {
+      const { unlinkSync } = await import('node:fs')
+      unlinkSync(turnsPath)
+    }
     return { success: true }
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : String(e) }
+  }
+})
+
+// 轮次(Turn/Item)持久化：历史翻看每一步思考/工具调用细节靠这个，与 messages 分开存
+ipcMain.handle('session:saveTurns', async (_e, args: { sessionId: string; turns: unknown[] }) => {
+  try {
+    const dir = getSessionsDir()
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+    writeFileSync(getSessionTurnsPath(args.sessionId), JSON.stringify(args.turns), 'utf-8')
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : String(e) }
+  }
+})
+
+ipcMain.handle('session:loadTurns', async (_e, sessionId: string) => {
+  try {
+    const p = getSessionTurnsPath(sessionId)
+    if (!existsSync(p)) return []
+    const raw = readFileSync(p, 'utf-8')
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? arr : []
+  } catch {
+    return []
   }
 })
 
@@ -442,4 +475,44 @@ ipcMain.handle('dialog:openFiles', async () => {
   }))
 
   return results
+})
+
+// 选择已有文件夹作为项目根目录（参考 Codex pickLocalWorkspaceRoots）
+ipcMain.handle('project:select', async () => {
+  const win = BrowserWindow.getFocusedWindow()
+  const opts: Electron.OpenDialogOptions = {
+    properties: ['openDirectory', 'createDirectory'],
+    title: '选择项目文件夹'
+  }
+  const result = win
+    ? await dialog.showOpenDialog(win, opts)
+    : await dialog.showOpenDialog(opts)
+  if (result.canceled || result.filePaths.length === 0) return null
+  return result.filePaths[0]
+})
+
+// 从零新建项目：在 ~/Documents/小蓝鲸项目/YYYY-MM-DD/ 下建目录（参考 Codex nS 逻辑）
+ipcMain.handle('project:create', async (_e, name: string) => {
+  const input = (name || '').trim()
+  if (!input) return null
+
+  // slug 化：提取 [a-z0-9] 片段取前 6 段用 - 拼接；纯中文等无字母数字时用项目名原样
+  const slugParts = input.toLowerCase().match(/[a-z0-9]+/g)
+  let dirName = slugParts && slugParts.length > 0 ? slugParts.slice(0, 6).join('-') : input
+
+  // 日期子目录 YYYY-MM-DD
+  const now = new Date()
+  const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  const baseDir = join(app.getPath('documents'), '小蓝鲸项目', dateStr)
+  if (!existsSync(baseDir)) mkdirSync(baseDir, { recursive: true })
+
+  // 去重：已存在则追加 -2 -3 …
+  let finalPath = join(baseDir, dirName)
+  let counter = 2
+  while (existsSync(finalPath)) {
+    finalPath = join(baseDir, `${dirName}-${counter}`)
+    counter++
+  }
+  mkdirSync(finalPath, { recursive: true })
+  return finalPath
 })

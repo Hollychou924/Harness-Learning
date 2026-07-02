@@ -72,7 +72,7 @@ async function handleStdin(msg: StdinMessage): Promise<void> {
   }
 
   if (msg.type === 'append_input') {
-    send({ type: 'thinking', text: '追加输入已收到，一期暂不支持任务中追加' })
+    send({ type: 'status', status: 'INFO', message: '追加输入已收到，一期暂不支持任务中追加' })
     return
   }
 }

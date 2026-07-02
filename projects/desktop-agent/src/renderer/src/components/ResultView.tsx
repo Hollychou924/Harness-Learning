@@ -2,6 +2,7 @@ import { memo, useEffect, useRef, useState } from 'react'
 import { MarkdownEngine } from './markdown/MarkdownEngine'
 import './markdown/markdown.css'
 
+// 最终回复展示：扁平占满宽度，不带卡片外壳(复刻 Codex 的"文档流"风格，而非聊天气泡)
 export const ResultView = memo(function ResultView({ content }: { content: string }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [autoScroll, setAutoScroll] = useState(true)
@@ -20,26 +21,19 @@ export const ResultView = memo(function ResultView({ content }: { content: strin
 
   if (!content) {
     return (
-      <div className="glass rounded-2xl p-4 text-sm text-[var(--ink-soft)]">
+      <div className="text-sm text-[var(--ink-soft)] px-1 py-1">
         正在生成回复…
       </div>
     )
   }
 
   return (
-    <div className="glass rounded-2xl overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-2.5 border-b border-black/[0.05]">
-        <span className="text-xs font-medium text-[var(--ink-soft)] flex items-center gap-1.5">
-          <span>💬</span> 回复
-        </span>
-      </div>
-      <div
-        ref={scrollRef}
-        onScroll={handleScroll}
-        className="px-5 py-4 max-h-[60vh] overflow-y-auto"
-      >
-        <MarkdownEngine content={content} streaming={true} />
-      </div>
+    <div
+      ref={scrollRef}
+      onScroll={handleScroll}
+      className="w-full px-1 py-1 max-h-[70vh] overflow-y-auto"
+    >
+      <MarkdownEngine content={content} streaming={true} />
     </div>
   )
 })
