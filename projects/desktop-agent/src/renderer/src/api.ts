@@ -61,7 +61,10 @@ type Api = {
   configGet: (key: string) => Promise<unknown>
   saveModelConfig: (cfg: ModelConfig) => Promise<{ success: boolean }>
   openExternal: (url: string) => Promise<void>
+  openPath: (filePath: string) => Promise<void>
   openFiles: () => Promise<AttachmentFile[]>
+  workspaceListFiles: (subDir?: string) => Promise<{ items: Array<{ name: string; type: string; size: number; path: string }> }>
+  workspaceReadFile: (relPath: string) => Promise<{ content?: string; truncated?: boolean; error?: string }>
   traceList: (limit?: number) => Promise<TraceMeta[]>
   traceGet: (traceId: string) => Promise<TraceDetail>
 }
@@ -83,7 +86,10 @@ const empty: Api = {
   configGet: async () => null,
   saveModelConfig: async () => ({ success: false }),
   openExternal: async () => {},
+  openPath: async () => {},
   openFiles: async () => [],
+  workspaceListFiles: async () => ({ items: [] }),
+  workspaceReadFile: async () => ({}),
   traceList: async () => [],
   traceGet: async () => ({ meta: null, events: [] })
 }

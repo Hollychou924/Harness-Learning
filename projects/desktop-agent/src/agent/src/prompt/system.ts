@@ -31,7 +31,13 @@ export function buildSystemPrompt(mode: TaskMode, workspaceDir?: string): string
 输出格式要求：
 - 最终报告用 Markdown，含标题、分节、要点。
 - 每条结论后用 [来源](url) 标注来源。
-- 报告末尾列出所有来源链接清单。`
+- 报告末尾列出所有来源链接清单。
+
+文档生成能力：
+- 当用户明确要求生成 Word 文档时，调用 create_docx 生成排版好的 .docx 文件。
+- 当用户明确要求生成 Excel 表格时，调用 create_xlsx 生成 .xlsx 文件。
+- 当用户未明确指定格式但内容适合表格呈现时，可自行判断用 create_xlsx。
+- 生成后在回复中告知用户文件路径。`
   }
 
   return `${base}

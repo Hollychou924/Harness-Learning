@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react'
 import {
-  Globe, FileText, FileSearch, FilePlus, FileEdit, Terminal, Code, type LucideIcon
+  Globe, FileText, FileSearch, FilePlus, FileEdit, Terminal, Code, FileType, FileSpreadsheet, type LucideIcon
 } from 'lucide-react'
 import type { ToolLogEntry } from '../store/task'
+import { api } from '../api'
 import { ToolCardShell, DetailBlock, type ToolCardStatus } from './ToolCardShell'
 
 export interface ToolCardProps {
@@ -29,6 +30,8 @@ function extractTarget(name: string, args: Record<string, unknown>): string {
   if (name === 'read_file' && typeof args.path === 'string') return args.path
   if (name === 'list_files' && typeof args.dir === 'string') return args.dir
   if (name === 'write_file' && typeof args.path === 'string') return args.path
+  if (name === 'create_docx' && typeof args.path === 'string') return args.path
+  if (name === 'create_xlsx' && typeof args.path === 'string') return args.path
   if (name === 'parse_page' && typeof args.url === 'string') return shortenUrl(args.url)
   return ''
 }
@@ -62,6 +65,8 @@ const TOOL_META: Record<string, { label: string; icon: ReactNode }> = {
   list_files: { label: '文件检索', icon: <FileSearch size={14} /> },
   read_file: { label: '文件读取', icon: <FileText size={14} /> },
   write_file: { label: '文件写入', icon: <FilePlus size={14} /> },
+  create_docx: { label: '生成 Word', icon: <FileType size={14} /> },
+  create_xlsx: { label: '生成 Excel', icon: <FileSpreadsheet size={14} /> },
   edit_file: { label: '文件编辑', icon: <FileEdit size={14} /> },
   shell: { label: '执行命令', icon: <Terminal size={14} /> },
 }
@@ -72,6 +77,8 @@ export function ToolCard({ entry }: ToolCardProps) {
   const target = extractTarget(entry.name, entry.args)
 
   if (entry.name === 'write_file') return <WriteFileCard entry={entry} />
+  if (entry.name === 'create_docx') return <DocGenCard entry={entry} fileType="Word" />
+  if (entry.name === 'create_xlsx') return <DocGenCard entry={entry} fileType="Excel" />
   if (entry.name === 'edit_file') return <EditFileCard entry={entry} />
   if (entry.name === 'shell') return <ShellCard entry={entry} />
 
@@ -164,6 +171,42 @@ function ShellCard({ entry }: ToolCardProps) {
       title={command ? `执行：${command}` : '执行命令'}
     >
       {entry.result && <DetailBlock title="输出" content={formatResult(entry.result)} />}
+    </ToolCardShell>
+  )
+}
+
+
+function DocGenCard({ entry, fileType }: ToolCardProps & { fileType: string }) {
+  const status = getStatus(entry)
+  const path = typeof entry.args.path === 'string' ? entry.args.path : ''
+  const name = path.split('/').pop() || path || '未命名'
+  const icon = fileType === 'Word' ? <FileType size={14} /> : <FileSpreadsheet size={14} />
+  const ok = status === 'done' && entry.result && !entry.result.includes('"error"')
+  let resultPath = ''
+  if (ok) {
+    try {
+      const obj = JSON.parse(entry.result || '{}')
+      if (obj.path) resultPath = obj.path
+    } catch { /* ignore */ }
+  }
+
+  return (
+    <ToolCardShell
+      status={status}
+      icon={icon}
+      title={`生成 ${fileType}：${name}`}
+      target={path}
+      badges={ok ? <span className="text-xs font-mono text-green-600">✓ 已生成</span> : undefined}
+    >
+      {ok && resultPath && (
+        <button
+          onClick={() => api.openPath(resultPath)}
+          className="text-xs text-[#0071e3] hover:underline"
+        >
+          打开文件 →
+        </button>
+      )}
+      {!ok && entry.result && <DetailBlock title="结果" content={formatResult(entry.result)} />}
     </ToolCardShell>
   )
 }

@@ -34,6 +34,7 @@ const api = {
   saveModelConfig: (cfg: { providerId: string; model: string; apiKey: string; apiBaseUrl: string; apiFormat: 'openai' | 'anthropic'; contextLimit: number; customProviderId?: string; autoApproveLow?: boolean }) =>
     ipcRenderer.invoke('config:saveModel', cfg) as Promise<{ success: boolean }>,
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url) as Promise<void>,
+  openPath: (filePath: string) => ipcRenderer.invoke('shell:openPath', filePath) as Promise<void>,
   traceList: (limit?: number) => ipcRenderer.invoke('trace:list', limit) as Promise<unknown[]>,
   traceGet: (traceId: string) => ipcRenderer.invoke('trace:get', traceId) as Promise<unknown>,
   openFiles: () => ipcRenderer.invoke('dialog:openFiles') as Promise<unknown[]>

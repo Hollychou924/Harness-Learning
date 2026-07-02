@@ -108,6 +108,8 @@ export interface Attachment {
   dataUrl?: string
   textContent?: string
   mime: string
+  /** 大图用 Object URL 替代 dataURL，减少内存占用 */
+  objectUrl?: string
 }
 
 export interface SubtaskEntry {
@@ -480,7 +482,11 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     saveSessionsToStorage(next)
     set({ sessions: next })
   },
-  reset: () => set({ ...initial, history: get().history, projects: get().projects, sessions: get().sessions, activeProjectId: get().activeProjectId, activeSessionId: get().activeSessionId, mode: get().mode, approvalPending: null, pendingPlan: null, todos: [], subtasks: [], attachments: [] }),
+  reset: () => {
+    // 释放附件的 Object URL，防止内存泄漏
+    for (const a of get().attachments) { if (a.objectUrl) URL.revokeObjectURL(a.objectUrl) }
+    set({ ...initial, history: get().history, projects: get().projects, sessions: get().sessions, activeProjectId: get().activeProjectId, activeSessionId: get().activeSessionId, mode: get().mode, approvalPending: null, pendingPlan: null, todos: [], subtasks: [], attachments: [] })
+  },
   cancelTask: async () => {
     const { taskId } = get()
     if (taskId) await api.cancelTask(taskId)
@@ -681,7 +687,28 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       messages: [...messages, userMsg]
     })
     const settingsState = useSettingsStore.getState()
-    const res = await api.startTask({ mode, message, maxIterations: settingsState.maxIterations, autoApproveLow: settingsState.autoApproveLow, sessionId, history, attachments })
+    // 发送前把 objectUrl 图片转成 dataUrl(agent 子进程需要 base64)
+    const sendAttachments = await Promise.all(attachments.map(async (a) => {
+      if (a.objectUrl && !a.dataUrl && a.type === 'image') {
+        try {
+          const resp = await fetch(a.objectUrl)
+          const blob = await resp.blob()
+          const dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as string)
+            reader.onerror = reject
+            reader.readAsDataURL(blob)
+          })
+          return { ...a, dataUrl }
+        } catch { return a }
+      }
+      return a
+    }))
+
+    // 释放附件 Object URL
+    for (const a of attachments) { if (a.objectUrl) URL.revokeObjectURL(a.objectUrl) }
+
+    const res = await api.startTask({ mode, message, maxIterations: settingsState.maxIterations, autoApproveLow: settingsState.autoApproveLow, sessionId, history, attachments: sendAttachments })
     if (res.error) {
       set({ status: 'failed', error: res.error })
     } else {

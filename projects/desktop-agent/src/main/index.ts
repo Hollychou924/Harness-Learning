@@ -1,8 +1,9 @@
 import { app, BrowserWindow, ipcMain, shell, nativeTheme, dialog } from 'electron'
-import { join } from 'node:path'
+import { join, resolve, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
+import { readdir as readdirAsync, stat as statAsync } from 'node:fs/promises'
 import { agentBridge } from './agent-bridge.js'
 import { startTrace, logAgentEvent, logUserAction, listTraces, getTrace } from './trace-logger.js'
 import type { StdoutMessage, AgentConfig, MessageAttachment } from '../agent/src/protocol.js'
@@ -57,7 +58,7 @@ function buildAgentConfig(): AgentConfig {
       apiKey: saved.apiKey,
       apiBaseUrl: saved.apiBaseUrl || undefined,
       maxIterations: Number(process.env.XLJ_MAX_ITER || 8),
-      workspaceDir: process.env.XLJ_WORKSPACE || undefined,
+      workspaceDir: process.env.XLJ_WORKSPACE || join(app.getPath('documents'), '小蓝鲸产出'),
       providerId: saved.providerId,
       apiFormat: saved.apiFormat,
       contextLimit: saved.contextLimit,
@@ -72,7 +73,7 @@ function buildAgentConfig(): AgentConfig {
     apiKey: process.env.ANTHROPIC_API_KEY || '',
     apiBaseUrl: process.env.ANTHROPIC_BASE_URL || undefined,
     maxIterations: Number(process.env.XLJ_MAX_ITER || 8),
-    workspaceDir: process.env.XLJ_WORKSPACE || undefined,
+    workspaceDir: process.env.XLJ_WORKSPACE || join(app.getPath('documents'), '小蓝鲸产出'),
     autoApproveLow: false
   }
 }
@@ -162,7 +163,10 @@ ipcMain.handle('agent:startTask', async (_e, args: { mode: 'work' | 'code'; mess
     providerId: config.providerId,
     customProviderId: config.customProviderId
   })
-  agentBridge.startTask(sessionId, args.message, config, args.workspaceDir, args.history, args.attachments as MessageAttachment[] | undefined)
+  // 输出目录：优先用用户指定，否则用系统文档目录下的「小蓝鲸产出」
+  const outputDir = args.workspaceDir || join(app.getPath('documents'), '小蓝鲸产出')
+  if (!existsSync(outputDir)) mkdirSync(outputDir, { recursive: true })
+  agentBridge.startTask(sessionId, args.message, config, outputDir, args.history, args.attachments as MessageAttachment[] | undefined)
   return { taskId: sessionId }
 })
 
@@ -202,6 +206,12 @@ ipcMain.handle('shell:openExternal', async (_e, url: string) => {
   if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
     await shell.openExternal(url)
   }
+})
+
+// 打开本地文件（Word/Excel 等生成产物）
+ipcMain.handle('shell:openPath', async (_e, filePath: string) => {
+  if (typeof filePath !== 'string' || !filePath) return
+  await shell.openPath(filePath)
 })
 
 // 任务控制通道（依据 docs/09 第二章，转发为 stdin task_control）
@@ -278,6 +288,52 @@ ipcMain.handle('session:deleteMessages', async (_e, sessionId: string) => {
   }
 })
 
+// 列出工作区目录文件(供输入框 @文件引用)
+ipcMain.handle('workspace:listFiles', async (_e, subDir?: string) => {
+  const root = join(app.getPath('documents'), '小蓝鲸产出')
+  const target = subDir ? resolve(root, subDir) : root
+  if (!target.startsWith(root)) return { error: '越界', items: [] }
+  try {
+    const entries = await readdirAsync(target, { withFileTypes: true })
+    const items = await Promise.all(
+      entries.map(async (e) => {
+        try {
+          const s = await statAsync(join(target, e.name))
+          return {
+            name: e.name,
+            type: e.isDirectory() ? 'dir' : 'file',
+            size: s.size,
+            path: relative(root, join(target, e.name))
+          }
+        } catch {
+          return { name: e.name, type: e.isDirectory() ? 'dir' : 'file', path: e.name }
+        }
+      })
+    )
+    // 目录排前面，文件按名字排序
+    items.sort((a, b) => {
+      if (a.type !== b.type) return a.type === 'dir' ? -1 : 1
+      return a.name.localeCompare(b.name)
+    })
+    return { items }
+  } catch {
+    return { items: [] }
+  }
+})
+
+// 读取工作区文件文本内容(供 @文件引用注入上下文)
+ipcMain.handle('workspace:readFile', async (_e, relPath: string) => {
+  const root = join(app.getPath('documents'), '小蓝鲸产出')
+  const abs = resolve(root, relPath)
+  if (!abs.startsWith(root)) return { error: '越界' }
+  try {
+    const content = readFileSync(abs, 'utf-8')
+    return { content: content.slice(0, 50000), truncated: content.length > 50000 }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) }
+  }
+})
+
 ipcMain.handle('trace:list', async (_e, limit?: number) => {
   return listTraces(limit ?? 50)
 })
@@ -285,6 +341,47 @@ ipcMain.handle('trace:list', async (_e, limit?: number) => {
 ipcMain.handle('trace:get', async (_e, traceId: string) => {
   return getTrace(traceId)
 })
+
+// 从 Office/PDF 文档中提取纯文本内容（供模型理解文档）
+async function extractDocumentText(filePath: string, ext: string): Promise<string> {
+  try {
+    if (ext === 'docx') {
+      const mammoth = await import('mammoth')
+      const result = await mammoth.extractRawText({ path: filePath })
+      return result.value || ''
+    }
+    if (ext === 'xlsx') {
+      const ExcelJS = await import('exceljs')
+      const wb = new ExcelJS.Workbook()
+      await wb.xlsx.readFile(filePath)
+      const lines: string[] = []
+      wb.eachSheet((sheet) => {
+        lines.push(`[工作表: ${sheet.name}]`)
+        sheet.eachRow((row) => {
+          const cells = row.values as unknown[]
+          // values[0] 是 undefined，从 1 开始
+          const text = cells.slice(1).map((c) => (c == null ? '' : String(c))).join('\t')
+          lines.push(text)
+        })
+      })
+      return lines.join('\n')
+    }
+    if (ext === 'pdf') {
+      const { PDFParse } = await import('pdf-parse')
+      const buf = readFileSync(filePath)
+      const parser = new PDFParse({ data: new Uint8Array(buf) })
+      const textResult = await parser.getText()
+      await parser.destroy()
+      return textResult.text || ''
+    }
+    // .doc / .pptx 等暂不支持解析，返回提示
+    if (ext === 'doc') return '[旧版 .doc 格式暂不支持解析，建议转为 .docx]'
+    if (ext === 'pptx') return '[.pptx 解析暂未实现，建议复制文字内容后发送]'
+  } catch (e) {
+    return `[文档解析失败: ${e instanceof Error ? e.message : String(e)}]`
+  }
+  return ''
+}
 
 ipcMain.handle('dialog:openFiles', async () => {
   const result = await dialog.showOpenDialog({
@@ -295,12 +392,21 @@ ipcMain.handle('dialog:openFiles', async () => {
   })
   if (result.canceled || result.filePaths.length === 0) return []
 
-  return result.filePaths.map((filePath) => {
+  const results = await Promise.all(result.filePaths.map(async (filePath) => {
     const fileName = filePath.split('/').pop() || filePath
     const ext = fileName.split('.').pop()?.toLowerCase() || ''
     const isImage = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(ext)
     const isText = ['txt', 'md', 'json', 'csv', 'log', 'ts', 'js', 'tsx', 'jsx', 'py', 'go', 'rs', 'java', 'html', 'css', 'xml', 'yaml', 'yml', 'sh', 'sql'].includes(ext)
-    const mime = isImage ? `image/${ext === 'jpg' ? 'jpeg' : ext}` : isText ? 'text/plain' : 'application/octet-stream'
+    const isDoc = ['docx', 'xlsx', 'pdf', 'doc', 'pptx'].includes(ext)
+    const mime = isImage
+      ? (ext === 'jpg' ? 'image/jpeg' : ext === 'svg' ? 'image/svg+xml' : `image/${ext}`)
+      : isText ? 'text/plain'
+      : isDoc ? (ext === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        : ext === 'xlsx' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        : ext === 'pdf' ? 'application/pdf'
+        : ext === 'pptx' ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        : 'application/msword')
+      : 'application/octet-stream'
 
     let dataUrl: string | undefined
     let textContent: string | undefined
@@ -313,18 +419,25 @@ ipcMain.handle('dialog:openFiles', async () => {
         dataUrl = `data:${mime};base64,${buf.toString('base64')}`
       } else if (isText) {
         textContent = buf.toString('utf-8')
+      } else if (isDoc) {
+        textContent = await extractDocumentText(filePath, ext)
       }
     } catch {
       // 读取失败
     }
 
+    // 文档类有提取到文本就归为 text，否则 file
+    const type = isImage ? 'image' : (isText || (isDoc && textContent)) ? 'text' : 'file'
+
     return {
       name: fileName,
-      type: isImage ? 'image' : isText ? 'text' : 'file',
+      type,
       size,
       mime,
       dataUrl,
       textContent
     }
-  })
+  }))
+
+  return results
 })
