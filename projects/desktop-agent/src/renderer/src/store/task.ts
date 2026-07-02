@@ -122,6 +122,25 @@ export interface SubtaskEntry {
   error?: string
 }
 
+/** 单任务运行时状态（隔离存储，切走不清除，切回来恢复） */
+export interface TaskRuntime {
+  status: TaskStatus
+  chunks: string
+  summary: string
+  thinking: string[]
+  toolLogs: ToolLogEntry[]
+  steps: StepEntry[]
+  artifacts: ArtifactEntry[]
+  usage: { inputTokens: number; outputTokens: number }
+  error: string | null
+  startedAt: number | null
+  finishedAt: number | null
+  approvalPending: ApprovalRequest | null
+  pendingPlan: PendingPlan | null
+  todos: TodoItem[]
+  subtasks: SubtaskEntry[]
+}
+
 export interface TaskState {
   status: TaskStatus
   taskId: string | null
@@ -141,6 +160,7 @@ export interface TaskState {
   history: HistoryEntry[]
   /** 当前对话的完整消息流（用于上下文恢复与全量传入） */
   messages: AgentMessage[]
+  runningTasks: Record<string, TaskRuntime>
   projects: Project[]
   sessions: Session[]
   activeProjectId: string
@@ -326,6 +346,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   ...initial,
   history: loadHistoryFromStorage(),
   messages: [],
+  runningTasks: {},
   projects: loadProjectsFromStorage(),
   sessions: loadSessionsFromStorage(),
   activeProjectId: loadActiveProject(),
@@ -333,7 +354,20 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   setMode: (m) => {
     const cur = get()
     if (cur.mode === m) return
-    // 保存当前模式状态（含 messages，切回来能恢复对话）
+    // 切走前：若当前任务还在执行，存进 runningTasks（后台继续跑）
+    if (cur.taskId && cur.status === 'executing') {
+      set((s) => ({
+        runningTasks: {
+          ...s.runningTasks,
+          [cur.taskId as string]: {
+            status: s.status, chunks: s.chunks, summary: s.summary, thinking: s.thinking,
+            toolLogs: s.toolLogs, steps: s.steps, artifacts: s.artifacts, usage: s.usage,
+            error: s.error, startedAt: s.startedAt, finishedAt: s.finishedAt,
+            approvalPending: s.approvalPending, pendingPlan: s.pendingPlan, todos: s.todos, subtasks: s.subtasks
+          }
+        }
+      }))
+    }
     modeSnapshots.set(cur.mode, {
       status: cur.status, taskId: cur.taskId, message: cur.message, goal: cur.goal,
       chunks: cur.chunks, summary: cur.summary, thinking: cur.thinking, toolLogs: cur.toolLogs,
@@ -349,14 +383,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       set({
         mode: m,
         ...snap,
-        status: 'idle',
+        runningTasks: get().runningTasks,
         approvalPending: null,
-        pendingPlan: null,
-        startedAt: null,
-        finishedAt: null
+        pendingPlan: null
       })
     } else {
-      set({ mode: m, ...initial, messages: [], history: cur.history, projects: cur.projects, sessions: cur.sessions, activeProjectId: cur.activeProjectId, activeSessionId: cur.activeSessionId })
+      set({ mode: m, ...initial, messages: [], runningTasks: get().runningTasks, history: cur.history, projects: cur.projects, sessions: cur.sessions, activeProjectId: cur.activeProjectId, activeSessionId: cur.activeSessionId })
     }
   },
   setMessage: (s) => set({ message: s }),
@@ -499,7 +531,9 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   cancelTask: async () => {
     const { taskId } = get()
     if (taskId) await api.cancelTask(taskId)
-    set({ status: 'idle', finishedAt: Date.now() })
+    const rt = { ...get().runningTasks }
+    if (taskId) delete rt[taskId]
+    set({ status: 'idle', finishedAt: Date.now(), runningTasks: rt })
   },
   appendInput: async (text: string, mode?: 'inject' | 'queue') => {
     const { taskId } = get()
@@ -523,25 +557,84 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     }
   },
   appendEvent: (msg) => {
+    const evTaskId = (msg as { taskId?: string }).taskId
+    const cur = get()
+    const isVisible = evTaskId === cur.activeSessionId
+
+    // 不可见任务：只更新隔离存储 runningTasks，不碰全局展示状态
+    if (!isVisible || !evTaskId) {
+      const rt = cur.runningTasks[evTaskId || '']
+      const base = rt || {
+        status: 'executing' as TaskStatus, chunks: '', summary: '', thinking: [],
+        toolLogs: [], steps: [], artifacts: [], usage: { inputTokens: 0, outputTokens: 0 },
+        error: null, startedAt: Date.now(), finishedAt: null,
+        approvalPending: null, pendingPlan: null, todos: [], subtasks: []
+      }
+      let patch: Partial<TaskRuntime> = {}
+      switch (msg.type) {
+        case 'chunk': patch = { chunks: base.chunks + msg.text, status: 'executing' }; break
+        case 'thinking': patch = { thinking: [...base.thinking, msg.text], status: 'executing' }; break
+        case 'tool_call': patch = { toolLogs: [...base.toolLogs, { name: msg.name, args: msg.args, id: msg.id }], status: 'executing' }; break
+        case 'tool_result': patch = { toolLogs: base.toolLogs.map((t) => t.id === msg.id && !t.result ? { ...t, result: msg.result } : t) }; break
+        case 'step_progress': { const next = [...base.steps]; const idx = next.findIndex((e) => e.step === msg.step && e.total === msg.total); if (idx >= 0) next[idx] = { ...next[idx], summary: msg.summary, done: true }; else next.push({ step: msg.step, total: msg.total, summary: msg.summary, done: true }); patch = { steps: next.sort((a, b) => a.step - b.step) }; break }
+        case 'artifact': patch = { artifacts: [...base.artifacts, { type: msg.artifact_type, filePath: msg.file_path }] }; break
+        case 'usage': patch = { usage: { inputTokens: base.usage.inputTokens + msg.inputTokens, outputTokens: base.usage.outputTokens + msg.outputTokens } }; break
+        case 'error': patch = { error: msg.message, status: 'failed', finishedAt: Date.now() }; break
+        case 'completed': {
+          // 后台任务完成：累积消息落盘，但不更新全局展示
+          const assistantText = base.chunks || msg.summary || ''
+          void api.loadSessionMessages(evTaskId as string).then((stored) => {
+            const msgs = (stored as AgentMessage[]) || []
+            let nextMessages = [...msgs]
+            if (base.toolLogs.length > 0) {
+              const toolCalls = base.toolLogs.map((t) => ({ id: t.id, type: 'function' as const, function: { name: t.name, arguments: JSON.stringify(t.args) } }))
+              nextMessages.push({ role: 'assistant', content: assistantText, tool_calls: toolCalls })
+              for (const t of base.toolLogs) nextMessages.push({ role: 'tool', tool_call_id: t.id, content: t.result || '{}' })
+            } else if (assistantText) { nextMessages.push({ role: 'assistant', content: assistantText }) }
+            void api.saveSessionMessages(evTaskId as string, nextMessages)
+            // 更新会话列表标题/状态
+            const gs = get()
+            const sess = gs.sessions.find((x) => x.id === evTaskId)
+            if (sess) {
+              const nextSessions = gs.sessions.map((x) => x.id === evTaskId ? { ...x, status: 'completed' as TaskStatus, updatedAt: Date.now(), stepCount: base.steps.length, tokens: base.usage.inputTokens + base.usage.outputTokens, title: assistantText.slice(0, 40) || x.title } : x)
+              saveSessionsToStorage(nextSessions)
+              set({ sessions: nextSessions })
+            }
+          })
+          const rtAfter = { ...get().runningTasks }
+          delete rtAfter[evTaskId as string]
+          set({ runningTasks: rtAfter })
+          return
+        }
+        default: break
+      }
+      set((st) => ({ runningTasks: { ...st.runningTasks, [evTaskId as string]: { ...base, ...patch } } }))
+      return
+    }
+
+    // 可见任务：走原有逻辑更新全局展示，同时同步到 runningTasks
+    const syncRT = (extra?: Partial<TaskRuntime>) => {
+      const st = get()
+      const old = st.runningTasks[evTaskId] || { status: 'executing' as TaskStatus, chunks: '', summary: '', thinking: [], toolLogs: [], steps: [], artifacts: [], usage: { inputTokens: 0, outputTokens: 0 }, error: null, startedAt: Date.now(), finishedAt: null, approvalPending: null, pendingPlan: null, todos: [], subtasks: [] }
+      set({ runningTasks: { ...st.runningTasks, [evTaskId]: { ...old, status: st.status, chunks: st.chunks, summary: st.summary, thinking: st.thinking, toolLogs: st.toolLogs, steps: st.steps, artifacts: st.artifacts, usage: st.usage, error: st.error, startedAt: st.startedAt, finishedAt: st.finishedAt, approvalPending: st.approvalPending, pendingPlan: st.pendingPlan, todos: st.todos, subtasks: st.subtasks, ...extra } } })
+    }
+
     switch (msg.type) {
       case 'chunk':
         set((s) => ({ chunks: s.chunks + msg.text, status: 'executing' }))
+        syncRT()
         break
       case 'thinking':
         set((s) => ({ thinking: [...s.thinking, msg.text], status: 'executing' }))
+        syncRT()
         break
       case 'tool_call':
-        set((s) => ({
-          toolLogs: [...s.toolLogs, { name: msg.name, args: msg.args, id: msg.id }],
-          status: 'executing'
-        }))
+        set((s) => ({ toolLogs: [...s.toolLogs, { name: msg.name, args: msg.args, id: msg.id }], status: 'executing' }))
+        syncRT()
         break
       case 'tool_result':
-        set((s) => ({
-          toolLogs: s.toolLogs.map((t) =>
-            t.id === msg.id && !t.result ? { ...t, result: msg.result } : t
-          )
-        }))
+        set((s) => ({ toolLogs: s.toolLogs.map((t) => t.id === msg.id && !t.result ? { ...t, result: msg.result } : t) }))
+        syncRT()
         break
       case 'step_progress':
         set((s) => {
@@ -551,7 +644,6 @@ export const useTaskStore = create<TaskState>((set, get) => ({
             next[existing] = { ...next[existing], summary: msg.summary, done: true }
           } else {
             next.push({ step: msg.step, total: msg.total, summary: msg.summary, done: true })
-            // 补齐前面未显式完成的步骤为已完成态，避免 checklist 卡住
             for (let i = 1; i < msg.step; i++) {
               if (!next.find((e) => e.step === i)) {
                 next.push({ step: i, total: msg.total, summary: '', done: true })
@@ -560,111 +652,65 @@ export const useTaskStore = create<TaskState>((set, get) => ({
           }
           return { steps: next.sort((a, b) => a.step - b.step) }
         })
+        syncRT()
         break
       case 'artifact':
-        set((s) => ({
-          artifacts: [...s.artifacts, { type: msg.artifact_type, filePath: msg.file_path }]
-        }))
+        set((s) => ({ artifacts: [...s.artifacts, { type: msg.artifact_type, filePath: msg.file_path }] }))
+        syncRT()
         break
       case 'usage':
-        set((s) => ({
-          usage: {
-            inputTokens: s.usage.inputTokens + msg.inputTokens,
-            outputTokens: s.usage.outputTokens + msg.outputTokens
-          }
-        }))
+        set((s) => ({ usage: { inputTokens: s.usage.inputTokens + msg.inputTokens, outputTokens: s.usage.outputTokens + msg.outputTokens } }))
+        syncRT()
         break
       case 'error':
         set({ error: msg.message, status: 'failed', finishedAt: Date.now() })
+        { const rt = { ...get().runningTasks }; delete rt[evTaskId]; set({ runningTasks: rt }) }
         break
       case 'completed': {
-        // 把本轮 assistant 回复 + 工具调用累积进 messages，并落盘（实现"像没离开过一样"的上下文恢复）
-        const cur = get()
-        const assistantText = cur.chunks || msg.summary || ''
-        const toolLogs = cur.toolLogs
-        let nextMessages = [...cur.messages]
+        const cur2 = get()
+        const assistantText = cur2.chunks || msg.summary || ''
+        const toolLogs = cur2.toolLogs
+        let nextMessages = [...cur2.messages]
         if (toolLogs.length > 0) {
-          // 有工具调用：assistant 消息带 tool_calls，每个工具结果单独一条 tool 消息
-          const toolCalls = toolLogs.map((t) => ({
-            id: t.id,
-            type: 'function' as const,
-            function: { name: t.name, arguments: JSON.stringify(t.args) }
-          }))
+          const toolCalls = toolLogs.map((t) => ({ id: t.id, type: 'function' as const, function: { name: t.name, arguments: JSON.stringify(t.args) } }))
           nextMessages.push({ role: 'assistant', content: assistantText, tool_calls: toolCalls })
-          for (const t of toolLogs) {
-            nextMessages.push({ role: 'tool', tool_call_id: t.id, content: t.result || '{}' })
-          }
-        } else if (assistantText) {
-          // 纯文本回复
-          nextMessages.push({ role: 'assistant', content: assistantText })
-        }
+          for (const t of toolLogs) nextMessages.push({ role: 'tool', tool_call_id: t.id, content: t.result || '{}' })
+        } else if (assistantText) { nextMessages.push({ role: 'assistant', content: assistantText }) }
         set({ status: 'completed', summary: msg.summary, finishedAt: Date.now(), messages: nextMessages })
         pushHistory(set, get)
-        // 全量落盘，下次继续对话时完整恢复
-        if (cur.taskId) {
-          void api.saveSessionMessages(cur.taskId, nextMessages)
-        }
+        if (evTaskId) void api.saveSessionMessages(evTaskId, nextMessages)
+        { const rt = { ...get().runningTasks }; delete rt[evTaskId]; set({ runningTasks: rt }) }
         break
       }
       case 'approval_request':
-        set({
-          approvalPending: {
-            requestId: msg.request_id,
-            toolName: msg.tool_name,
-            args: msg.args,
-            riskLevel: msg.risk_level,
-            impact: msg.impact,
-            canRollback: msg.can_rollback
-          }
-        })
+        set({ approvalPending: { requestId: msg.request_id, toolName: msg.tool_name, args: msg.args, riskLevel: msg.risk_level, impact: msg.impact, canRollback: msg.can_rollback } })
+        syncRT()
         break
       case 'plan_proposed':
-        set({
-          pendingPlan: {
-            requestId: msg.request_id,
-            plan: msg.plan,
-            steps: msg.steps
-          }
-        })
+        set({ pendingPlan: { requestId: msg.request_id, plan: msg.plan, steps: msg.steps } })
+        syncRT()
         break
       case 'todo_update':
         set({ todos: msg.todos })
+        syncRT()
         break
       case 'subtask_started':
-        set((s) => ({
-          subtasks: [...s.subtasks, {
-            id: msg.subtask_id,
-            title: msg.title,
-            status: 'running'
-          }]
-        }))
+        set((s) => ({ subtasks: [...s.subtasks, { id: msg.subtask_id, title: msg.title, status: 'running' }] }))
+        syncRT()
         break
       case 'subtask_completed':
-        set((s) => ({
-          subtasks: s.subtasks.map((st) =>
-            st.id === msg.subtask_id
-              ? { ...st, status: 'completed', durationMs: msg.duration_ms, toolCount: msg.tool_count, tokens: msg.tokens }
-              : st
-          )
-        }))
+        set((s) => ({ subtasks: s.subtasks.map((st) => st.id === msg.subtask_id ? { ...st, status: 'completed', durationMs: msg.duration_ms, toolCount: msg.tool_count, tokens: msg.tokens } : st) }))
+        syncRT()
         break
       case 'subtask_failed':
-        set((s) => ({
-          subtasks: s.subtasks.map((st) =>
-            st.id === msg.subtask_id
-              ? { ...st, status: 'failed', error: msg.error }
-              : st
-          )
-        }))
-        break
-      case 'status':
-        if (msg.status === 'EXECUTING') set({ status: 'executing' })
-        if (msg.status === 'PAUSED') set({ status: 'idle' })
+        set((s) => ({ subtasks: s.subtasks.map((st) => st.id === msg.subtask_id ? { ...st, status: 'failed', error: msg.error } : st) }))
+        syncRT()
         break
       default:
         break
     }
   },
+
   startTask: async () => {
     const { mode, message, goal, activeSessionId, messages, attachments } = get()
     if (!message.trim()) return
@@ -695,6 +741,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       goal: goal || message,
       messages: [...messages, userMsg]
     })
+    // 注册到隔离存储，切走后事件继续写入对应任务
+    set((st) => ({ runningTasks: { ...st.runningTasks, [get().taskId as string]: { status: 'executing', chunks: '', summary: '', thinking: [], toolLogs: [], steps: [], artifacts: [], usage: { inputTokens: 0, outputTokens: 0 }, error: null, startedAt: Date.now(), finishedAt: null, approvalPending: null, pendingPlan: null, todos: [], subtasks: [] } } }))
     const settingsState = useSettingsStore.getState()
     // 发送前把 objectUrl 图片转成 dataUrl(agent 子进程需要 base64)
     const sendAttachments = await Promise.all(attachments.map(async (a) => {
@@ -729,21 +777,30 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     }
   },
   continueSession: async (sessionId) => {
-    // 从磁盘恢复该会话的完整消息流，让界面"像没离开过一样"
-    const stored = (await api.loadSessionMessages(sessionId)) as AgentMessage[]
+    const cur = get()
+    // 切走前：若当前任务还在执行，存进 runningTasks（后台继续跑，不中断）
+    if (cur.taskId && cur.status === 'executing') {
+      set((s) => ({
+        runningTasks: {
+          ...s.runningTasks,
+          [cur.taskId as string]: {
+            status: s.status, chunks: s.chunks, summary: s.summary, thinking: s.thinking,
+            toolLogs: s.toolLogs, steps: s.steps, artifacts: s.artifacts, usage: s.usage,
+            error: s.error, startedAt: s.startedAt, finishedAt: s.finishedAt,
+            approvalPending: s.approvalPending, pendingPlan: s.pendingPlan, todos: s.todos, subtasks: s.subtasks
+          }
+        }
+      }))
+    }
+    // 切到目标：优先从 runningTasks 恢复运行时（任务还在跑），否则读盘恢复历史
+    const rt = get().runningTasks[sessionId]
     const sess = get().sessions.find((s) => s.id === sessionId)
-    set({
-      ...initial,
-      messages: stored || [],
-      mode: sess?.mode || get().mode,
-      activeSessionId: sessionId,
-      activeProjectId: sess?.projectId || get().activeProjectId,
-      taskId: sessionId,
-      goal: sess?.title || '',
-      projects: get().projects,
-      sessions: get().sessions,
-      history: get().history
-    })
+    if (rt && rt.status === 'executing') {
+      set({ ...initial, ...rt, messages: cur.messages, mode: sess?.mode || cur.mode, activeSessionId: sessionId, activeProjectId: sess?.projectId || cur.activeProjectId, taskId: sessionId, goal: sess?.title || '', runningTasks: get().runningTasks, projects: get().projects, sessions: get().sessions, history: get().history })
+    } else {
+      const stored = (await api.loadSessionMessages(sessionId)) as AgentMessage[]
+      set({ ...initial, messages: stored || [], mode: sess?.mode || cur.mode, activeSessionId: sessionId, activeProjectId: sess?.projectId || cur.activeProjectId, taskId: sessionId, goal: sess?.title || '', runningTasks: get().runningTasks, projects: get().projects, sessions: get().sessions, history: get().history })
+    }
   }
 }))
 

@@ -102,16 +102,18 @@ function createWindow(): void {
     }
   })
 
-  // 把 Agent 子进程消息转发给渲染进程
+  // 把 Agent 子进程消息转发给渲染进程，并注入 taskId（流式事件本身不带，补上以便前端按任务隔离）
   agentBridge.onMessage((msg: StdoutMessage) => {
-    if (activeTraceId) {
-      logAgentEvent(activeTraceId, msg)
+    const taskId = activeTraceId
+    if (taskId) {
+      logAgentEvent(taskId, msg)
       if (msg.type === 'completed' || msg.type === 'error') {
         activeTraceId = null
       }
     }
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('agent:event', msg)
+      // 给所有事件补上 taskId，前端据此写入对应任务的隔离存储
+      mainWindow.webContents.send('agent:event', { ...msg, taskId })
     }
   })
   mainWindow.on('ready-to-show', () => {
