@@ -1,5 +1,6 @@
 import {
   Settings,
+  MessageSquarePlus,
   Plus,
   CheckCircle2,
   XCircle,
@@ -23,10 +24,11 @@ import { useSettingsStore } from './settings/settingsStore'
 
 /* ============================================================
  * 左侧导航（对标 Codex 桌面客户端）
- * - 两种组织模式可切换：按项目分组 / 按时间排列
- * - 对话支持拖拽排序、拖进拖出置顶区
- * - 右侧相对时间 + hover 完整时间
- * - 批量归档
+ * - 顶部常驻入口：新对话 / 搜索 / 已安排 / 插件
+ * - 中部按区块：置顶对话 / 项目 / 普通对话
+ * - 项目可展开，项目下对话按时间倒序，默认折叠超出的旧对话
+ * - 对话右侧显示相对时间；运行中显示小蓝点
+ * - 项目/对话支持置顶、归档、重命名、删除、新建子对话
  * ============================================================ */
 
 const COLLAPSED_KEY = 'xld.collapsed.v1'
@@ -52,15 +54,26 @@ export function Sidebar() {
   const store = useTaskStore()
   const { mode, setMode, message, startTask, reset, projects, sessions, activeProjectId, activeSessionId } = store
   const { openSettings } = useSettingsStore()
+  const [activeTab, setActiveTab] = useState<'new' | 'search' | 'scheduled' | 'plugins'>('new')
   const [search, setSearch] = useState('')
   const [showArchived, setShowArchived] = useState(false)
   const [newProjectOpen, setNewProjectOpen] = useState(false)
   const [renamingProject, setRenamingProject] = useState<string | null>(null)
   const [newProjectName, setNewProjectName] = useState('')
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => loadCollapsed())
-  // 拖拽状态
   const [dragSessionId, setDragSessionId] = useState<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
+  // 项目内默认只显示前 N 条；点「展开显示」后切到全量
+  const [expandedAll, setExpandedAll] = useState<Record<string, boolean>>({})
+  const SESSION_VISIBLE_DEFAULT = 3
+  // 轻量提示：一期给「已安排 / 插件」等未实现入口使用
+  const [toast, setToast] = useState<string | null>(null)
+  const toastTimer = useRef<number | null>(null)
+  const notifyComingSoon = (label: string) => {
+    setToast(`「${label}」功能即将上线`)
+    if (toastTimer.current) window.clearTimeout(toastTimer.current)
+    toastTimer.current = window.setTimeout(() => setToast(null), 2400)
+  }
 
   useEffect(() => { saveCollapsed(collapsed) }, [collapsed])
 
@@ -99,10 +112,10 @@ export function Sidebar() {
 
   const archivedOf = (pid: string) => sessions.filter((s) => s.projectId === pid && s.archived)
 
-  // ===== 拖拽处理 =====
   const handleDragStart = (e: React.DragEvent, sessionId: string) => {
     setDragSessionId(sessionId)
     e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/session', sessionId)
   }
   const handleDragOver = (e: React.DragEvent, overId: string) => {
     e.preventDefault()
@@ -112,10 +125,8 @@ export function Sidebar() {
   const handleDrop = (e: React.DragEvent, overSessionId: string, projectId: string) => {
     e.preventDefault()
     if (!dragSessionId || dragSessionId === overSessionId) { setDragSessionId(null); setDragOverId(null); return }
-    // 在同项目内重排；若跨项目则先迁移再重排
     const list = sessionsOf(projectId).map((s) => s.id)
     if (!list.includes(dragSessionId)) {
-      // 跨项目：把拖动的会话归属改到目标项目
       store.updateSessionProject(dragSessionId, projectId)
     }
     const current = sessionsOf(projectId).map((s) => s.id)
@@ -129,7 +140,6 @@ export function Sidebar() {
     setDragSessionId(null)
     setDragOverId(null)
   }
-  // 拖到置顶区：置顶该对话
   const handleDropToPinned = (e: React.DragEvent) => {
     e.preventDefault()
     if (dragSessionId && !sessions.find((s) => s.id === dragSessionId)?.pinned) {
@@ -138,17 +148,19 @@ export function Sidebar() {
     setDragSessionId(null); setDragOverId(null)
   }
 
-  const renderProjectBlock = (p: Project) => {
+  const renderProjectBlock = (p: Project, sectionLabel?: string) => {
     const expanded = isExpanded(p)
     const list = sessionsOf(p.id)
     const isDefault = p.id === DEFAULT_PROJECT_ID
     return (
       <div key={p.id} className="space-y-0.5">
+        {sectionLabel && <SectionLabel label={sectionLabel} />}
         <ProjectRow
           project={p}
           expanded={expanded}
           onToggle={() => toggleCollapse(p.id)}
           onActivate={() => store.setActiveProject(p.id)}
+          onNewSession={isDefault ? undefined : () => { store.setActiveProject(p.id); store.createSession(p.id); reset(); startTask() }}
           onRename={isDefault ? null : () => { setRenamingProject(p.id); setNewProjectName(p.name) }}
           onDelete={isDefault ? null : () => { if (confirm(`删除项目「${p.name}」及其下所有对话？`)) store.deleteProject(p.id) }}
           onTogglePin={isDefault ? null : () => store.togglePinProject(p.id)}
@@ -159,7 +171,7 @@ export function Sidebar() {
             {list.length === 0 && !search && (
               <p className="pl-7 py-1 text-[11px] text-[var(--ink-soft)]/60">暂无对话</p>
             )}
-            {list.map((s) => (
+            {(expandedAll[p.id] ? list : list.slice(0, SESSION_VISIBLE_DEFAULT)).map((s) => (
               <SessionRow
                 key={s.id}
                 session={s}
@@ -172,6 +184,18 @@ export function Sidebar() {
                 isDragOver={dragOverId === s.id}
               />
             ))}
+            {!expandedAll[p.id] && list.length > SESSION_VISIBLE_DEFAULT && (
+              <button onClick={() => setExpandedAll((m) => ({ ...m, [p.id]: true }))}
+                className="w-full flex items-center gap-1 pl-7 pr-2 py-1 text-[11px] text-[var(--ink-soft)] hover:text-[var(--ink)] transition">
+                <ChevronDown size={11} /> 展开显示 {list.length - SESSION_VISIBLE_DEFAULT} 条
+              </button>
+            )}
+            {expandedAll[p.id] && list.length > SESSION_VISIBLE_DEFAULT && (
+              <button onClick={() => setExpandedAll((m) => ({ ...m, [p.id]: false }))}
+                className="w-full flex items-center gap-1 pl-7 pr-2 py-1 text-[11px] text-[var(--ink-soft)] hover:text-[var(--ink)] transition">
+                <ChevronUp size={11} /> 收起
+              </button>
+            )}
             {archivedOf(p.id).length > 0 && !search && (
               <ArchivedSection
                 sessions={archivedOf(p.id)}
@@ -191,38 +215,32 @@ export function Sidebar() {
     <aside className="glass-soft w-60 flex-shrink-0 flex flex-col border-r border-white/40">
       <div className="drag h-9" />
 
-      {/* Work / Code 切换 */}
+      {/* 顶部快捷入口：新对话 / 搜索 / 已安排 / 插件 */}
       <div className="px-3 pb-2">
-        <div className="flex gap-1 p-1 rounded-lg bg-black/[0.05]">
-          {(['work', 'code'] as const).map((m) => (
-            <button key={m} onClick={() => setMode(m)}
-              className={`flex-1 h-7 rounded-md text-sm font-medium transition ${mode === m ? 'bg-white shadow-sm text-[var(--ink)]' : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'}`}>
-              {m === 'work' ? 'Work' : 'Code'}
-            </button>
-          ))}
+        <div className="space-y-0.5">
+          <NavPill icon={<MessageSquarePlus size={15} />} label="新对话" active={activeTab === 'new'}
+            onClick={() => { setActiveTab('new'); reset(); }} />
+          <NavPill icon={<Search size={15} />} label="搜索" active={activeTab === 'search'}
+            onClick={() => setActiveTab('search')} />
+          <NavPill icon={<Clock size={15} />} label="已安排" active={activeTab === 'scheduled'}
+            onClick={() => { setActiveTab('scheduled'); notifyComingSoon('已安排') }} />
+          <NavPill icon={<Settings size={15} />} label="插件" active={activeTab === 'plugins'}
+            onClick={() => { setActiveTab('plugins'); notifyComingSoon('插件') }} />
         </div>
       </div>
 
-      {/* 新建对话 */}
-      <div className="px-3 pb-2">
-        <button onClick={() => { reset(); startTask() }} disabled={!message.trim()}
-          className="no-drag w-full h-9 rounded-lg glass flex items-center justify-center gap-2 text-sm font-medium hover:brightness-105 transition disabled:opacity-50">
-          <Plus size={15} /> 新建对话
-        </button>
-      </div>
-
-      {/* 新建项目 + 搜索（新建项目常驻可见，不依赖是否已有项目） */}
+      {/* 搜索框 + 新建项目 */}
       <div className="px-3 pb-2 flex items-center gap-1.5">
+        <div className="relative flex-1">
+          <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--ink-soft)]" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索对话"
+            className="no-drag w-full h-7 pl-6 pr-5 text-xs rounded-md bg-black/[0.04] outline-none focus:bg-black/[0.06] transition placeholder:text-[var(--ink-soft)]/60" />
+          {search && <button onClick={() => setSearch('')} className="absolute right-1 top-1/2 -translate-y-1/2 text-[var(--ink-soft)] hover:text-[var(--ink)]"><X size={11} /></button>}
+        </div>
         <button onClick={() => setNewProjectOpen(true)} title="新建项目"
           className="no-drag w-7 h-7 rounded-md bg-black/[0.04] hover:bg-black/[0.08] flex items-center justify-center text-[var(--ink-soft)] hover:text-[var(--ink)] transition flex-shrink-0">
           <FolderPlus size={14} />
         </button>
-        <div className="relative flex-1">
-          <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--ink-soft)]" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索"
-            className="no-drag w-full h-7 pl-6 pr-5 text-xs rounded-md bg-black/[0.04] outline-none focus:bg-black/[0.06] transition placeholder:text-[var(--ink-soft)]/60" />
-          {search && <button onClick={() => setSearch('')} className="absolute right-1 top-1/2 -translate-y-1/2 text-[var(--ink-soft)] hover:text-[var(--ink)]"><X size={11} /></button>}
-        </div>
       </div>
 
       {/* 置顶对话区（可拖入自动置顶） */}
@@ -235,17 +253,19 @@ export function Sidebar() {
       <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-1">
         {pinnedProjects.length > 0 && (
           <div className="space-y-0.5">
-            <SectionLabel label="置顶项目" />
-            {pinnedProjects.map(renderProjectBlock)}
+            <SectionLabel label="置顶" />
+            {pinnedProjects.map((p) => renderProjectBlock(p, '置顶项目'))}
           </div>
         )}
         <div className="space-y-0.5">
           {otherProjects.length > 0 && <SectionLabel label="项目" />}
-          {otherProjects.map(renderProjectBlock)}
+          {otherProjects.map((p) => renderProjectBlock(p))}
         </div>
         {defaultProject && (
           <div className="space-y-0.5">
-            <SectionLabel label="对话" />
+            <SectionLabel label="对话" action={
+              <button onClick={() => { store.setActiveProject(DEFAULT_PROJECT_ID); store.createSession(); reset(); }} className="p-1 rounded hover:bg-black/[0.06]"><Plus size={12} /></button>
+            } />
             {renderProjectBlock(defaultProject)}
           </div>
         )}
@@ -278,7 +298,28 @@ export function Sidebar() {
           onCancel={() => setRenamingProject(null)}
           onConfirm={(name) => { store.renameProject(renamingProject, name); setRenamingProject(null) }} />
       )}
+      {toast && (
+        <div className="absolute left-1/2 bottom-6 -translate-x-1/2 z-[120] px-3 py-1.5 rounded-full bg-[var(--ink)]/85 text-white text-[12px] shadow-lg backdrop-blur">
+          {toast}
+        </div>
+      )}
     </aside>
+  )
+}
+
+/* ---- 顶部导航 Pill ---- */
+function NavPill({ icon, label, active, badge, onClick }: { icon: React.ReactNode; label: string; active?: boolean; badge?: number; onClick: () => void }) {
+  return (
+    <button onClick={onClick}
+      className={`no-drag w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition ${
+        active ? 'bg-white/60 text-[var(--ink)] shadow-sm' : 'text-[var(--ink-soft)] hover:bg-black/[0.04] hover:text-[var(--ink)]'
+      }`}>
+      <span className="w-4 h-4 flex items-center justify-center">{icon}</span>
+      <span className="flex-1 text-left">{label}</span>
+      {badge !== undefined && badge > 0 && (
+        <span className="min-w-[18px] h-[18px] px-1.5 flex items-center justify-center rounded-full bg-[var(--ink)]/10 text-[10px] text-[var(--ink-soft)]">{badge}</span>
+      )}
+    </button>
   )
 }
 
@@ -335,11 +376,12 @@ function SectionLabel({ label, action }: { label: string; action?: React.ReactNo
 }
 
 /* ---- 项目行 ---- */
-function ProjectRow({ project, expanded, onToggle, onActivate, onRename, onDelete, onTogglePin, onArchiveAll }: {
+function ProjectRow({ project, expanded, onToggle, onActivate, onNewSession, onRename, onDelete, onTogglePin, onArchiveAll }: {
   project: Project; expanded: boolean; onToggle: () => void; onActivate: () => void
-  onRename: (() => void) | null; onDelete: (() => void) | null; onTogglePin: (() => void) | null
-  onArchiveAll: (() => void) | null
+  onNewSession?: () => void; onRename: (() => void) | null; onDelete: (() => void) | null
+  onTogglePin: (() => void) | null; onArchiveAll: (() => void) | null
 }) {
+  const [menuOpen, setMenuOpen] = useState(false)
   return (
     <div className="group relative flex items-center rounded-[10px] hover:bg-black/[0.04] transition">
       <button onClick={() => { onActivate(); onToggle() }}
@@ -350,11 +392,42 @@ function ProjectRow({ project, expanded, onToggle, onActivate, onRename, onDelet
         {project.pinned && <Pin size={10} className="text-amber-400 flex-shrink-0" />}
       </button>
       <div className="hidden group-hover:flex items-center gap-0.5 mr-0.5">
-        {onTogglePin && <IconBtn title={project.pinned ? '取消置顶' : '置顶'} onClick={onTogglePin}>{project.pinned ? <PinOff size={11} /> : <Pin size={11} />}</IconBtn>}
-        {onArchiveAll && <IconBtn title="归档全部" onClick={onArchiveAll}><Archive size={11} /></IconBtn>}
-        {onRename && <IconBtn title="重命名" onClick={onRename}><Pencil size={11} /></IconBtn>}
-        {onDelete && <IconBtn title="删除项目" danger onClick={onDelete}><Trash2 size={11} /></IconBtn>}
+        {onNewSession && <IconBtn title="新建对话" onClick={onNewSession}><Plus size={11} /></IconBtn>}
+        <IconBtn title="更多" onClick={() => setMenuOpen((v) => !v)}><MoreHorizontal size={11} /></IconBtn>
       </div>
+      {menuOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+          <div className="absolute right-0 top-7 z-50 w-36 glass rounded-lg shadow-lg py-1">
+            {onTogglePin && (
+              <button onClick={(e) => { e.stopPropagation(); onTogglePin(); setMenuOpen(false) }} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-black/[0.05] transition">
+                {project.pinned ? <PinOff size={12} /> : <Pin size={12} />} {project.pinned ? '取消置顶' : '置顶'}
+              </button>
+            )}
+            {onArchiveAll && (
+              <button onClick={(e) => { e.stopPropagation(); onArchiveAll(); setMenuOpen(false) }} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-black/[0.05] transition">
+                <Archive size={12} /> 归档所有聊天
+              </button>
+            )}
+            <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false) }} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-black/[0.05] transition">
+              <Pencil size={12} /> 整理侧边栏
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false) }} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-black/[0.05] transition">
+              <Clock size={12} /> 排序条件
+            </button>
+            {onRename && (
+              <button onClick={(e) => { e.stopPropagation(); onRename(); setMenuOpen(false) }} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-black/[0.05] transition">
+                <Pencil size={12} /> 重命名
+              </button>
+            )}
+            {onDelete && (
+              <button onClick={(e) => { e.stopPropagation(); onDelete(); setMenuOpen(false) }} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-black/[0.05] transition text-red-500">
+                <Trash2 size={12} /> 删除项目
+              </button>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -408,20 +481,24 @@ function SessionRow({ session, active, onClick, onDragStart, onDragOver, onDrop,
       onDragOver={onDragOver}
       onDrop={onDrop}
       onDragEnd={() => { /* 状态由父组件清理 */ }}
-      className={`group relative flex items-center ${compact ? 'pl-2' : 'pl-7'} pr-1 py-[5px] rounded-[10px] cursor-pointer transition ${
+      className={`group relative flex items-center ${compact ? 'pl-2' : 'pl-7'} pr-1.5 py-[5px] rounded-[10px] cursor-pointer transition ${
         active ? 'bg-black/[0.07]' : 'hover:bg-black/[0.04]'
       } ${isDragging ? 'opacity-40' : ''} ${isDragOver ? 'border-t-2 border-blue-400' : ''}`}
     >
-      <button onClick={onClick} className="flex-1 flex items-center gap-1.5 min-w-0 text-left">
+      <button onClick={onClick} className="flex-1 flex items-center gap-1.5 min-w-0 text-left pr-1">
         {icon}
         <span className={`flex-1 truncate text-xs ${active ? 'text-[var(--ink)] font-medium' : 'text-[var(--ink-soft)]'}`}>{session.title}</span>
       </button>
-      {/* 右侧：项目标签(时间模式) + 相对时间 + 置顶图标 */}
+      {/* 右侧：项目标签 + 相对时间/状态 + 置顶图标 */}
       <div className="flex items-center gap-1 flex-shrink-0">
-        {showProject && <span className="text-[9px] text-[var(--ink-soft)]/60 bg-black/[0.04] px-1 rounded max-w-[48px] truncate">{showProject}</span>}
-        <span className="text-[9px] text-[var(--ink-soft)]/50" title={new Date(session.updatedAt).toLocaleString('zh-CN')}>
-          {timeAgo(session.updatedAt)}
-        </span>
+        {showProject && <span className="text-[10px] text-[var(--ink-soft)]/60 bg-black/[0.04] px-1 rounded max-w-[48px] truncate">{showProject}</span>}
+        {session.status === 'executing' ? (
+          <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse flex-shrink-0" title="进行中" />
+        ) : (
+          <span className="text-[10px] tabular-nums text-[var(--ink-soft)]/55" title={new Date(session.updatedAt).toLocaleString('zh-CN')}>
+            {timeAgo(session.updatedAt)}
+          </span>
+        )}
         {session.pinned && <Pin size={9} className="text-amber-400 flex-shrink-0" />}
       </div>
       <button onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v) }}
@@ -481,11 +558,14 @@ function NameDialog({ title, initial, placeholder, confirmLabel, onCancel, onCon
 }
 
 function timeAgo(ts: number): string {
-  const sec = Math.floor((Date.now() - ts) / 1000)
+  const diff = Date.now() - ts
+  const sec = Math.floor(diff / 1000)
   if (sec < 60) return '刚刚'
-  if (sec < 3600) return `${Math.floor(sec / 60)}m`
-  if (sec < 86400) return `${Math.floor(sec / 3600)}h`
-  return `${Math.floor(sec / 86400)}d`
+  if (sec < 3600) return `${Math.floor(sec / 60)} 分`
+  if (sec < 86400) return `${Math.floor(sec / 3600)} 小时`
+  if (sec < 86400 * 7) return `${Math.floor(sec / 86400)} 天`
+  if (sec < 86400 * 30) return `${Math.floor(sec / (86400 * 7))} 周`
+  return `${new Date(ts).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}`
 }
 
 function formatTokens(n: number): string {
