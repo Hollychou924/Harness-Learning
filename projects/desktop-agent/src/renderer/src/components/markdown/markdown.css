@@ -1,3 +1,4 @@
+@import 'katex/dist/katex.min.css';
 /* ============ Markdown 渲染引擎样式 ============ */
 
 .md-engine {
@@ -242,7 +243,6 @@
 .md-mermaid-fullscreen svg { max-width: 90vw; max-height: 90vh; }
 
 /* ============ KaTeX 数学公式 ============ */
-@import 'katex/dist/katex.min.css';
 .md-math-block {
   display: block;
   margin: 0.8em 0;

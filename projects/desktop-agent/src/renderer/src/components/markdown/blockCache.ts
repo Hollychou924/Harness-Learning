@@ -1,4 +1,4 @@
-import DOMPurify from 'dompurify'
+import DOMPurify, { type Config as PurifyConfig } from 'dompurify'
 
 // Block 缓存 + DOMPurify 消毒
 // 参考 opencode markdown-cache.tsx
@@ -12,7 +12,7 @@ export interface CacheEntry {
 const MAX_CACHE = 200
 const cache = new Map<string, CacheEntry>()
 
-const PURIFY_CONFIG: DOMPurify.Config = {
+const PURIFY_CONFIG: PurifyConfig = {
   USE_PROFILES: { html: true, mathMl: true },
   SANITIZE_NAMED_PROPS: true,
   FORBID_TAGS: ['style'],
@@ -36,7 +36,7 @@ if (typeof window !== 'undefined' && DOMPurify.isSupported) {
 
 export function sanitize(html: string): string {
   if (!DOMPurify.isSupported) return ''
-  return DOMPurify.sanitize(html, PURIFY_CONFIG)
+  return DOMPurify.sanitize(html, PURIFY_CONFIG) as string
 }
 
 export function fnv1a(text: string): string {

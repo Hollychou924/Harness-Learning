@@ -15,6 +15,7 @@ export type SettingsTab =
   | 'mify'
   | 'permissions'
   | 'agent'
+  | 'diagnostics'
   | 'about'
 
 interface SettingsState {
