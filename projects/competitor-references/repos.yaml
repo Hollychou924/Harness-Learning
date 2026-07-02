@@ -1,0 +1,119 @@
+# 本地竞品参考项目源地址登记
+# 目录按 6 类物理分目录存放，category 字段对应子目录编号。
+# 源码只本地分析，不提交（见 .gitignore）。
+
+categories:
+  "01-desktop-apps":
+    desc: PC 桌面应用，窗口化运行，Tauri/Electron 为主
+    count: 8
+  "02-cli-terminals":
+    desc: CLI / 终端工具，纯命令行交互
+    count: 5
+  "03-cli-multi-form":
+    desc: CLI 为主、多形态扩展，同代码库延伸桌面/Web/IDE
+    count: 6
+  "04-agent-frameworks":
+    desc: Agent 框架 / 库，供开发者构建 Agent 的 SDK
+    count: 3
+  "05-selfhosted-web":
+    desc: 自托管 / Web 平台，浏览器访问、可自托管
+    count: 2
+  "06-multi-platform-engine":
+    desc: 多端综合 / 后端引擎，跨端或引擎驱动
+    count: 2
+
+public_open_source:
+  - name: codex-cli
+    url: https://github.com/openai/codex.git
+    category: "02-cli-terminals"
+  - name: gemini-cli
+    url: https://github.com/google-gemini/gemini-cli.git
+    category: "02-cli-terminals"
+  - name: opencode
+    url: https://github.com/sst/opencode.git
+    category: "03-cli-multi-form"
+  - name: goose
+    url: https://github.com/block/goose.git
+    category: "03-cli-multi-form"
+  - name: opencowork
+    url: https://github.com/AIDotNet/OpenCowork.git
+    category: "01-desktop-apps"
+  - name: cline
+    url: https://github.com/cline/cline.git
+    category: "03-cli-multi-form"
+  - name: kilocode
+    url: https://github.com/Kilo-Org/kilocode.git
+    category: "03-cli-multi-form"
+  - name: openhands
+    url: https://github.com/OpenHands/OpenHands.git
+    category: "05-selfhosted-web"
+  - name: qwen-code
+    url: https://github.com/QwenLM/qwen-code.git
+    category: "02-cli-terminals"
+  - name: mimo-code
+    url: https://github.com/XiaomiMiMo/MiMo-Code.git
+    category: "03-cli-multi-form"
+  - name: aider
+    url: https://github.com/Aider-AI/aider.git
+    category: "02-cli-terminals"
+  - name: deerflow
+    url: https://github.com/bytedance/deer-flow.git
+    category: "05-selfhosted-web"
+  - name: agentscope
+    url: https://github.com/modelscope/agentscope.git
+    category: "04-agent-frameworks"
+  - name: openharness
+    url: https://github.com/HKUDS/OpenHarness.git
+    category: "04-agent-frameworks"
+  - name: crewai
+    url: https://github.com/crewAIInc/crewAI.git
+    category: "04-agent-frameworks"
+  - name: zagens
+    url: https://github.com/didclawapp-ai/zagens.git
+    category: "03-cli-multi-form"
+  - name: kuse-cowork
+    url: https://github.com/kuse-ai/kuse_cowork.git
+    category: "01-desktop-apps"
+  - name: harnessclaw
+    url: https://github.com/harnessclaw/harnessclaw.git
+    category: "01-desktop-apps"
+  - name: harnessclaw-engine
+    url: https://github.com/harnessclaw/harnessclaw-engine.git
+    category: "06-multi-platform-engine"
+  - name: aionui
+    url: https://github.com/iOfficeAI/AionUi.git
+    category: "01-desktop-apps"
+  - name: myagents
+    url: https://github.com/hAcKlyc/MyAgents.git
+    category: "01-desktop-apps"
+  - name: hexclaw-desktop
+    url: https://github.com/hexagon-codes/hexclaw-desktop.git
+    category: "01-desktop-apps"
+  - name: kun
+    url: https://github.com/KunAgent/Kun.git
+    category: "01-desktop-apps"
+  - name: lobsterai
+    url: https://github.com/netease-youdao/lobsterai.git
+    category: "01-desktop-apps"
+  - name: qwenpaw
+    url: https://github.com/agentscope-ai/QwenPaw.git
+    category: "06-multi-platform-engine"
+
+local_learning:
+  - name: claude-code-learning
+    source: /Users/zhouhao/桌面/桌面原有文件夹/AITR/claude-code
+    local_dir: claude-code
+    category: "02-cli-terminals"
+    note: 同事做的学习项目，不是泄露源码；仅供本地学习分析，不提交源码。
+
+renamed:
+  - name: DeepSeek-GUI
+    renamed_to: Kun
+    category: "01-desktop-apps"
+    note: Kun 改名前的旧名，已归入 01-desktop-apps/Kun，无需重复拉取。
+
+notes:
+  - 共 26 个本地参考项目：25 个公开开源项目 + 1 个本地学习项目。
+  - 所有源码仅供本地分析，不提交到当前仓库。
+  - 后续小蓝鲸决策可以引用这些项目做对比，但不能直接复制源码。
+  - 每个分类子目录含 _category.md 说明，根目录含 _category-index.md 总索引。

@@ -1,0 +1,14 @@
+# 本地竞品参考库，仅供本地分析，不提交源码
+# 忽略所有内容，仅放行说明文件和6个分类目录（不含分类目录内的项目源码）
+*
+!.gitignore
+!README.md
+!repos.yaml
+!_category-index.md
+!01-desktop-apps/
+!02-cli-terminals/
+!03-cli-multi-form/
+!04-agent-frameworks/
+!05-selfhosted-web/
+!06-multi-platform-engine/
+!**/_category.md
