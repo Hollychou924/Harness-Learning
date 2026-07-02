@@ -45,6 +45,25 @@ export class AnthropicProvider implements LlmProvider {
           content: [{ type: 'tool_result', tool_use_id: m.tool_call_id || '', content: m.content }]
         }
       }
+      // 用户消息含图片附件：组装多模态 content（Anthropic 格式）
+      if (m.role === 'user' && m.attachments && m.attachments.length > 0) {
+        const blocks: Record<string, unknown>[] = []
+        if (m.content) {
+          blocks.push({ type: 'text', text: m.content })
+        }
+        for (const att of m.attachments) {
+          if (att.type === 'image' && att.dataUrl) {
+            const parsed = parseDataUrl(att.dataUrl)
+            if (parsed) {
+              blocks.push({
+                type: 'image',
+                source: { type: 'base64', media_type: parsed.mediaType, data: parsed.data }
+              })
+            }
+          }
+        }
+        return { role: 'user', content: blocks }
+      }
       return { role: m.role, content: m.content }
     })
 
@@ -107,4 +126,12 @@ function safeParse(s: string): Record<string, unknown> {
   } catch {
     return {}
   }
+}
+
+
+// 解析 data URL：data:image/png;base64,xxxx -> { mediaType, data }
+function parseDataUrl(dataUrl: string): { mediaType: string; data: string } | null {
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
+  if (!match) return null
+  return { mediaType: match[1], data: match[2] }
 }

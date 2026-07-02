@@ -65,6 +65,19 @@ export class OpenAIProvider implements LlmProvider {
         if (m.role === 'tool') {
           return { role: 'tool', tool_call_id: m.tool_call_id || '', content: m.content }
         }
+        // 用户消息含图片附件：组装多模态 content
+        if (m.role === 'user' && m.attachments && m.attachments.length > 0) {
+          const content: OpenAI.Chat.ChatCompletionContentPart[] = []
+          if (m.content) {
+            content.push({ type: 'text', text: m.content })
+          }
+          for (const att of m.attachments) {
+            if (att.type === 'image' && att.dataUrl) {
+              content.push({ type: 'image_url', image_url: { url: att.dataUrl } })
+            }
+          }
+          return { role: 'user', content }
+        }
         return { role: m.role as 'user' | 'assistant', content: m.content }
       })
     ]

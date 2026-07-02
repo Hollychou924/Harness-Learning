@@ -3,7 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 type StdoutMessage = Record<string, unknown>
 
 const api = {
-  startTask: (args: { mode: 'work' | 'code'; message: string; workspaceDir?: string; maxIterations?: number; autoApproveLow?: boolean; sessionId?: string; history?: unknown[] }) =>
+  startTask: (args: { mode: 'work' | 'code'; message: string; workspaceDir?: string; maxIterations?: number; autoApproveLow?: boolean; sessionId?: string; history?: unknown[]; attachments?: unknown[] }) =>
     ipcRenderer.invoke('agent:startTask', args) as Promise<{ taskId: string; error?: string }>,
   saveSessionMessages: (sessionId: string, messages: unknown[]) =>
     ipcRenderer.invoke('session:saveMessages', { sessionId, messages }) as Promise<{ success: boolean; error?: string }>,

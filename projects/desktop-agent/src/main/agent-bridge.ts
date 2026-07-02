@@ -2,7 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { app } from 'electron'
-import type { StdoutMessage, StdinMessage, AgentConfig, AgentMessage } from '../agent/src/protocol.js'
+import type { StdoutMessage, StdinMessage, AgentConfig, AgentMessage, MessageAttachment } from '../agent/src/protocol.js'
 
 // Agent 子进程管理：启动、stdio 收发（依据 docs/09 第三章）
 export class AgentBridge {
@@ -57,8 +57,8 @@ export class AgentBridge {
     this.proc?.stdin.write(JSON.stringify(msg) + '\n')
   }
 
-  startTask(session_id: string, message: string, config: AgentConfig, workspace_dir?: string, history?: unknown[]): void {
-    this.send({ type: 'chat_request', session_id, message, config, workspace_dir, history: history as AgentMessage[] | undefined })
+  startTask(session_id: string, message: string, config: AgentConfig, workspace_dir?: string, history?: unknown[], attachments?: MessageAttachment[]): void {
+    this.send({ type: 'chat_request', session_id, message, config, workspace_dir, history: history as AgentMessage[] | undefined, attachments })
   }
 
   stop(): void {

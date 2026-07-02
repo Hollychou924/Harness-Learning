@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto'
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
 import { agentBridge } from './agent-bridge.js'
 import { startTrace, logAgentEvent, logUserAction, listTraces, getTrace } from './trace-logger.js'
-import type { StdoutMessage, AgentConfig } from '../agent/src/protocol.js'
+import type { StdoutMessage, AgentConfig, MessageAttachment } from '../agent/src/protocol.js'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 
@@ -141,7 +141,7 @@ app.on('window-all-closed', () => {
 })
 
 // IPC 通道（依据 docs/09 第二章）
-ipcMain.handle('agent:startTask', async (_e, args: { mode: 'work' | 'code'; message: string; workspaceDir?: string; maxIterations?: number; autoApproveLow?: boolean; sessionId?: string; history?: unknown[] }) => {
+ipcMain.handle('agent:startTask', async (_e, args: { mode: 'work' | 'code'; message: string; workspaceDir?: string; maxIterations?: number; autoApproveLow?: boolean; sessionId?: string; history?: unknown[]; attachments?: unknown[] }) => {
   const sessionId = args.sessionId || randomUUID()
   const config = buildAgentConfig()
   if (!config.apiKey) {
@@ -162,7 +162,7 @@ ipcMain.handle('agent:startTask', async (_e, args: { mode: 'work' | 'code'; mess
     providerId: config.providerId,
     customProviderId: config.customProviderId
   })
-  agentBridge.startTask(sessionId, args.message, config, args.workspaceDir, args.history)
+  agentBridge.startTask(sessionId, args.message, config, args.workspaceDir, args.history, args.attachments as MessageAttachment[] | undefined)
   return { taskId: sessionId }
 })
 
