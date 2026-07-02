@@ -30,11 +30,25 @@ export interface AgentMessage {
     type: 'function'
     function: { name: string; arguments: string }
   }>
+  attachments?: MessageAttachment[]
+}
+
+
+// 多模态附件：图片/文本，随用户消息一起传给模型
+export interface MessageAttachment {
+  type: 'image' | 'text' | 'file'
+  name: string
+  mime: string
+  size: number
+  /** 图片：data URL（data:image/png;base64,...） */
+  dataUrl?: string
+  /** 文本类文件：提取的纯文本内容 */
+  textContent?: string
 }
 
 // 主进程 -> Agent (stdin)
 export type StdinMessage =
-  | { type: 'chat_request'; session_id: string; message: string; config: AgentConfig; history?: AgentMessage[]; workspace_dir?: string }
+  | { type: 'chat_request'; session_id: string; message: string; config: AgentConfig; history?: AgentMessage[]; workspace_dir?: string; attachments?: MessageAttachment[] }
   | { type: 'task_control'; task_id: string; action: 'pause' | 'resume' | 'cancel' | 'rollback' }
   | { type: 'approval_response'; request_id: string; approved: boolean }
   | { type: 'append_input'; task_id: string; message: string; mode?: 'inject' | 'queue' }

@@ -26,7 +26,7 @@ rl.on('line', (line) => {
 
 async function handleStdin(msg: StdinMessage): Promise<void> {
   if (msg.type === 'chat_request') {
-    const { session_id, message, config, history, workspace_dir } = msg
+    const { session_id, message, config, history, workspace_dir, attachments } = msg
     const onEvent = (ev: StdoutMessage) => send(ev)
 
     onEvent({ type: 'status', status: 'EXECUTING', message: '开始执行任务' })
@@ -39,7 +39,8 @@ async function handleStdin(msg: StdinMessage): Promise<void> {
         onEvent,
         workspace_dir,
         'work',
-        session_id
+        session_id,
+        attachments
       )
       sessionHistory.set(session_id, result.messages.slice(1))
 

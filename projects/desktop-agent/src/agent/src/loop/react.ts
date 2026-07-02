@@ -1,4 +1,4 @@
-import type { AgentConfig, AgentMessage, StdoutMessage } from '../protocol.js'
+import type { AgentConfig, AgentMessage, StdoutMessage, MessageAttachment } from '../protocol.js'
 import { send } from '../protocol.js'
 import type { AgentTool } from '../tools/index.js'
 import { isSafe, isBlocked } from '../tools/index.js'
@@ -25,7 +25,8 @@ export async function runReact(
   onEvent: (msg: StdoutMessage) => void,
   workspaceDir?: string,
   mode: 'work' | 'code' = 'work',
-  taskId?: string
+  taskId?: string,
+  attachments?: MessageAttachment[]
 ): Promise<ReactResult> {
   const provider: LlmProvider = config.apiFormat === 'openai'
     ? new OpenAIProvider(config)
@@ -48,14 +49,35 @@ export async function runReact(
   const tools = await getAvailableTools(workspaceDir)
 
   const system = buildSystemPrompt(mode, workspaceDir)
+
+  // 文本类附件内容拼入用户消息文字，图片类附件走多模态 content
+  const textParts: string[] = [userMessage]
+  const imageAttachments: MessageAttachment[] = []
+  for (const att of attachments || []) {
+    if (att.type === 'image' && att.dataUrl) {
+      imageAttachments.push(att)
+    } else if (att.textContent) {
+      textParts.push(`\n\n--- 附件：${att.name} ---\n${att.textContent}`)
+    }
+  }
+  const userContent = textParts.join('')
+
   const messages: AgentMessage[] = [
     { role: 'system', content: system },
     ...history,
-    { role: 'user', content: userMessage }
+    {
+      role: 'user',
+      content: userContent,
+      ...(imageAttachments.length > 0 ? { attachments: imageAttachments } : {})
+    }
   ]
+
+  // 标记本轮用户消息是否含图片（用于不支持图片时的退回重试）
+  const hasImages = imageAttachments.length > 0
 
   let finalText = ''
   let emptyRetried = false
+  let imagesDisabled = false
 
   for (let iter = 0; iter < config.maxIterations; iter++) {
     onEvent({ type: 'thinking', text: `第 ${iter + 1} 轮思考` })
@@ -81,6 +103,20 @@ export async function runReact(
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
+      // 图片兼容退回：模型不支持图片时，移除图片后重试一次本轮
+      if (hasImages && !imagesDisabled && isImageUnsupportedError(msg)) {
+        imagesDisabled = true
+        onEvent({ type: 'thinking', text: '当前模型不支持图片，已自动移除图片并用纯文字重试' })
+        const lastUser = messages.findLast((m) => m.role === 'user')
+        if (lastUser) {
+          lastUser.attachments = undefined
+          if (!lastUser.content) {
+            lastUser.content = userContent
+          }
+        }
+        iter-- // 不消耗本轮次数，重新执行
+        continue
+      }
       onEvent({ type: 'error', message: `模型调用失败：${msg}` })
       // 工具后报错兜底：合成收尾，不让对话悬空
       if (finalText) {
@@ -211,4 +247,20 @@ export async function runReact(
   }
 
   return { messages, finalText }
+}
+
+
+// 判断错误是否因为模型不支持图片输入
+function isImageUnsupportedError(msg: string): boolean {
+  const lower = msg.toLowerCase()
+  return (
+    lower.includes('image') && (lower.includes('not support') || lower.includes('unsupported')) ||
+    lower.includes('does not support image') ||
+    lower.includes('unsupported content type') ||
+    lower.includes('invalid content type') ||
+    lower.includes('image input is not supported') ||
+    lower.includes('multimodal') && lower.includes('not support') ||
+    lower.includes('vision') && lower.includes('not') ||
+    lower.includes('400') && lower.includes('image')
+  )
 }
