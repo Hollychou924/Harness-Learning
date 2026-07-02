@@ -187,3 +187,188 @@
 
 /* 删除线 */
 .md-engine del { color: var(--ink-soft); }
+
+/* ============ Mermaid 流程图 ============ */
+.md-mermaid-wrapper {
+  margin: 0.8em 0;
+  padding: 16px;
+  background: #fafbfc;
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 10px;
+  text-align: center;
+  overflow-x: auto;
+}
+.md-mermaid-wrapper pre {
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  text-align: left;
+  font-size: 12px;
+}
+.md-mermaid {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 40px;
+}
+.md-mermaid svg { max-width: 100%; height: auto; }
+.md-mermaid-loading::after {
+  content: '渲染流程图中…';
+  display: block;
+  padding: 12px;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+.md-mermaid-error {
+  border: 1px dashed rgba(204,0,0,0.3);
+  border-radius: 8px;
+}
+.md-mermaid-err-hint {
+  font-size: 11px;
+  color: #cc0000;
+  margin-bottom: 4px;
+}
+.md-mermaid-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  cursor: zoom-out;
+}
+.md-mermaid-fullscreen svg { max-width: 90vw; max-height: 90vh; }
+
+/* ============ KaTeX 数学公式 ============ */
+@import 'katex/dist/katex.min.css';
+.md-math-block {
+  display: block;
+  margin: 0.8em 0;
+  text-align: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 0;
+}
+.md-math-block .katex-display { margin: 0; }
+.md-math-block .katex { font-size: 1.05em; }
+
+/* ============ 表格交互增强 ============ */
+.md-engine .table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 8px;
+  border: 1px solid rgba(0,0,0,0.08);
+  margin: 0.8em 0;
+}
+.md-engine .table-wrapper table {
+  margin: 0;
+  min-width: 100%;
+}
+.md-engine table {
+  display: table;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+/* ============ 图片 Lightbox ============ */
+.md-engine img {
+  cursor: zoom-in;
+  transition: opacity 0.2s;
+}
+.md-engine img:hover { opacity: 0.92; }
+.md-img-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+}
+.md-img-lightbox img {
+  max-width: 92vw;
+  max-height: 92vh;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+
+/* ============ 代码块行号 ============ */
+.md-code-wrapper pre code .line.md-line {
+  counter-increment: line;
+  position: relative;
+  padding-left: 2.5em;
+}
+.md-code-wrapper pre code .line.md-line::before {
+  content: counter(line);
+  position: absolute;
+  left: 0;
+  width: 1.8em;
+  text-align: right;
+  color: rgba(205,214,244,0.25);
+  font-size: 0.85em;
+  user-select: none;
+  pointer-events: none;
+}
+.md-code-wrapper pre code {
+  counter-reset: line;
+}
+
+/* ============ 来源引用卡片 ============ */
+.md-source-list {
+  margin: 1em 0;
+  padding: 0;
+  list-style: none;
+}
+.md-source-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  margin: 6px 0;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 8px;
+  background: rgba(0,0,0,0.015);
+  transition: background 0.15s;
+}
+.md-source-card:hover { background: rgba(0,113,227,0.04); }
+.md-source-card .md-source-favicon {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.md-source-card .md-source-favicon-placeholder {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  background: #e8edf3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: var(--ink-soft);
+}
+.md-source-card .md-source-title {
+  font-size: 13px;
+  color: var(--ink);
+  font-weight: 500;
+  text-decoration: none;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.md-source-card .md-source-title:hover { color: #0071e3; }
+.md-source-card .md-source-domain {
+  font-size: 11px;
+  color: var(--ink-soft);
+  flex-shrink: 0;
+}

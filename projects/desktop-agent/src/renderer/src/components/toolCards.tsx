@@ -163,14 +163,45 @@ function EditFileCard({ entry }: ToolCardProps) {
 function ShellCard({ entry }: ToolCardProps) {
   const status = getStatus(entry)
   const command = typeof entry.args.command === 'string' ? entry.args.command : ''
+  const cwd = typeof entry.args.cwd === 'string' ? entry.args.cwd : ''
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).catch(() => {})
+  }
 
   return (
     <ToolCardShell
       status={status}
       icon={<Terminal size={14} />}
       title={command ? `执行：${command}` : '执行命令'}
+      target={cwd || undefined}
     >
-      {entry.result && <DetailBlock title="输出" content={formatResult(entry.result)} />}
+      {command && (
+        <div className="flex items-center justify-between gap-2">
+          <code className="text-xs font-mono text-[var(--ink)] bg-black/[0.04] px-2 py-1 rounded flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+            $ {command}
+          </code>
+          <button
+            onClick={() => copyToClipboard(command)}
+            className="flex-shrink-0 text-[10px] text-[var(--ink-soft)] hover:text-[#0071e3] px-2 py-1 rounded hover:bg-black/[0.04] transition"
+            title="复制命令"
+          >
+            复制命令
+          </button>
+        </div>
+      )}
+      {entry.result && (
+        <div className="flex items-center justify-between gap-2">
+          <DetailBlock title="输出" content={formatResult(entry.result)} />
+          <button
+            onClick={() => copyToClipboard(formatResult(entry.result))}
+            className="flex-shrink-0 text-[10px] text-[var(--ink-soft)] hover:text-[#0071e3] px-2 py-1 rounded hover:bg-black/[0.04] transition"
+            title="复制输出"
+          >
+            复制输出
+          </button>
+        </div>
+      )}
     </ToolCardShell>
   )
 }

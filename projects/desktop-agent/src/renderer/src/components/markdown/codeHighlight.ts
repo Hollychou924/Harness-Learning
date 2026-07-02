@@ -1,7 +1,7 @@
 // 代码高亮：Shiki 主线程异步高亮
 // 参考 kilocode markdown-stream-highlight.ts
 
-import { createHighlighter, type Highlighter, bundledLanguages } from 'shiki'
+import { createHighlighter, type Highlighter, bundledLanguages, transformerNotationDiff } from 'shiki'
 
 let highlighter: Highlighter | null = null
 const loadedLanguages = new Set<string>()
@@ -45,10 +45,22 @@ export async function highlightCode(code: string, lang: string): Promise<string 
       const ok = await loadLanguage(language)
       if (!ok) language = 'text'
     }
+    // 超过 5 行的代码块显示行号
+    const lineCount = code.split('\n').length
+    const showLineNum = lineCount > 5
+
     return h.codeToHtml(code, {
       lang: language,
       theme: 'catppuccin-mocha',
-      tabindex: false
+      tabindex: false,
+      transformers: [{
+        line(node, line) {
+          if (showLineNum) {
+            node.properties['data-line'] = line
+            node.properties.class = (node.properties.class || '') + ' md-line'
+          }
+        }
+      }]
     })
   } catch {
     return null
