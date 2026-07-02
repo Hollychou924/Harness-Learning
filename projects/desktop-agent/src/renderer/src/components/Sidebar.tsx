@@ -341,7 +341,7 @@ function ProjectRow({ project, expanded, onToggle, onActivate, onRename, onDelet
   onArchiveAll: (() => void) | null
 }) {
   return (
-    <div className="group relative flex items-center rounded-md hover:bg-black/[0.04] transition">
+    <div className="group relative flex items-center rounded-[10px] hover:bg-black/[0.04] transition">
       <button onClick={() => { onActivate(); onToggle() }}
         className="flex-1 flex items-center gap-1.5 px-2 py-1.5 text-left min-w-0">
         {expanded ? <ChevronDown size={13} className="text-[var(--ink-soft)] flex-shrink-0" /> : <ChevronRight size={13} className="text-[var(--ink-soft)] flex-shrink-0" />}
@@ -408,7 +408,7 @@ function SessionRow({ session, active, onClick, onDragStart, onDragOver, onDrop,
       onDragOver={onDragOver}
       onDrop={onDrop}
       onDragEnd={() => { /* 状态由父组件清理 */ }}
-      className={`group relative flex items-center ${compact ? 'pl-2' : 'pl-7'} pr-1 py-1 rounded-md cursor-pointer transition ${
+      className={`group relative flex items-center ${compact ? 'pl-2' : 'pl-7'} pr-1 py-[5px] rounded-[10px] cursor-pointer transition ${
         active ? 'bg-black/[0.07]' : 'hover:bg-black/[0.04]'
       } ${isDragging ? 'opacity-40' : ''} ${isDragOver ? 'border-t-2 border-blue-400' : ''}`}
     >
@@ -425,7 +425,7 @@ function SessionRow({ session, active, onClick, onDragStart, onDragOver, onDrop,
         {session.pinned && <Pin size={9} className="text-amber-400 flex-shrink-0" />}
       </div>
       <button onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v) }}
-        className="no-drag w-5 h-5 rounded flex items-center justify-center text-[var(--ink-soft)] hover:bg-black/[0.08] opacity-0 group-hover:opacity-100 transition flex-shrink-0">
+        className="no-drag w-5 h-5 rounded-sm flex items-center justify-center text-[var(--ink-soft)] hover:bg-black/[0.08] hover:text-[var(--ink)] opacity-0 group-hover:opacity-100 transition flex-shrink-0">
         <MoreHorizontal size={12} />
       </button>
       {menuOpen && (
