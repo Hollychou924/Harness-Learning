@@ -500,6 +500,35 @@ ipcMain.handle('workspace:readFile', async (_e, args: { relPath: string; workspa
   }
 })
 
+
+// 预览工作区产物：文本直接读，图片返回可展示内容，Office/PDF 提取文字用于预览
+ipcMain.handle('workspace:previewFile', async (_e, args: { filePath: string; workspaceDir?: string }) => {
+  const filePath = args?.filePath
+  const workspaceDir = args?.workspaceDir
+  if (!filePath || typeof filePath !== 'string') return { error: '文件路径为空' }
+  const root = resolveWorkspaceRoot(workspaceDir)
+  const abs = filePath.startsWith('/') ? resolve(filePath) : resolve(root, filePath)
+  if (!isInsideRoot(root, abs)) return { error: '不能预览工作区外的文件' }
+  try {
+    const ext = abs.split('.').pop()?.toLowerCase() || ''
+    const buf = readFileSync(abs)
+    const imageMime: Record<string, string> = {
+      png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', bmp: 'image/bmp'
+    }
+    if (imageMime[ext]) {
+      return { kind: 'image', dataUrl: `data:${imageMime[ext]};base64,${buf.toString('base64')}`, size: buf.length }
+    }
+    if (['docx', 'xlsx', 'pdf', 'doc', 'pptx'].includes(ext)) {
+      const content = await extractDocumentText(abs, ext)
+      return { kind: ext === 'xlsx' ? 'table' : 'document', content: content.slice(0, 50000), truncated: content.length > 50000, size: buf.length }
+    }
+    const content = buf.toString('utf-8')
+    return { kind: 'text', content: content.slice(0, 50000), truncated: content.length > 50000, size: buf.length }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) }
+  }
+})
+
 ipcMain.handle('trace:list', async (_e, limit?: number) => {
   return listTraces(limit ?? 50)
 })

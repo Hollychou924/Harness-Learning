@@ -49,6 +49,8 @@ export function RightPanel({ collapsed }: { collapsed: boolean }) {
   const activeWorkspaceDir = projects.find((p) => p.id === activeProjectId)?.folderPath
   const [selectedArtifact, setSelectedArtifact] = useState<ArtifactEntry | null>(null)
   const [previewText, setPreviewText] = useState('')
+  const [previewDataUrl, setPreviewDataUrl] = useState('')
+  const [previewKind, setPreviewKind] = useState('')
   const [previewError, setPreviewError] = useState('')
   const [artifactAccepted, setArtifactAccepted] = useState(false)
 
@@ -56,10 +58,14 @@ export function RightPanel({ collapsed }: { collapsed: boolean }) {
     if (!selectedArtifact) return
     setArtifactAccepted(false)
     setPreviewText('')
+    setPreviewDataUrl('')
+    setPreviewKind('')
     setPreviewError('')
-    void api.workspaceReadFile(selectedArtifact.filePath, activeWorkspaceDir).then((res) => {
+    void api.workspacePreviewFile(selectedArtifact.filePath, activeWorkspaceDir).then((res) => {
+      setPreviewKind(res.kind || '')
+      if (res.dataUrl) setPreviewDataUrl(res.dataUrl)
       if (res.content) setPreviewText(res.content)
-      else setPreviewError(res.error || '这个产物暂时不能直接预览，可以打开文件查看')
+      if (!res.dataUrl && !res.content) setPreviewError(res.error || '这个产物暂时不能直接预览，可以打开文件查看')
     })
   }, [selectedArtifact, activeWorkspaceDir])
 
@@ -120,6 +126,8 @@ export function RightPanel({ collapsed }: { collapsed: boolean }) {
           <ArtifactPreview
             art={selectedArtifact}
             content={previewText}
+            dataUrl={previewDataUrl}
+            kind={previewKind}
             error={previewError}
             accepted={artifactAccepted}
             onAccept={() => setArtifactAccepted(true)}
@@ -215,9 +223,11 @@ function ArtifactItem({ art, onPreview }: { art: ArtifactEntry; onPreview: () =>
   )
 }
 
-function ArtifactPreview({ art, content, error, accepted, onAccept, onRevise, onRollback, onOpen }: {
+function ArtifactPreview({ art, content, dataUrl, kind, error, accepted, onAccept, onRevise, onRollback, onOpen }: {
   art: ArtifactEntry
   content: string
+  dataUrl: string
+  kind: string
   error: string
   accepted: boolean
   onAccept: () => void
@@ -233,9 +243,13 @@ function ArtifactPreview({ art, content, error, accepted, onAccept, onRevise, on
         <span className="text-xs font-semibold tracking-wide text-[var(--ink-soft)] uppercase">预览</span>
       </div>
       <div className="text-xs font-mono text-[var(--ink)] truncate" title={art.filePath}>{name}</div>
-      {content ? (
+      {dataUrl ? (
+        <div className="rounded-lg bg-black/[0.03] p-2">
+          <img src={dataUrl} alt={name} className="max-h-52 w-full object-contain rounded-md" />
+        </div>
+      ) : content ? (
         <pre className="max-h-52 overflow-y-auto rounded-lg bg-black/[0.03] px-2.5 py-2 text-[11px] text-[var(--ink-soft)] whitespace-pre-wrap break-all font-mono">
-          {content.slice(0, 5000)}{content.length > 5000 ? '\n...（仅显示前 5000 字）' : ''}
+          {kind === 'table' ? '表格预览\n' : kind === 'document' ? '文档预览\n' : ''}{content.slice(0, 5000)}{content.length > 5000 ? '\n...（仅显示前 5000 字）' : ''}
         </pre>
       ) : (
         <div className="rounded-lg bg-black/[0.03] px-2.5 py-2 text-xs text-[var(--ink-soft)]">{error || '正在读取预览...'}</div>

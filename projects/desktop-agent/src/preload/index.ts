@@ -52,7 +52,9 @@ const api = {
   workspaceListFiles: (workspaceDir?: string, subDir?: string) =>
     ipcRenderer.invoke('workspace:listFiles', { workspaceDir, subDir }) as Promise<{ items: Array<{ name: string; type: string; size: number; path: string }>; error?: string }>,
   workspaceReadFile: (relPath: string, workspaceDir?: string) =>
-    ipcRenderer.invoke('workspace:readFile', { relPath, workspaceDir }) as Promise<{ content?: string; truncated?: boolean; error?: string }>
+    ipcRenderer.invoke('workspace:readFile', { relPath, workspaceDir }) as Promise<{ content?: string; truncated?: boolean; error?: string }>,
+  workspacePreviewFile: (filePath: string, workspaceDir?: string) =>
+    ipcRenderer.invoke('workspace:previewFile', { filePath, workspaceDir }) as Promise<{ kind?: string; content?: string; dataUrl?: string; truncated?: boolean; error?: string }>
 }
 
 contextBridge.exposeInMainWorld('api', api)

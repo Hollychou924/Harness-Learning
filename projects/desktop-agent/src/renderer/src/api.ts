@@ -73,6 +73,7 @@ type Api = {
   createProjectFolder: (name: string) => Promise<string | null>
   workspaceListFiles: (workspaceDir?: string, subDir?: string) => Promise<{ items: Array<{ name: string; type: string; size: number; path: string }>; error?: string }>
   workspaceReadFile: (relPath: string, workspaceDir?: string) => Promise<{ content?: string; truncated?: boolean; error?: string }>
+  workspacePreviewFile: (filePath: string, workspaceDir?: string) => Promise<{ kind?: string; content?: string; dataUrl?: string; truncated?: boolean; error?: string }>
   traceList: (limit?: number) => Promise<TraceMeta[]>
   traceGet: (traceId: string) => Promise<TraceDetail>
 }
@@ -106,6 +107,7 @@ const empty: Api = {
   createProjectFolder: async () => null,
   workspaceListFiles: async () => ({ items: [] }),
   workspaceReadFile: async () => ({}),
+  workspacePreviewFile: async () => ({}),
   traceList: async () => [],
   traceGet: async () => ({ meta: null, events: [] })
 }
