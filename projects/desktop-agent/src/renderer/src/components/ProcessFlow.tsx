@@ -6,9 +6,9 @@ import { PlanCard } from './PlanCard'
 import { TodoChecklist } from './TodoChecklist'
 import { SubtaskList } from './SubtaskList'
 import { TurnItemsView } from './TurnItemsView'
-import { LiveStatusBar } from './LiveStatusBar'
 import { CompactDivider } from './CompactDivider'
 import { ConnectionRecoveryBanner } from './ConnectionRecoveryBanner'
+import { ExecutionSummaryBar } from './ExecutionSummaryBar'
 import type { Turn } from '../../../agent/src/items'
 
 // 当前实时轮次的执行过程展示 + 全局态卡片(计划/待办/子任务/审批)
@@ -23,6 +23,7 @@ export function ProcessFlow() {
   return (
     <div className="space-y-2">
       <ConnectionRecoveryBanner />
+      <ExecutionSummaryBar status={status} turn={latestTurn} />
 
       {compactNotice && (
         <button onClick={clearCompactNotice} className="w-full text-left">
@@ -43,8 +44,6 @@ export function ProcessFlow() {
           {error}
         </div>
       )}
-
-      <LiveStatusBar />
     </div>
   )
 }
