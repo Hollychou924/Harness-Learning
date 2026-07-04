@@ -43,7 +43,8 @@ export async function runReact(
   workspaceDir?: string,
   mode: 'work' | 'code' = 'work',
   taskId?: string,
-  attachments?: MessageAttachment[]
+  attachments?: MessageAttachment[],
+  consumeAppendedInput?: () => string[]
 ): Promise<ReactResult> {
   const provider: LlmProvider = config.apiFormat === 'openai'
     ? new OpenAIProvider(config)
@@ -104,7 +105,33 @@ export async function runReact(
   /** 上一个失败的工具调用条目 id，用于把下一次同名重试串成"失败→重试→成功"链条 */
   let lastFailedToolItemId: string | null = null
 
+  function appendRuntimeInputs(appended: string[]): boolean {
+    const entries = appended.map((text) => text.trim()).filter(Boolean)
+    if (entries.length === 0) return false
+    const displayText = entries.length === 1
+      ? `\n\n补充要求：${entries[0]}`
+      : `\n\n补充要求：\n${entries.map((text, index) => `${index + 1}. ${text}`).join('\n')}`
+    const promptText = `用户在任务执行中补充了要求，请从现在开始遵守，并在后续动作和最终答复中体现：\n${entries.map((text, index) => `${index + 1}. ${text}`).join('\n')}`
+    messages.push({ role: 'user', content: promptText })
+
+    const appendedItem: Item = {
+      type: 'userMessage',
+      id: `userMessage-${randomUUID()}`,
+      content: [{ type: 'text', text: displayText }]
+    }
+    onEvent({ type: 'item_started', turn_id: turnId, item: appendedItem })
+    onEvent({ type: 'item_completed', turn_id: turnId, item: appendedItem })
+    onEvent({ type: 'status', status: 'INFO', message: '补充要求已并入当前任务' })
+    return true
+  }
+
+  function takeAppendedInputs(): string[] {
+    return consumeAppendedInput ? consumeAppendedInput() : []
+  }
+
   for (let iter = 0; iter < config.maxIterations; iter++) {
+    appendRuntimeInputs(takeAppendedInputs())
+
     let assistantText = ''
     let toolUse: { id: string; name: string; args: Record<string, unknown> } | null = null
     let inputTokens = 0
@@ -263,6 +290,16 @@ export async function runReact(
 
     // 如果没有工具调用，说明模型给出最终回复，结束
     if (!toolUse) {
+      const appendedAfterAnswer = takeAppendedInputs()
+      if (appendedAfterAnswer.length > 0) {
+        messages.push({
+          role: 'assistant',
+          content: assistantText,
+          ...(turnThinkingText && turnThinkingSignature ? { thinkingBlocks: [{ type: 'thinking' as const, thinking: turnThinkingText, signature: turnThinkingSignature }] } : {})
+        })
+        appendRuntimeInputs(appendedAfterAnswer)
+        continue
+      }
       break
     }
 

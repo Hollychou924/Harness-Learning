@@ -9,6 +9,21 @@ import { resolveApproval } from './approval.js'
 const rl = createInterface({ input: process.stdin })
 
 const sessionHistory = new Map<string, AgentMessage[]>()
+const appendInputQueues = new Map<string, string[]>()
+
+function enqueueAppendInput(taskId: string, message: string): void {
+  const text = message.trim()
+  if (!text) return
+  const queue = appendInputQueues.get(taskId) || []
+  queue.push(text)
+  appendInputQueues.set(taskId, queue)
+}
+
+function consumeAppendInputs(taskId: string): string[] {
+  const queue = appendInputQueues.get(taskId) || []
+  appendInputQueues.delete(taskId)
+  return queue
+}
 
 rl.on('line', (line) => {
   if (!line.trim()) return
@@ -40,9 +55,11 @@ async function handleStdin(msg: StdinMessage): Promise<void> {
         workspace_dir,
         'work',
         session_id,
-        attachments
+        attachments,
+        () => consumeAppendInputs(session_id)
       )
       sessionHistory.set(session_id, result.messages.slice(1))
+      appendInputQueues.delete(session_id)
 
       // 产出报告产物
       onEvent({
@@ -56,6 +73,7 @@ async function handleStdin(msg: StdinMessage): Promise<void> {
       const errMsg = e instanceof Error ? e.message : String(e)
       onEvent({ type: 'error', message: errMsg })
       onEvent({ type: 'completed', task_id: session_id, summary: `任务失败：${errMsg}` })
+      appendInputQueues.delete(session_id)
     }
     return
   }
@@ -72,7 +90,8 @@ async function handleStdin(msg: StdinMessage): Promise<void> {
   }
 
   if (msg.type === 'append_input') {
-    send({ type: 'status', status: 'INFO', message: '追加输入已收到，一期暂不支持任务中追加' })
+    enqueueAppendInput(msg.task_id, msg.message)
+    send({ type: 'status', status: 'INFO', message: '补充要求已收到，正在并入当前任务' })
     return
   }
 }
