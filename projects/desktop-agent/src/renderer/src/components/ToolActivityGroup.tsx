@@ -132,7 +132,7 @@ function MergedToolGroupCard({ group }: { group: ToolGroup }) {
         <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${groupColor.dot}`} />
         {groupColor.icon}
         <span className="text-[var(--ink)]">{text}</span>
-        <ChevronRight size={14} className={`text-[var(--ink-soft)] transition-transform ml-auto ${isOpen ? 'rotate-90' : ''}`} />
+        <ChevronRight size={14} className={`text-[var(--ink-soft)] transition-transform ml-auto ${open ? 'rotate-90' : ''}`} />
       </button>
       {open && (
         <div className="px-3 pb-2 pt-1 space-y-0.5">
