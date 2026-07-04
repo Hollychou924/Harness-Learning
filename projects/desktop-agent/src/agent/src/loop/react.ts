@@ -322,6 +322,7 @@ export async function runReact(
         multiple: parsedQuestion.multiple,
         allowCustom: parsedQuestion.allowCustom,
         allowSkip: parsedQuestion.allowSkip,
+        prompts: parsedQuestion.prompts,
         decision: 'pending'
       }
       onEvent({ type: 'item_started', turn_id: turnId, item: questionItem })
@@ -333,7 +334,8 @@ export async function runReact(
         options: parsedQuestion.options,
         multiple: parsedQuestion.multiple,
         allow_custom: parsedQuestion.allowCustom,
-        allow_skip: parsedQuestion.allowSkip
+        allow_skip: parsedQuestion.allowSkip,
+        prompts: parsedQuestion.prompts
       })
 
       const answer = await waitForQuestion(questionRequestId)

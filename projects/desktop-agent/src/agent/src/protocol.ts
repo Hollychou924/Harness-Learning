@@ -80,14 +80,14 @@ export type StdoutMessage =
   // 审批/计划的用户决策结果（决策本身也会同步进对应 item，这里额外发一份用于旧组件兼容）
   | { type: 'approval_request'; request_id: string; tool_name: string; args: Record<string, unknown>; risk_level: 'low' | 'medium' | 'high' | 'critical'; impact: string; can_rollback: boolean }
   | { type: 'plan_proposed'; request_id: string; plan: string; steps: PlanStep[] }
-  | { type: 'question_proposed'; request_id: string; question: string; detail?: string; options: QuestionOption[]; multiple: boolean; allow_custom: boolean; allow_skip: boolean }
+  | { type: 'question_proposed'; request_id: string; question: string; detail?: string; options: QuestionOption[]; multiple: boolean; allow_custom: boolean; allow_skip: boolean; prompts?: QuestionPrompt[] }
   | { type: 'todo_update'; todos: TodoItem[] }
   // 用量与产物
   | { type: 'usage'; inputTokens: number; outputTokens: number }
   | { type: 'status'; status: string; message?: string }
   | { type: 'artifact'; artifact_type: 'diff' | 'report' | 'file' | 'preview' | 'evidence' | 'task_summary'; file_path: string }
   | { type: 'error'; message: string }
-  | { type: 'completed'; task_id: string; summary: string }
+  | { type: 'completed'; task_id: string; summary: string; messages?: AgentMessage[] }
   | { type: 'subtask_started'; subtask_id: string; title: string; agent_id?: string }
   | { type: 'subtask_completed'; subtask_id: string; title: string; duration_ms: number; tool_count: number; tokens: number }
   | { type: 'subtask_failed'; subtask_id: string; title: string; error: string }
@@ -96,6 +96,16 @@ export interface QuestionOption {
   id: string
   label: string
   description?: string
+}
+
+export interface QuestionPrompt {
+  id: string
+  question: string
+  detail?: string
+  options: QuestionOption[]
+  multiple: boolean
+  allowCustom: boolean
+  allowSkip: boolean
 }
 
 export interface PlanStep {

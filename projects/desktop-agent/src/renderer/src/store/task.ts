@@ -125,6 +125,17 @@ export interface QuestionOption {
   description?: string
 }
 
+export interface QuestionPrompt {
+  id: string
+  question: string
+  detail?: string
+  options: QuestionOption[]
+  multiple: boolean
+  allowCustom: boolean
+  allowSkip: boolean
+  prompts?: QuestionPrompt[]
+}
+
 export interface QuestionRequest {
   requestId: string
   question: string
@@ -719,7 +730,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         case 'error': patch = { error: msg.message, status: 'failed', finishedAt: Date.now() }; break
         case 'approval_request': patch = { approvalPending: { requestId: msg.request_id, toolName: msg.tool_name, args: msg.args, riskLevel: msg.risk_level, impact: msg.impact, canRollback: msg.can_rollback } }; break
         case 'plan_proposed': patch = { pendingPlan: { requestId: msg.request_id, plan: msg.plan, steps: msg.steps } }; break
-        case 'question_proposed': patch = { pendingQuestion: { requestId: msg.request_id, question: msg.question, detail: msg.detail, options: msg.options, multiple: msg.multiple, allowCustom: msg.allow_custom, allowSkip: msg.allow_skip } }; break
+        case 'question_proposed': patch = { pendingQuestion: { requestId: msg.request_id, question: msg.question, detail: msg.detail, options: msg.options, multiple: msg.multiple, allowCustom: msg.allow_custom, allowSkip: msg.allow_skip, prompts: msg.prompts } }; break
         case 'todo_update': patch = { todos: msg.todos }; break
         case 'completed': {
           // 后台任务完成：累积轮次落盘，但不更新全局展示
@@ -801,7 +812,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         syncRT()
         break
       case 'question_proposed':
-        set({ pendingQuestion: { requestId: msg.request_id, question: msg.question, detail: msg.detail, options: msg.options, multiple: msg.multiple, allowCustom: msg.allow_custom, allowSkip: msg.allow_skip } })
+        set({ pendingQuestion: { requestId: msg.request_id, question: msg.question, detail: msg.detail, options: msg.options, multiple: msg.multiple, allowCustom: msg.allow_custom, allowSkip: msg.allow_skip, prompts: msg.prompts } })
         syncRT()
         break
       case 'todo_update':

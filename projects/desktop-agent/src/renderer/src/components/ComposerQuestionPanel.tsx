@@ -14,7 +14,15 @@ interface AnswerDraft {
 }
 
 export function ComposerQuestionPanel({ question, onAnswer }: Props) {
-  const prompts = useMemo(() => [question], [question])
+  const prompts = useMemo(() => question.prompts && question.prompts.length > 0 ? question.prompts : [{
+    id: 'question-1',
+    question: question.question,
+    detail: question.detail,
+    options: question.options,
+    multiple: question.multiple,
+    allowCustom: question.allowCustom,
+    allowSkip: question.allowSkip
+  }], [question])
   const [index, setIndex] = useState(0)
   const [drafts, setDrafts] = useState<Record<number, AnswerDraft>>({})
   const [submitting, setSubmitting] = useState(false)
@@ -35,7 +43,24 @@ export function ComposerQuestionPanel({ question, onAnswer }: Props) {
     }
     setSubmitting(true)
     try {
-      await onAnswer(next.selectedOptionIds, next.customAnswer.trim(), next.skipped, false)
+      if (prompts.length === 1) {
+        await onAnswer(next.selectedOptionIds, next.customAnswer.trim(), next.skipped, false)
+        return
+      }
+      const finalDrafts = { ...drafts, [index]: next }
+      const customAnswer = prompts.map((prompt, promptIndex) => {
+        const answer = finalDrafts[promptIndex] || { selectedOptionIds: [], customAnswer: '', skipped: true }
+        const labels = prompt.options
+          .filter((option) => answer.selectedOptionIds.includes(option.id))
+          .map((option) => option.label)
+        return {
+          question: prompt.question,
+          selected: labels,
+          custom: answer.customAnswer,
+          skipped: answer.skipped
+        }
+      })
+      await onAnswer([], JSON.stringify(customAnswer, null, 2), false, false)
     } finally {
       setSubmitting(false)
     }

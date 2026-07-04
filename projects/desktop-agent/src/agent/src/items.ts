@@ -116,6 +116,16 @@ export interface QuestionOptionItem {
   description?: string
 }
 
+export interface QuestionPromptItem {
+  id: string
+  question: string
+  detail?: string
+  options: QuestionOptionItem[]
+  multiple: boolean
+  allowCustom: boolean
+  allowSkip: boolean
+}
+
 export interface QuestionItem {
   type: 'question'
   id: string
@@ -126,6 +136,7 @@ export interface QuestionItem {
   multiple: boolean
   allowCustom: boolean
   allowSkip: boolean
+  prompts?: QuestionPromptItem[]
   decision: 'pending' | 'answered' | 'skipped'
   selectedOptionIds?: string[]
   customAnswer?: string
