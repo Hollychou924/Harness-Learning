@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, shell, nativeTheme, dialog } from 'electro
 import { isAbsolute, join, resolve, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
 import { readdir as readdirAsync, stat as statAsync } from 'node:fs/promises'
 import { agentBridge } from './agent-bridge.js'
@@ -439,6 +440,15 @@ ipcMain.handle('session:loadTurns', async (_e, sessionId: string) => {
   }
 })
 
+function decodeXml(input: string): string {
+  return input
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+}
+
 function resolveWorkspaceRoot(workspaceDir?: string): string {
   const fallback = join(app.getPath('documents'), '小蓝鲸产出')
   if (!workspaceDir || typeof workspaceDir !== 'string') return fallback
@@ -569,9 +579,15 @@ async function extractDocumentText(filePath: string, ext: string): Promise<strin
       await parser.destroy()
       return textResult.text || ''
     }
-    // .doc / .pptx 等暂不支持解析，返回提示
+    // .doc 暂不支持解析；.pptx 用系统 unzip 读取幻灯片文字，不额外引入依赖。
     if (ext === 'doc') return '[旧版 .doc 格式暂不支持解析，建议转为 .docx]'
-    if (ext === 'pptx') return '[.pptx 解析暂未实现，建议复制文字内容后发送]'
+    if (ext === 'pptx') {
+      const xml = execFileSync('unzip', ['-p', filePath, 'ppt/slides/slide*.xml'], { encoding: 'utf8', maxBuffer: 1024 * 1024 * 20 })
+      const text = Array.from(xml.matchAll(/<a:t>(.*?)<\/a:t>/g))
+        .map((m) => decodeXml(m[1]))
+        .filter(Boolean)
+      return text.join('\n') || '[未提取到演示稿文字]'
+    }
   } catch (e) {
     return `[文档解析失败: ${e instanceof Error ? e.message : String(e)}]`
   }
