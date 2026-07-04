@@ -13,14 +13,17 @@ import {
   Pencil,
   Trash2,
   FolderPlus,
+  Folder,
   ChevronDown,
   ChevronRight,
+  ChevronUp,
   MoreHorizontal,
   X
 } from 'lucide-react'
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useTaskStore, type Session, type Project, DEFAULT_PROJECT_ID } from '../store/task'
 import { useSettingsStore } from './settings/settingsStore'
+import { NameDialog, NewProjectDialog } from './Dialogs'
 
 /* ============================================================
  * 左侧导航（对标 Codex 桌面客户端）
@@ -50,22 +53,22 @@ function saveCollapsed(map: Record<string, boolean>) {
   }
 }
 
-export function Sidebar() {
+export function Sidebar({ collapsed }: { collapsed: boolean }) {
   const store = useTaskStore()
   const { mode, setMode, message, startTask, reset, projects, sessions, activeProjectId, activeSessionId } = store
   const { openSettings } = useSettingsStore()
   const [activeTab, setActiveTab] = useState<'new' | 'search' | 'scheduled' | 'plugins'>('new')
   const [search, setSearch] = useState('')
-  const [showArchived, setShowArchived] = useState(false)
   const [newProjectOpen, setNewProjectOpen] = useState(false)
   const [renamingProject, setRenamingProject] = useState<string | null>(null)
   const [newProjectName, setNewProjectName] = useState('')
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => loadCollapsed())
+  const [renamingSession, setRenamingSession] = useState<{ id: string; title: string } | null>(null)
+  const [projectCollapsed, setProjectCollapsed] = useState<Record<string, boolean>>(() => loadCollapsed())
   const [dragSessionId, setDragSessionId] = useState<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
   // 项目内默认只显示前 N 条；点「展开显示」后切到全量
   const [expandedAll, setExpandedAll] = useState<Record<string, boolean>>({})
-  const SESSION_VISIBLE_DEFAULT = 3
+  const SESSION_VISIBLE_DEFAULT = 5
   // 轻量提示：一期给「已安排 / 插件」等未实现入口使用
   const [toast, setToast] = useState<string | null>(null)
   const toastTimer = useRef<number | null>(null)
@@ -75,9 +78,9 @@ export function Sidebar() {
     toastTimer.current = window.setTimeout(() => setToast(null), 2400)
   }
 
-  useEffect(() => { saveCollapsed(collapsed) }, [collapsed])
+  useEffect(() => { saveCollapsed(projectCollapsed) }, [projectCollapsed])
 
-  const toggleCollapse = (id: string) => setCollapsed((m) => ({ ...m, [id]: !m[id] }))
+  const toggleCollapse = (id: string) => setProjectCollapsed((m) => ({ ...m, [id]: !m[id] }))
 
   const searchMatch = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -86,22 +89,19 @@ export function Sidebar() {
   }, [sessions, search])
 
   const sortedProjects = useMemo(() => {
-    const normal = projects.filter((p) => p.id !== DEFAULT_PROJECT_ID)
-    const def = projects.find((p) => p.id === DEFAULT_PROJECT_ID)
-    const list = [...normal].sort(
+    return [...projects].sort(
       (a, b) => Number(b.pinned) - Number(a.pinned) || (b.pinnedAt ?? 0) - (a.pinnedAt ?? 0) || a.order - b.order
     )
-    return def ? [...list, def] : list
   }, [projects])
 
   const pinnedProjects = sortedProjects.filter((p) => p.pinned)
-  const otherProjects = sortedProjects.filter((p) => !p.pinned && p.id !== DEFAULT_PROJECT_ID)
-  const defaultProject = sortedProjects.find((p) => p.id === DEFAULT_PROJECT_ID)
+  const otherProjects = sortedProjects.filter((p) => !p.pinned)
+  const unassignedSessions = sessions.filter((s) => s.projectId === DEFAULT_PROJECT_ID)
 
   const isExpanded = (p: Project) => {
     if (search) return true
     if (p.id === activeProjectId) return true
-    return !collapsed[p.id]
+    return !projectCollapsed[p.id]
   }
 
   const sessionsOf = (pid: string) => {
@@ -110,7 +110,6 @@ export function Sidebar() {
     return [...list].sort((a, b) => Number(b.pinned) - Number(a.pinned) || (b.pinnedAt ?? 0) - (a.pinnedAt ?? 0) || b.order - a.order || b.updatedAt - a.updatedAt)
   }
 
-  const archivedOf = (pid: string) => sessions.filter((s) => s.projectId === pid && s.archived)
 
   const handleDragStart = (e: React.DragEvent, sessionId: string) => {
     setDragSessionId(sessionId)
@@ -160,7 +159,6 @@ export function Sidebar() {
           expanded={expanded}
           onToggle={() => toggleCollapse(p.id)}
           onActivate={() => store.setActiveProject(p.id)}
-          onNewSession={isDefault ? undefined : () => { store.setActiveProject(p.id); store.createSession(p.id); reset(); startTask() }}
           onRename={isDefault ? null : () => { setRenamingProject(p.id); setNewProjectName(p.name) }}
           onDelete={isDefault ? null : () => { if (confirm(`删除项目「${p.name}」及其下所有对话？`)) store.deleteProject(p.id) }}
           onTogglePin={isDefault ? null : () => store.togglePinProject(p.id)}
@@ -182,28 +180,20 @@ export function Sidebar() {
                 onDrop={(e) => handleDrop(e, s.id, p.id)}
                 isDragging={dragSessionId === s.id}
                 isDragOver={dragOverId === s.id}
+                onRename={() => setRenamingSession({ id: s.id, title: s.title })}
               />
             ))}
             {!expandedAll[p.id] && list.length > SESSION_VISIBLE_DEFAULT && (
               <button onClick={() => setExpandedAll((m) => ({ ...m, [p.id]: true }))}
-                className="w-full flex items-center gap-1 pl-7 pr-2 py-1 text-[11px] text-[var(--ink-soft)] hover:text-[var(--ink)] transition">
+                className="w-full flex items-center gap-1 pl-7 pr-2 py-1 text-[11px] text-[var(--ink-soft)]/70 hover:text-[var(--ink-soft)] transition">
                 <ChevronDown size={11} /> 展开显示 {list.length - SESSION_VISIBLE_DEFAULT} 条
               </button>
             )}
             {expandedAll[p.id] && list.length > SESSION_VISIBLE_DEFAULT && (
               <button onClick={() => setExpandedAll((m) => ({ ...m, [p.id]: false }))}
-                className="w-full flex items-center gap-1 pl-7 pr-2 py-1 text-[11px] text-[var(--ink-soft)] hover:text-[var(--ink)] transition">
+                className="w-full flex items-center gap-1 pl-7 pr-2 py-1 text-[11px] text-[var(--ink-soft)]/70 hover:text-[var(--ink-soft)] transition">
                 <ChevronUp size={11} /> 收起
               </button>
-            )}
-            {archivedOf(p.id).length > 0 && !search && (
-              <ArchivedSection
-                sessions={archivedOf(p.id)}
-                expanded={showArchived}
-                onToggle={() => setShowArchived((v) => !v)}
-                activeId={activeSessionId}
-                onClick={(id) => void store.continueSession(id)}
-              />
             )}
           </>
         )}
@@ -212,9 +202,12 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="glass-soft w-60 flex-shrink-0 flex flex-col border-r border-white/40">
-      <div className="drag h-9" />
-
+    <aside
+      className={`glass-soft flex-shrink-0 flex flex-col border-r border-white/40 transition-all duration-300 ease-in-out overflow-hidden ${
+        collapsed ? 'w-0 border-r-0' : 'w-60'
+      }`}
+    >
+      <div className="drag h-9 flex-shrink-0" />
       {/* 顶部快捷入口：新对话 / 搜索 / 已安排 / 插件 */}
       <div className="px-3 pb-2">
         <div className="space-y-0.5">
@@ -247,10 +240,11 @@ export function Sidebar() {
       <PinnedDropZone sessions={pinnedSessionsAll(sessions, searchMatch)} activeId={activeSessionId}
         onClick={(id) => void store.continueSession(id)} onDrop={handleDropToPinned}
         onDragOver={(e) => { e.preventDefault(); setDragOverId('__pinned__') }}
-        isDragOver={dragOverId === '__pinned__'} />
+        isDragOver={dragOverId === '__pinned__'}
+        onRename={(id, title) => setRenamingSession({ id, title })} />
 
       {/* 主体列表：按项目分组，项目下对话按时间倒序（最新在前） */}
-      <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-1">
+      <div className="flex-1 overflow-y-auto px-3 pb-2 space-y-1">
         {pinnedProjects.length > 0 && (
           <div className="space-y-0.5">
             <SectionLabel label="置顶" />
@@ -261,16 +255,51 @@ export function Sidebar() {
           {otherProjects.length > 0 && <SectionLabel label="项目" />}
           {otherProjects.map((p) => renderProjectBlock(p))}
         </div>
-        {defaultProject && (
+        {unassignedSessions.length > 0 && (
           <div className="space-y-0.5">
-            <SectionLabel label="对话" action={
-              <button onClick={() => { store.setActiveProject(DEFAULT_PROJECT_ID); store.createSession(); reset(); }} className="p-1 rounded hover:bg-black/[0.06]"><Plus size={12} /></button>
-            } />
-            {renderProjectBlock(defaultProject)}
+            <SectionLabel label="无项目对话" />
+            {(() => {
+              const list = sessionsOf(DEFAULT_PROJECT_ID)
+              if (list.length === 0 && !search) {
+                return <p className="pl-2.5 py-1 text-[11px] text-[var(--ink-soft)]/60">暂无对话</p>
+              }
+              const visible = expandedAll[DEFAULT_PROJECT_ID] ? list : list.slice(0, SESSION_VISIBLE_DEFAULT)
+              return (
+                <>
+                  {visible.map((s) => (
+                    <SessionRow
+                      key={s.id}
+                      session={s}
+                      active={s.id === activeSessionId}
+                      onClick={() => void store.continueSession(s.id)}
+                      onDragStart={(e) => handleDragStart(e, s.id)}
+                      onDragOver={(e) => handleDragOver(e, s.id)}
+                      onDrop={(e) => handleDrop(e, s.id, DEFAULT_PROJECT_ID)}
+                      isDragging={dragSessionId === s.id}
+                      isDragOver={dragOverId === s.id}
+                      compact
+                      onRename={() => setRenamingSession({ id: s.id, title: s.title })}
+                    />
+                  ))}
+                  {!expandedAll[DEFAULT_PROJECT_ID] && list.length > SESSION_VISIBLE_DEFAULT && (
+                    <button onClick={() => setExpandedAll((m) => ({ ...m, [DEFAULT_PROJECT_ID]: true }))}
+                      className="w-full flex items-center gap-1 pl-2.5 pr-2 py-1 text-[11px] text-[var(--ink-soft)]/70 hover:text-[var(--ink-soft)] transition">
+                      <ChevronDown size={11} /> 展开显示 {list.length - SESSION_VISIBLE_DEFAULT} 条
+                    </button>
+                  )}
+                  {expandedAll[DEFAULT_PROJECT_ID] && list.length > SESSION_VISIBLE_DEFAULT && (
+                    <button onClick={() => setExpandedAll((m) => ({ ...m, [DEFAULT_PROJECT_ID]: false }))}
+                      className="w-full flex items-center gap-1 pl-2.5 pr-2 py-1 text-[11px] text-[var(--ink-soft)]/70 hover:text-[var(--ink-soft)] transition">
+                      <ChevronUp size={11} /> 收起
+                    </button>
+                  )}
+                </>
+              )
+            })()}
           </div>
         )}
         {sortedProjects.length === 0 && (
-          <p className="px-2 py-3 text-xs text-[var(--ink-soft)] opacity-70 text-center">还没有项目，点上方 + 新建一个</p>
+          <p className="px-2.5 py-3 text-xs text-[var(--ink-soft)] opacity-70 text-center">还没有项目，点上方 + 新建一个</p>
         )}
       </div>
 
@@ -289,14 +318,21 @@ export function Sidebar() {
       </div>
 
       {newProjectOpen && (
-        <NameDialog title="新建项目" initial="" placeholder="项目名称" confirmLabel="创建"
+        <NewProjectDialog
           onCancel={() => setNewProjectOpen(false)}
-          onConfirm={(name) => { store.createProject(name); setNewProjectOpen(false) }} />
+          onCreateNew={(name) => { store.createProject(name); setNewProjectOpen(false) }}
+          onLoadFolder={(name, folderPath) => { store.createProject(name, '📁', folderPath); setNewProjectOpen(false) }}
+        />
       )}
       {renamingProject && (
         <NameDialog title="重命名项目" initial={newProjectName} placeholder="项目名称" confirmLabel="保存"
           onCancel={() => setRenamingProject(null)}
           onConfirm={(name) => { store.renameProject(renamingProject, name); setRenamingProject(null) }} />
+      )}
+      {renamingSession && (
+        <NameDialog title="重命名对话" initial={renamingSession.title} placeholder="对话名称" confirmLabel="保存"
+          onCancel={() => setRenamingSession(null)}
+          onConfirm={(name) => { store.renameSession(renamingSession.id, name); setRenamingSession(null) }} />
       )}
       {toast && (
         <div className="absolute left-1/2 bottom-6 -translate-x-1/2 z-[120] px-3 py-1.5 rounded-full bg-[var(--ink)]/85 text-white text-[12px] shadow-lg backdrop-blur">
@@ -314,28 +350,29 @@ function NavPill({ icon, label, active, badge, onClick }: { icon: React.ReactNod
       className={`no-drag w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition ${
         active ? 'bg-white/60 text-[var(--ink)] shadow-sm' : 'text-[var(--ink-soft)] hover:bg-black/[0.04] hover:text-[var(--ink)]'
       }`}>
-      <span className="w-4 h-4 flex items-center justify-center">{icon}</span>
+      <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">{icon}</span>
       <span className="flex-1 text-left">{label}</span>
       {badge !== undefined && badge > 0 && (
-        <span className="min-w-[18px] h-[18px] px-1.5 flex items-center justify-center rounded-full bg-[var(--ink)]/10 text-[10px] text-[var(--ink-soft)]">{badge}</span>
+        <span className="min-w-[18px] h-[18px] px-1.5 flex items-center justify-center rounded-full bg-[var(--ink)]/10 text-[11px] text-[var(--ink-soft)]">{badge}</span>
       )}
     </button>
   )
 }
 
 /* ---- 置顶拖放区 ---- */
-function PinnedDropZone({ sessions, activeId, onClick, onDrop, onDragOver, isDragOver }: {
+function PinnedDropZone({ sessions, activeId, onClick, onDrop, onDragOver, isDragOver, onRename }: {
   sessions: Session[]; activeId: string | null; onClick: (id: string) => void
   onDrop: (e: React.DragEvent) => void; onDragOver: (e: React.DragEvent) => void; isDragOver: boolean
+  onRename?: (id: string, title: string) => void
 }) {
   if (sessions.length === 0) return null
   return (
-    <div className={`px-2 pb-1 ${isDragOver ? 'bg-amber-50/50 rounded-lg' : ''}`}
+    <div className={`px-3 pb-1 ${isDragOver ? 'bg-amber-50/50 rounded-lg' : ''}`}
       onDragOver={onDragOver} onDrop={onDrop}>
       <SectionLabel label="置顶对话" />
       <div className="space-y-0.5">
         {sessions.map((s) => (
-          <SessionRow key={s.id} session={s} active={s.id === activeId} onClick={() => onClick(s.id)} compact />
+          <SessionRow key={s.id} session={s} active={s.id === activeId} onClick={() => onClick(s.id)} compact onRename={() => onRename?.(s.id, s.title)} />
         ))}
       </div>
     </div>
@@ -343,22 +380,6 @@ function PinnedDropZone({ sessions, activeId, onClick, onDrop, onDragOver, isDra
 }
 
 /* ---- 已归档折叠区 ---- */
-function ArchivedSection({ sessions, expanded, onToggle, activeId, onClick }: {
-  sessions: Session[]; expanded: boolean; onToggle: () => void; activeId: string | null; onClick: (id: string) => void
-}) {
-  return (
-    <div className="space-y-0.5">
-      <button onClick={onToggle} className="w-full flex items-center gap-1 px-1 py-1 text-[11px] text-[var(--ink-soft)] hover:text-[var(--ink)] transition">
-        {expanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-        已归档 ({sessions.length})
-      </button>
-      {expanded && sessions.map((s) => (
-        <SessionRow key={s.id} session={s} active={s.id === activeId} onClick={() => onClick(s.id)} compact />
-      ))}
-    </div>
-  )
-}
-
 function pinnedSessionsAll(sessions: Session[], searchMatch: Set<string> | null): Session[] {
   let list = sessions.filter((s) => s.pinned && !s.archived)
   if (searchMatch) list = list.filter((s) => searchMatch.has(s.id))
@@ -369,30 +390,31 @@ function pinnedSessionsAll(sessions: Session[], searchMatch: Set<string> | null)
 function SectionLabel({ label, action }: { label: string; action?: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between px-1 pt-1.5 pb-0.5">
-      <span className="text-[10px] font-medium text-[var(--ink-soft)]/70">{label}</span>
+      <span className="text-[13px] font-semibold text-[var(--ink-soft)] tracking-wide">{label}</span>
       {action}
     </div>
   )
 }
 
 /* ---- 项目行 ---- */
-function ProjectRow({ project, expanded, onToggle, onActivate, onNewSession, onRename, onDelete, onTogglePin, onArchiveAll }: {
+function ProjectRow({ project, expanded, onToggle, onActivate, onRename, onDelete, onTogglePin, onArchiveAll }: {
   project: Project; expanded: boolean; onToggle: () => void; onActivate: () => void
-  onNewSession?: () => void; onRename: (() => void) | null; onDelete: (() => void) | null
+  onRename: (() => void) | null; onDelete: (() => void) | null
   onTogglePin: (() => void) | null; onArchiveAll: (() => void) | null
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   return (
     <div className="group relative flex items-center rounded-[10px] hover:bg-black/[0.04] transition">
       <button onClick={() => { onActivate(); onToggle() }}
-        className="flex-1 flex items-center gap-1.5 px-2 py-1.5 text-left min-w-0">
-        {expanded ? <ChevronDown size={13} className="text-[var(--ink-soft)] flex-shrink-0" /> : <ChevronRight size={13} className="text-[var(--ink-soft)] flex-shrink-0" />}
-        <span className="text-sm leading-none flex-shrink-0">{project.icon}</span>
-        <span className="flex-1 text-xs font-medium text-[var(--ink)] truncate">{project.name}</span>
+        className="flex-1 flex items-center gap-2.5 px-2.5 py-1.5 text-left min-w-0">
+        <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+          <Folder size={15} className="text-[var(--ink-soft)]" />
+        </span>
+        <span className="flex-1 text-[12px] font-medium text-[var(--ink)] truncate">{project.name}</span>
         {project.pinned && <Pin size={10} className="text-amber-400 flex-shrink-0" />}
+        {expanded ? <ChevronDown size={13} className="text-[var(--ink-soft)] flex-shrink-0" /> : <ChevronRight size={13} className="text-[var(--ink-soft)] flex-shrink-0" />}
       </button>
       <div className="hidden group-hover:flex items-center gap-0.5 mr-0.5">
-        {onNewSession && <IconBtn title="新建对话" onClick={onNewSession}><Plus size={11} /></IconBtn>}
         <IconBtn title="更多" onClick={() => setMenuOpen((v) => !v)}><MoreHorizontal size={11} /></IconBtn>
       </div>
       {menuOpen && (
@@ -433,17 +455,13 @@ function ProjectRow({ project, expanded, onToggle, onActivate, onNewSession, onR
 }
 
 /* ---- 单条对话行 ---- */
-function SessionRow({ session, active, onClick, onDragStart, onDragOver, onDrop, isDragging, isDragOver, showProject, compact }: {
+function SessionRow({ session, active, onClick, onDragStart, onDragOver, onDrop, isDragging, isDragOver, showProject, compact, onRename }: {
   session: Session; active: boolean; onClick: () => void
   onDragStart?: (e: React.DragEvent) => void; onDragOver?: (e: React.DragEvent) => void; onDrop?: (e: React.DragEvent) => void
-  isDragging?: boolean; isDragOver?: boolean; showProject?: string; compact?: boolean
+  isDragging?: boolean; isDragOver?: boolean; showProject?: string; compact?: boolean; onRename?: () => void
 }) {
   const store = useTaskStore()
   const [menuOpen, setMenuOpen] = useState(false)
-  const [renaming, setRenaming] = useState(false)
-  const [name, setName] = useState(session.title)
-
-  useEffect(() => { setName(session.title) }, [session.title])
 
   const icon = session.status === 'completed'
     ? <CheckCircle2 size={12} className="text-green-500 flex-shrink-0 mt-0.5" />
@@ -453,26 +471,12 @@ function SessionRow({ session, active, onClick, onDragStart, onDragOver, onDrop,
 
   const actions: MenuAction[] = [
     { id: 'pin', label: session.pinned ? '取消置顶' : '置顶', icon: session.pinned ? <PinOff size={12} /> : <Pin size={12} />, onClick: () => store.togglePinSession(session.id) },
-    { id: 'rename', label: '重命名', icon: <Pencil size={12} />, onClick: () => { setRenaming(true); setMenuOpen(false) } },
+    { id: 'rename', label: '重命名', icon: <Pencil size={12} />, onClick: () => { onRename?.(); setMenuOpen(false) } },
     session.archived
       ? { id: 'unarchive', label: '取消归档', icon: <ArchiveRestore size={12} />, onClick: () => store.unarchiveSession(session.id) }
       : { id: 'archive', label: '归档', icon: <Archive size={12} />, onClick: () => store.archiveSession(session.id) },
     { id: 'delete', label: '删除', icon: <Trash2 size={12} />, danger: true, onClick: () => store.deleteSession(session.id) }
   ]
-
-  if (renaming) {
-    return (
-      <div className={compact ? 'pl-2 pr-1 py-0.5' : 'pl-7 pr-2 py-0.5'}>
-        <input autoFocus value={name} onChange={(e) => setName(e.target.value)}
-          onBlur={() => { if (name.trim()) store.renameSession(session.id, name); setRenaming(false) }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') { if (name.trim()) store.renameSession(session.id, name); setRenaming(false) }
-            if (e.key === 'Escape') setRenaming(false)
-          }}
-          className="w-full h-6 px-2 text-xs rounded bg-white border border-blue-400 outline-none" />
-      </div>
-    )
-  }
 
   return (
     <div
@@ -481,21 +485,21 @@ function SessionRow({ session, active, onClick, onDragStart, onDragOver, onDrop,
       onDragOver={onDragOver}
       onDrop={onDrop}
       onDragEnd={() => { /* 状态由父组件清理 */ }}
-      className={`group relative flex items-center ${compact ? 'pl-2' : 'pl-7'} pr-1.5 py-[5px] rounded-[10px] cursor-pointer transition ${
+      className={`group relative flex items-center ${compact ? 'pl-2.5' : 'pl-7'} pr-1.5 py-[5px] rounded-[10px] cursor-pointer transition ${
         active ? 'bg-black/[0.07]' : 'hover:bg-black/[0.04]'
       } ${isDragging ? 'opacity-40' : ''} ${isDragOver ? 'border-t-2 border-blue-400' : ''}`}
     >
-      <button onClick={onClick} className="flex-1 flex items-center gap-1.5 min-w-0 text-left pr-1">
-        {icon}
-        <span className={`flex-1 truncate text-xs ${active ? 'text-[var(--ink)] font-medium' : 'text-[var(--ink-soft)]'}`}>{session.title}</span>
+      <button onClick={onClick} className="flex-1 flex items-center gap-2.5 min-w-0 text-left pr-1">
+        <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">{icon}</span>
+        <span className={`flex-1 truncate text-xs ${active ? 'text-[var(--ink)] font-medium' : 'text-[var(--ink)]/75'}`}>{session.title}</span>
       </button>
       {/* 右侧：项目标签 + 相对时间/状态 + 置顶图标 */}
       <div className="flex items-center gap-1 flex-shrink-0">
-        {showProject && <span className="text-[10px] text-[var(--ink-soft)]/60 bg-black/[0.04] px-1 rounded max-w-[48px] truncate">{showProject}</span>}
+        {showProject && <span className="text-[11px] text-[var(--ink-soft)]/60 bg-black/[0.04] px-1 rounded max-w-[48px] truncate">{showProject}</span>}
         {session.status === 'executing' ? (
           <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse flex-shrink-0" title="进行中" />
         ) : (
-          <span className="text-[10px] tabular-nums text-[var(--ink-soft)]/55" title={new Date(session.updatedAt).toLocaleString('zh-CN')}>
+          <span className="text-[11px] tabular-nums text-[var(--ink-soft)]/55" title={new Date(session.updatedAt).toLocaleString('zh-CN')}>
             {timeAgo(session.updatedAt)}
           </span>
         )}
@@ -531,29 +535,6 @@ function IconBtn({ children, title, onClick, danger }: { children: React.ReactNo
       className={`w-6 h-6 rounded flex items-center justify-center transition ${danger ? 'text-red-500 hover:bg-red-50' : 'text-[var(--ink-soft)] hover:bg-black/[0.08] hover:text-[var(--ink)]'}`}>
       {children}
     </button>
-  )
-}
-
-function NameDialog({ title, initial, placeholder, confirmLabel, onCancel, onConfirm }: {
-  title: string; initial: string; placeholder: string; confirmLabel: string
-  onCancel: () => void; onConfirm: (name: string) => void
-}) {
-  const [val, setVal] = useState(initial)
-  const ref = useRef<HTMLInputElement>(null)
-  useEffect(() => { ref.current?.focus(); ref.current?.select() }, [])
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30" onClick={onCancel}>
-      <div className="w-72 glass rounded-2xl shadow-xl p-5" onClick={(e) => e.stopPropagation()}>
-        <h3 className="mb-3 text-sm font-semibold text-[var(--ink)]">{title}</h3>
-        <input ref={ref} value={val} onChange={(e) => setVal(e.target.value)} placeholder={placeholder}
-          onKeyDown={(e) => { if (e.key === 'Enter' && val.trim()) onConfirm(val); if (e.key === 'Escape') onCancel() }}
-          className="w-full h-9 px-3 text-sm rounded-lg bg-white border border-black/10 outline-none focus:border-blue-400" />
-        <div className="flex justify-end gap-2 mt-4">
-          <button onClick={onCancel} className="px-3 py-1.5 text-xs text-[var(--ink-soft)] hover:text-[var(--ink)] transition">取消</button>
-          <button onClick={() => val.trim() && onConfirm(val)} className="px-3 py-1.5 text-xs rounded-lg bg-[var(--ink)] text-white hover:opacity-90 transition">{confirmLabel}</button>
-        </div>
-      </div>
-    </div>
   )
 }
 

@@ -8,6 +8,11 @@ import { TurnItemsView } from './TurnItemsView'
 import { TurnNavigator } from './TurnNavigator'
 import { ChatInput } from './ChatInput'
 import { useSettingsStore } from './settings/settingsStore'
+import { useDetailLevelStore, type DetailLevel } from './detailLevelStore'
+import { useTimelineScroll } from './useTimelineScroll'
+import { useDeferredRender } from './useDeferredRender'
+import { ChevronUp } from 'lucide-react'
+import { Maximize2, Minimize2, Eye } from 'lucide-react'
 import type { Turn } from '../../../agent/src/items'
 
 export function Workbench() {
@@ -18,30 +23,29 @@ export function Workbench() {
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
       {/* 顶部栏 */}
-      <div className="drag h-14 flex items-center justify-between px-6 border-b border-black/[0.06] gap-4">
+      <div className="drag h-14 flex items-center justify-center px-6 border-b border-black/[0.06]">
         <div className="no-drag flex items-center gap-3 min-w-0">
-          <span className="text-sm font-medium flex-shrink-0">
-            {mode === 'work' ? 'Work 工作台' : 'Code 工作台'}
-          </span>
           {taskTitle && (
-            <>
-              <span className="text-black/10">/</span>
-              <span className="text-sm text-[var(--ink-soft)] truncate" title={taskTitle}>
-                {taskTitle}
-              </span>
-            </>
+            <span className="text-sm font-medium text-[var(--ink)] truncate" title={taskTitle}>
+              {taskTitle}
+            </span>
           )}
+          {messages.length > 0 && <DetailLevelToggle />}
         </div>
       </div>
 
-      {/* 主区域 */}
-      <div className="flex-1 overflow-y-auto min-h-0">
+      {/* 主区域：滚动由各子视图自行管理，避免双层 overflow 导致双滚动条 */}
+      <div className="flex-1 min-h-0 overflow-hidden">
         {messages.length > 0 ? (
           <ConversationView status={status} />
         ) : status === 'idle' ? (
-          <HomeView greeting={greeting} />
+          <div className="h-full overflow-y-auto">
+            <HomeView greeting={greeting} />
+          </div>
         ) : (
-          <RunningView summary={summary} status={status} />
+          <div className="h-full overflow-y-auto">
+            <RunningView summary={summary} status={status} />
+          </div>
         )}
       </div>
 
@@ -77,16 +81,17 @@ function HomeView({ greeting }: { greeting: string }) {
       </div>
 
       {/* 中间输入框 */}
-      <div className="w-full max-w-3xl">
+      <div className="w-full max-w-4xl">
         <ChatInput
           value={message}
           onChange={setMessage}
           onSend={() => void startTask()}
+          showProjectPicker
         />
       </div>
 
       {/* 快捷能力 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 w-full max-w-3xl mt-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 w-full max-w-4xl mt-6">
         {quickActions.map((q) => (
           <button
             key={q.label}
@@ -103,28 +108,17 @@ function HomeView({ greeting }: { greeting: string }) {
 }
 
 function RunningView({ summary, status }: { summary: string; status: string }) {
-  const { goal, message, currentTurn, cancelTask } = useTaskStore()
+  const { goal, message, currentTurn } = useTaskStore()
   const chunks = getFinalAnswerOfTurn(currentTurn)
   const userQuery = goal || message
   return (
-    <div className="max-w-3xl mx-auto px-6 py-6 space-y-4">
+    <div className="max-w-4xl mx-auto px-6 py-6 space-y-4">
       {/* 用户消息：右侧气泡 */}
       {userQuery && (
         <div className="flex justify-end">
           <div className="glass rounded-2xl rounded-tr-md px-4 py-2.5 max-w-[80%]">
             <p className="text-sm leading-relaxed text-[var(--ink)] whitespace-pre-wrap">{userQuery}</p>
           </div>
-        </div>
-      )}
-
-      {status === 'executing' && (
-        <div className="flex justify-end">
-          <button
-            onClick={() => cancelTask()}
-            className="h-8 px-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600 hover:bg-red-100 transition"
-          >
-            停止任务
-          </button>
         </div>
       )}
 
@@ -144,6 +138,10 @@ function RunningView({ summary, status }: { summary: string; status: string }) {
  * ============================================================ */
 function ConversationView({ status }: { status: string }) {
   const { turns, currentTurn, goal, message } = useTaskStore()
+  const liveUserText = currentTurn?.items
+    .filter((it) => it.type === 'userMessage')
+    .flatMap((it) => it.content.filter((c) => c.type === 'text').map((c) => c.text || ''))
+    .join('') || ''
   const { showThinking } = useSettingsStore()
   const chunks = getFinalAnswerOfTurn(currentTurn)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -154,7 +152,8 @@ function ConversationView({ status }: { status: string }) {
     }
   }, [turns.length, chunks, status])
 
-  const isLiveTurn = status === 'executing' || status === 'completed'
+  // 本轮正在进行：currentTurn 存在时才走实时渲染；完成后 currentTurn 置空并入 turns，交由历史轮统一渲染，避免重复
+  const isLiveTurn = Boolean(currentTurn)
 
   // 点击导航条刻度：滚动定位到对应轮次，并高亮闪一下
   const handleJump = (turnId: string) => {
@@ -169,13 +168,19 @@ function ConversationView({ status }: { status: string }) {
   }
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full min-h-0 overflow-hidden">
       {/* 左侧跨轮导航条：超过 3 轮才出现 */}
       <TurnNavigator turns={turns} onJump={handleJump} />
-      <div ref={scrollRef} className="flex-1 max-w-3xl mx-auto px-6 py-6 space-y-4 overflow-y-auto h-full">
-        {turns.map((t) => (
-          <HistoryTurnView key={t.id} turn={t} showThinking={showThinking} />
-        ))}
+      <div ref={scrollRef} className="flex-1 w-full max-w-4xl mx-auto px-6 py-6 space-y-4 overflow-y-auto h-full">
+        <TimelinePaged turns={turns} showThinking={showThinking} />
+        {/* 本轮用户消息气泡 */}
+        {isLiveTurn && liveUserText && (
+          <div className="flex justify-end">
+            <div className="glass rounded-2xl rounded-tr-md px-4 py-2.5 max-w-[80%]">
+              <p className="text-sm leading-relaxed text-[var(--ink)] whitespace-pre-wrap">{liveUserText}</p>
+            </div>
+          </div>
+        )}
         {/* 本轮执行过程 + 实时回复 */}
         {isLiveTurn && <ProcessFlow />}
         {isLiveTurn && chunks && <ResultView content={chunks} />}
@@ -187,16 +192,18 @@ function ConversationView({ status }: { status: string }) {
   )
 }
 
-/** 一轮历史：用户消息气泡(右) + 思考/工具活动(左，可展开) + 最终回复(左) */
+/** 一轮历史：用户消息气泡(右) + 思考/工具活动(左，可展开) + 最终回复(左)
+ *  懒加载：不在视口内时只渲染用户消息占位，进入视口才渲染完整内容（来自 lobsterai LazyRenderTurn） */
 function HistoryTurnView({ turn, showThinking }: { turn: Turn; showThinking: boolean }) {
   const userText = turn.items
     .filter((it) => it.type === 'userMessage')
     .flatMap((it) => it.content.filter((c) => c.type === 'text').map((c) => c.text || ''))
     .join('')
   const finalAnswer = getFinalAnswerOfTurn(turn)
+  const { ref, shouldRender } = useDeferredRender<HTMLDivElement>({ rootMargin: '300px' })
 
   return (
-    <div data-turn-id={turn.id} className="space-y-3 turn-target">
+    <div ref={ref} data-turn-id={turn.id} className="space-y-3 turn-target">
       {userText && (
         <div className="flex justify-end">
           <div className="glass rounded-2xl rounded-tr-md px-4 py-2.5 max-w-[80%]">
@@ -204,8 +211,78 @@ function HistoryTurnView({ turn, showThinking }: { turn: Turn; showThinking: boo
           </div>
         </div>
       )}
-      <TurnItemsView turn={turn} showThinking={showThinking} />
-      {finalAnswer && <ResultView content={finalAnswer} />}
+      {shouldRender ? (
+        <>
+          <TurnItemsView turn={turn} showThinking={showThinking} />
+          {finalAnswer && <ResultView content={finalAnswer} />}
+        </>
+      ) : (
+        <div className="h-8" />
+      )}
+    </div>
+  )
+}
+
+/** 虚拟分页的历史轮次渲染：超阈值自动折叠，可手动加载/折叠更早轮次（来自 Kun） */
+function TimelinePaged({ turns, showThinking }: { turns: Turn[]; showThinking: boolean }) {
+  const { visibleTurnCount, hasHidden, shouldShowCollapseButton, loadEarlier, collapseEarlier } = useTimelineScroll(turns.length)
+  const visibleTurns = hasHidden ? turns.slice(hasHidden) : turns
+
+  return (
+    <>
+      {hasHidden && (
+        <div className="flex justify-center">
+          <button
+            onClick={loadEarlier}
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-[var(--ink-soft)] hover:bg-black/[0.04] transition"
+          >
+            <ChevronUp size={13} />
+            加载更早的 {hasHidden} 轮对话
+          </button>
+        </div>
+      )}
+      {shouldShowCollapseButton && (
+        <div className="flex justify-center">
+          <button
+            onClick={collapseEarlier}
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-[var(--ink-soft)] hover:bg-black/[0.04] transition"
+          >
+            <ChevronUp size={13} />
+            折叠更早的轮次
+          </button>
+        </div>
+      )}
+      {visibleTurns.map((t) => (
+        <HistoryTurnView key={t.id} turn={t} showThinking={showThinking} />
+      ))}
+    </>
+  )
+}
+
+function DetailLevelToggle() {
+  const { level, setLevel } = useDetailLevelStore()
+  const options: { value: DetailLevel; icon: React.ReactNode; label: string }[] = [
+    { value: 'conclusionOnly', icon: <Eye size={13} />, label: '只看结论' },
+    { value: 'normal', icon: <Minimize2 size={13} />, label: '默认' },
+    { value: 'expandAll', icon: <Maximize2 size={13} />, label: '全部展开' }
+  ]
+  return (
+    <div className="flex items-center gap-0.5 rounded-lg bg-black/[0.04] p-0.5">
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          onClick={() => setLevel(opt.value)}
+          className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs transition ${
+            level === opt.value
+              ? 'bg-white shadow-sm text-[var(--ink)]'
+              : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
+          }`}
+          title={opt.label}
+        >
+          {opt.icon}
+          <span className="hidden sm:inline">{opt.label}</span>
+        </button>
+      ))}
     </div>
   )
 }

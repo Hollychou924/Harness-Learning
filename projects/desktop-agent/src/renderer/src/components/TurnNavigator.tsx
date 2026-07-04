@@ -39,7 +39,7 @@ export function TurnNavigator({ turns, onJump }: { turns: Turn[]; onJump: (turnI
   if (turns.length < MIN_TURNS) return null
 
   return (
-    <div className="flex flex-col items-center gap-0.5 py-2" onMouseLeave={() => setHoveredIndex(null)}>
+    <div className="flex flex-col items-center gap-0.5 py-2 h-full overflow-hidden flex-shrink-0" onMouseLeave={() => setHoveredIndex(null)}>
       {summaries.map((s) => {
         const heightPct = (s.weight / totalWeight) * 100
         const isHovered = hoveredIndex === s.index

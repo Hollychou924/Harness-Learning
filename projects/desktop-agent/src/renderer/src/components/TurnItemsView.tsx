@@ -3,9 +3,9 @@ import { Loader2, Check, AlertCircle, ChevronRight, FilePlus } from 'lucide-reac
 import type { Turn, ToolCallItem } from '../../../agent/src/items'
 import { ReasoningBlock } from './ReasoningBlock'
 import { ToolActivityGroupView, groupToolItems } from './ToolActivityGroup'
-import { DurationBreakdown } from './DurationBreakdown'
-import { TimelineScrubber } from './TimelineScrubber'
 import { CollapsedTurnBar } from './CollapsedTurnBar'
+import { ProcessFold } from './ProcessFold'
+import { useDetailLevelStore } from './detailLevelStore'
 
 // 单轮内条目的纯展示：思考块 + 文件变更 + 工具活动组，历史轮次和当前实时轮次共用这一份渲染逻辑
 // 这样翻回历史对话，每一轮的思考/工具调用细节依然能展开看，不再是只剩一句"用了N个工具"
@@ -41,6 +41,7 @@ function collectFileChanges(items: ToolCallItem[]): FileChangeEntry[] {
 }
 
 export function TurnItemsView({ turn, showThinking, showStatusLine }: { turn: Turn; showThinking: boolean; showStatusLine?: boolean }) {
+  const detailLevel = useDetailLevelStore((s) => s.level)
   const items = turn.items
   const toolItems = items.filter((it): it is ToolCallItem => it.type === 'toolCall')
   const reasoningItems = items.filter((it) => it.type === 'reasoning')
@@ -54,14 +55,15 @@ export function TurnItemsView({ turn, showThinking, showStatusLine }: { turn: Tu
 
   if (toolItems.length === 0 && reasoningItems.length === 0) return null
 
+  // 只看结论模式：过程完全不渲染
+  if (detailLevel === 'conclusionOnly') return null
+
   // 轮内折叠判定(复刻 Codex tIn)：已完成 + 最终回复已出现 + 有过程内容 → 过程默认收起
-  const shouldCollapse = isCompleted && finalAnswerStarted && (toolItems.length > 0 || reasoningItems.length > 0)
+  // expandAll 模式：不折叠
+  const shouldCollapse = detailLevel === 'expandAll' ? false : (isCompleted && finalAnswerStarted && (toolItems.length > 0 || reasoningItems.length > 0))
 
   const processContent = (
     <>
-      {isCompleted && <DurationBreakdown turn={turn} />}
-      {isCompleted && <TimelineScrubber turn={turn} />}
-
       {showThinking && reasoningItems.map((r) => (
         <ReasoningBlock key={r.id} item={r} finalAnswerStarted={finalAnswerStarted} />
       ))}
@@ -71,10 +73,12 @@ export function TurnItemsView({ turn, showThinking, showStatusLine }: { turn: Tu
       )}
 
       {groups.length > 0 && (
-        <div className={`glass rounded-xl p-1.5 space-y-0.5 ${isCompleted ? 'opacity-70' : ''}`}>
-          {groups.map((g, i) => (
-            <ToolActivityGroupView key={`${g.kind}-${i}`} group={g} />
-          ))}
+        <div className={`glass rounded-xl p-1.5 ${isCompleted ? 'opacity-70' : ''}`}>
+          <ProcessFold>
+            {groups.map((g, i) => (
+              <ToolActivityGroupView key={`${g.kind}-${i}`} group={g} />
+            ))}
+          </ProcessFold>
         </div>
       )}
     </>
@@ -94,22 +98,34 @@ export function TurnItemsView({ turn, showThinking, showStatusLine }: { turn: Tu
 function StatusLine({ status, doneCount, runningCount, total }: {
   status: string; doneCount: number; runningCount: number; total: number
 }) {
-  const label =
-    status === 'running'
-      ? runningCount > 0
-        ? `执行中 · ${doneCount}/${total} 步完成`
-        : '思考中…'
-      : status === 'completed'
-      ? `任务完成 · 共 ${total} 步`
-      : '任务失败'
+  // 融合 Codex 计数摘要 + harnessclaw 降级展示
+  const failedCount = 0 // TurnItemsView 传入时未拆分 failed，此处占位
+  let label: string
+  if (status === 'running') {
+    if (runningCount > 0 && doneCount > 0) {
+      label = `${doneCount} 步完成 · ${runningCount} 步进行中`
+    } else if (runningCount > 0) {
+      label = `执行中 · ${runningCount} 步`
+    } else {
+      label = '思考中…'
+    }
+  } else if (status === 'completed') {
+    label = total > 0 ? `任务完成 · 共 ${total} 步` : '任务完成'
+  } else if (status === 'failed') {
+    label = '任务失败'
+  } else {
+    label = '已停止'
+  }
   return (
     <div className="flex items-center gap-2 text-sm text-[var(--ink-soft)]">
       {status === 'running' ? (
         <Loader2 size={14} className="text-sky-500 animate-spin" />
       ) : status === 'completed' ? (
         <Check size={14} className="text-green-500" />
-      ) : (
+      ) : status === 'failed' ? (
         <AlertCircle size={14} className="text-red-500" />
+      ) : (
+        <AlertCircle size={14} className="text-amber-500" />
       )}
       {label}
     </div>

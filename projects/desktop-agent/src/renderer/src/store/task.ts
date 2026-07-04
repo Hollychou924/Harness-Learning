@@ -5,6 +5,24 @@ import type { StdoutMessage, AgentMessage } from '../../../agent/src/protocol'
 import type { Turn } from '../../../agent/src/items'
 import { reduceTurnsEvent, getFinalAnswerOfTurn, deriveAgentMessages, type TurnsReducerState } from './turns'
 
+// 从 turns 的工具调用里派生产物列表：write_file/create_docx/create_xlsx 等写文件工具的产物
+// 历史会话恢复时顶层 artifacts 已清空，靠这个从持久化的 turns 里重建，右栏"产物"区不再空白
+const FILE_PRODUCING_TOOLS = new Set(['write_file', 'create_docx', 'create_xlsx'])
+
+function deriveArtifactsFromTurns(turns: Turn[]): ArtifactEntry[] {
+  const out: ArtifactEntry[] = []
+  for (const t of turns) {
+    for (const it of t.items) {
+      if (it.type !== 'toolCall') continue
+      if (!FILE_PRODUCING_TOOLS.has(it.kind)) continue
+      const p = it.args?.path
+      if (typeof p !== 'string' || !p) continue
+      out.push({ type: 'file', filePath: p })
+    }
+  }
+  return out
+}
+
 export type TaskStatus = 'idle' | 'executing' | 'completed' | 'failed'
 
 /** 判断一条 stdout 消息是否属于 Turn/Item 事件模型，走 reduceTurnsEvent 统一处理 */
@@ -26,6 +44,13 @@ export interface ArtifactEntry {
   filePath: string
   added?: number
   removed?: number
+}
+
+export interface SourceEntry {
+  type: 'file' | 'web' | 'note'
+  label: string
+  path?: string
+  url?: string
 }
 
 export interface HistoryEntry {
@@ -75,6 +100,12 @@ export interface Session {
   archivedAt?: number
   /** 手动排序序号（拖拽调整） */
   order: number
+  /** 任务耗时（毫秒），完成时写入，历史会话恢复时用于右栏"耗时"展示 */
+  durationMs?: number
+  /** 任务开始时间戳，完成时写入 */
+  startedAt?: number
+  /** 任务结束时间戳，完成时写入 */
+  finishedAt?: number
 }
 
 export interface ApprovalRequest {
@@ -250,27 +281,14 @@ function loadProjectsFromStorage(): Project[] {
     if (raw) {
       const arr = JSON.parse(raw) as Project[]
       if (Array.isArray(arr)) {
-        const migrated = arr.map((p) =>
-          p.id === DEFAULT_PROJECT_ID && p.name === '默认项目'
-            ? { ...p, name: '对话', icon: '💬' }
-            : p
-        )
-        return migrated
+        // 过滤掉历史遗留的 default"对话"伪项目，只保留真实项目
+        return arr.filter((p) => p.id !== DEFAULT_PROJECT_ID)
       }
     }
   } catch {
     /* ignore */
   }
-  const now = Date.now()
-  return [{
-    id: DEFAULT_PROJECT_ID,
-    name: '对话',
-    icon: '💬',
-    createdAt: now,
-    updatedAt: now,
-    pinned: false,
-    order: 0
-  }]
+  return []
 }
 
 function saveProjectsToStorage(p: Project[]) {
@@ -732,6 +750,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       startedAt: Date.now(),
       finishedAt: null,
       goal: goal || message,
+      message: '',
       messages: [...messages, userMsg]
     })
     // 注册到隔离存储，切走后事件继续写入对应任务
@@ -797,7 +816,15 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         api.loadSessionMessages(sessionId) as Promise<AgentMessage[]>,
         api.loadSessionTurns(sessionId) as Promise<Turn[]>
       ])
-      set({ ...initial, messages: stored || [], turns: storedTurns || [], mode: sess?.mode || cur.mode, activeSessionId: sessionId, activeProjectId: sess?.projectId || cur.activeProjectId, taskId: sessionId, goal: sess?.title || '', runningTasks: get().runningTasks, projects: get().projects, sessions: get().sessions, history: get().history })
+      const restoredTurns = storedTurns || []
+      // 从 session 元数据恢复右栏展示所需字段：
+      // - status：用 session 的完成态(completed/failed)，而非 idle，让右栏正常渲染、折叠按钮可用
+      // - usage：session.tokens 只有总量，无法拆 input/output，总量置入 inputTokens、outputTokens 留 0（右栏合计显示总量）
+      // - startedAt/finishedAt：恢复耗时展示
+      // - artifacts：从 turns 派生（write_file 等写文件工具的产物），顶层 artifacts 落盘未存
+      const sessStatus = (sess?.status === 'completed' || sess?.status === 'failed') ? sess.status : 'completed'
+      const sessTokens = sess?.tokens ?? 0
+      set({ ...initial, status: sessStatus, messages: stored || [], turns: restoredTurns, mode: sess?.mode || cur.mode, activeSessionId: sessionId, activeProjectId: sess?.projectId || cur.activeProjectId, taskId: sessionId, goal: sess?.title || '', usage: { inputTokens: sessTokens, outputTokens: 0 }, startedAt: sess?.startedAt ?? null, finishedAt: sess?.finishedAt ?? null, artifacts: deriveArtifactsFromTurns(restoredTurns), runningTasks: get().runningTasks, projects: get().projects, sessions: get().sessions, history: get().history })
     }
   }
 }))
@@ -827,7 +854,7 @@ function pushHistory(
   if (existing) {
     nextSessions = s.sessions.map((sess) =>
       sess.id === entry.id
-        ? { ...sess, title: entry.title, status: entry.status, updatedAt: now, stepCount: entry.stepCount, tokens: entry.tokens }
+        ? { ...sess, title: entry.title, status: entry.status, updatedAt: now, stepCount: entry.stepCount, tokens: entry.tokens, startedAt: s.startedAt ?? sess.startedAt, finishedAt: entry.finishedAt, durationMs: s.startedAt ? entry.finishedAt - s.startedAt : sess.durationMs }
         : sess
     )
   } else {
@@ -843,7 +870,10 @@ function pushHistory(
       tokens: entry.tokens,
       pinned: false,
       archived: false,
-      order: 0
+      order: 0,
+      startedAt: s.startedAt,
+      finishedAt: entry.finishedAt,
+      durationMs: s.startedAt ? entry.finishedAt - s.startedAt : undefined
     }
     nextSessions = [newSession, ...s.sessions]
   }

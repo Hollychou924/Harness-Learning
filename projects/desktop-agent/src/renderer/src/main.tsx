@@ -10,6 +10,15 @@ api.onAgentEvent((msg) => {
   useTaskStore.getState().appendEvent(msg)
 })
 
+
+
+
+
+
+
+
+
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />
