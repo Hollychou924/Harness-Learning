@@ -4,6 +4,7 @@ import { useSettingsStore } from '../components/settings/settingsStore'
 import type { StdoutMessage, AgentMessage } from '../../../agent/src/protocol'
 import type { Turn } from '../../../agent/src/items'
 import { reduceTurnsEvent, getFinalAnswerOfTurn, deriveAgentMessages, type TurnsReducerState } from './turns'
+import { buildCompletedSessionMessages, sanitizeContinuationMessages } from './sessionHistory'
 
 // 从 turns 的工具调用里派生产物列表：write_file/create_docx/create_xlsx 等写文件工具的产物
 // 历史会话恢复时顶层 artifacts 已清空，靠这个从持久化的 turns 里重建，右栏"产物"区不再空白
@@ -246,7 +247,7 @@ export interface TaskState {
   cancelTask: () => Promise<void>
   appendInput: (text: string) => Promise<void>
   respondApproval: (approved: boolean, scope?: 'once' | 'task' | 'always') => Promise<void>
-  respondQuestion: (selectedOptionIds?: string[], customAnswer?: string, skipped?: boolean) => Promise<void>
+  respondQuestion: (selectedOptionIds?: string[], customAnswer?: string, skipped?: boolean, skipAll?: boolean) => Promise<void>
   respondPlan: (decision: 'approve' | 'reject_stop' | 'reject_revise', feedback?: string) => Promise<void>
   reset: () => void
   loadHistory: () => void
@@ -672,10 +673,13 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       set({ approvalPending: null })
     }
   },
-  respondQuestion: async (selectedOptionIds?: string[], customAnswer?: string, skipped?: boolean) => {
+  respondQuestion: async (selectedOptionIds?: string[], customAnswer?: string, skipped?: boolean, skipAll?: boolean) => {
     const { pendingQuestion } = get()
     if (pendingQuestion) {
-      await api.sendQuestionResponse(pendingQuestion.requestId, selectedOptionIds, customAnswer, skipped)
+      const finalCustomAnswer = skipAll
+        ? JSON.stringify({ skipped_all: true }, null, 2)
+        : customAnswer
+      await api.sendQuestionResponse(pendingQuestion.requestId, selectedOptionIds, finalCustomAnswer, skipped || skipAll)
       set({ pendingQuestion: null })
     }
   },
@@ -724,7 +728,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
           void api.loadSessionMessages(evTaskId as string).then((stored) => {
             const msgs = (stored as AgentMessage[]) || []
             const derivedTail = deriveAgentMessages(finishedTurns)
-            const nextMessages = [...msgs, ...derivedTail]
+            const nextMessages = buildCompletedSessionMessages(msgs, msg.messages, derivedTail)
             void api.saveSessionMessages(evTaskId as string, nextMessages)
             void api.saveSessionTurns(evTaskId as string, finishedTurns)
             // 更新会话列表标题/状态
@@ -778,7 +782,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         const cur2 = get()
         const assistantText = getFinalAnswerOfTurn(cur2.currentTurn) || msg.summary || ''
         const derivedTail = deriveAgentMessages(cur2.turns)
-        const nextMessages = [...cur2.messages, ...derivedTail]
+        const nextMessages = buildCompletedSessionMessages(cur2.messages, msg.messages, derivedTail)
         set({ status: 'completed', summary: msg.summary, finishedAt: Date.now(), messages: nextMessages })
         pushHistory(set, get)
         if (evTaskId) {
@@ -827,8 +831,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     // 继续已有对话：用原 sessionId + 全量历史；新建对话：无 sessionId 无 history
     const isContinue = Boolean(activeSessionId && messages.length > 0)
     const sessionId = isContinue ? (activeSessionId as string) : undefined
-    // 历史只取 user/assistant/tool（不含 system，agent 会自己加 system prompt）
-    const rawHistory = isContinue ? messages.filter((m) => m.role !== 'system') : undefined
+    // 续聊只带用户/助手正文，过程回放里的工具细节不再反推给模型
+    const rawHistory = isContinue ? sanitizeContinuationMessages(messages.filter((m) => m.role !== 'system')) : undefined
     let history = rawHistory
     if (rawHistory) {
       const compacted = compactMessagesForContext(rawHistory)

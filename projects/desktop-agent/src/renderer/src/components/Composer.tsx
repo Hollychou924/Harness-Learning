@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useTaskStore } from '../store/task'
 import { ChatInput } from './ChatInput'
+import { ComposerQuestionPanel } from './ComposerQuestionPanel'
 import { ProgressPill } from './ProgressPill'
 
 export function Composer() {
-  const { status, message, setMessage, startTask, appendInput, cancelTask, taskId, messages, currentTurn, approvalPending, todos } = useTaskStore()
+  const { status, message, setMessage, startTask, appendInput, cancelTask, taskId, messages, currentTurn, approvalPending, pendingQuestion, respondQuestion, todos } = useTaskStore()
   const [pending, setPending] = useState(false)
 
   // idle 状态不渲染底部 Composer（输入框在 HomeView 中间）
@@ -41,6 +42,9 @@ export function Composer() {
         <div className="mb-2 flex justify-center">
           <ProgressPill status={status} currentTurn={currentTurn} todos={todos} hasApprovalPending={Boolean(approvalPending)} />
         </div>
+        {pendingQuestion && (
+          <ComposerQuestionPanel question={pendingQuestion} onAnswer={respondQuestion} />
+        )}
         <ChatInput
           value={message}
           onChange={setMessage}
