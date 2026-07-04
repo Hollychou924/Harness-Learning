@@ -133,7 +133,6 @@ export interface QuestionPrompt {
   multiple: boolean
   allowCustom: boolean
   allowSkip: boolean
-  prompts?: QuestionPrompt[]
 }
 
 export interface QuestionRequest {
@@ -144,6 +143,7 @@ export interface QuestionRequest {
   multiple: boolean
   allowCustom: boolean
   allowSkip: boolean
+  prompts?: QuestionPrompt[]
 }
 
 export interface PlanStep {
