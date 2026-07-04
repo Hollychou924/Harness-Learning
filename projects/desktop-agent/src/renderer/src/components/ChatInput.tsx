@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, ArrowUp, ChevronDown, Check, X, FileText, Image as ImageIcon, Eye, AlertCircle, FolderPlus, FolderInput } from 'lucide-react'
+import { Plus, ArrowUp, ChevronDown, Check, X, FileText, Image as ImageIcon, Eye, AlertCircle, FolderPlus } from 'lucide-react'
 import { api, type ModelConfig, type AttachmentFile } from '../api'
 import { useSettingsStore } from './settings/settingsStore'
+import { NewProjectDialog } from './Dialogs'
 import { useTaskStore, type Attachment, type Project, DEFAULT_PROJECT_ID } from '../store/task'
 import { PROVIDER_PRESETS, BUILTIN_PROVIDER_ORDER, modelSupportsVision } from './providerPresets'
 
@@ -10,7 +11,11 @@ interface Props {
   value: string
   onChange: (v: string) => void
   onSend: () => void
+  onStop?: () => void
+  isRunning?: boolean
   placeholder?: string
+  /** 是否显示项目归属选择器：仅新对话时为 true，老对话归属已定不显示 */
+  showProjectPicker?: boolean
 }
 
 const PASTE_TEXT_THRESHOLD = 500
@@ -30,7 +35,7 @@ function hasWeirdLineBreaks(text: string): boolean {
   return WEIRD_DETECT.test(text)
 }
 
-export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
+export function ChatInput({ value, onChange, onSend, onStop, isRunning = false, placeholder, showProjectPicker = false }: Props) {
   const [config, setConfig] = useState<ModelConfig | null>(null)
   const [modelMenuOpen, setModelMenuOpen] = useState(false)
   const [menuPos, setMenuPos] = useState<{ left: number; bottom: number } | null>(null)
@@ -38,9 +43,12 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
   const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null)
   const { openSettings, modelConfig: storeConfig } = useSettingsStore()
   const { attachments, setAttachments, projects, activeProjectId, setActiveProject, createProject } = useTaskStore()
+  const activeProject = projects.find((p) => p.id === activeProjectId)
+  const activeWorkspaceDir = activeProject?.folderPath
   const taRef = useRef<HTMLTextAreaElement>(null)
   const [projectMenuOpen, setProjectMenuOpen] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
+  const [newProjectOpen, setNewProjectOpen] = useState(false)
   const [creatingProject, setCreatingProject] = useState(false)
 
   // IME 合成态跟踪
@@ -80,6 +88,7 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
   }, [value])
 
   const hasContent = value.trim().length > 0 || attachments.length > 0
+  const shouldStop = isRunning && !hasContent && Boolean(onStop)
   const modelLabel = config
     ? PROVIDER_PRESETS[config.providerId]?.label || config.providerId
     : '未配置'
@@ -154,7 +163,7 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
   const loadMentionItems = useCallback(async (query: string) => {
     setMentionLoading(true)
     try {
-      const result = await api.workspaceListFiles()
+      const result = await api.workspaceListFiles(activeWorkspaceDir)
       let items = result.items
       if (query) {
         items = items.filter((i) => i.name.toLowerCase().includes(query.toLowerCase()))
@@ -178,7 +187,7 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
 
     // 读取文件内容，作为文本附件注入
     if (item.type === 'file') {
-      const result = await api.workspaceReadFile(item.path)
+      const result = await api.workspaceReadFile(item.path, activeWorkspaceDir)
       if (result.content) {
         const newAtt: Attachment = {
           id: `mention-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -349,8 +358,20 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
 
   return (
     <>
+      {/* 项目归属选择器：输入框外、紧贴上方，仅新对话时显示 */}
+      {showProjectPicker && (
+        <ProjectPicker
+          projects={projects}
+          activeProjectId={activeProjectId}
+          onPick={(id) => { setActiveProject(id); setProjectMenuOpen(false) }}
+          onClearProject={() => { setActiveProject(DEFAULT_PROJECT_ID); setProjectMenuOpen(false) }}
+          onCreateProject={() => { setProjectMenuOpen(false); setNewProjectOpen(true) }}
+          open={projectMenuOpen}
+          setOpen={setProjectMenuOpen}
+        />
+      )}
       <div
-        className="relative w-full max-w-3xl glass rounded-2xl shadow-lg transition-all"
+        className="relative w-full max-w-4xl glass rounded-2xl shadow-lg transition-all"
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -362,28 +383,6 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
             <span className="text-sm font-medium text-[#0071e3]">松开以上传文件</span>
           </div>
         )}
-
-        {/* 项目归属选择器 */}
-        <ProjectPicker
-          projects={projects}
-          activeProjectId={activeProjectId}
-          onPick={(id) => { setActiveProject(id); setProjectMenuOpen(false) }}
-          onCreateFromScratch={async (name) => {
-            const folderPath = await api.createProjectFolder(name)
-            createProject(name, '📁', folderPath ?? undefined)
-            setProjectMenuOpen(false)
-          }}
-          onPickFolder={async () => {
-            const folderPath = await api.pickFolder()
-            if (folderPath) {
-              const folderName = folderPath.split('/').pop() || folderPath
-              createProject(folderName, '📁', folderPath)
-            }
-            setProjectMenuOpen(false)
-          }}
-          open={projectMenuOpen}
-          setOpen={setProjectMenuOpen}
-        />
 
         {/* 视觉能力提示 */}
         {visionWarn && (
@@ -495,15 +494,24 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
             </div>
 
             <button
-              onClick={() => hasContent && onSend()}
-              disabled={!hasContent}
+              onClick={() => {
+                if (shouldStop) {
+                  onStop?.()
+                  return
+                }
+                if (hasContent) onSend()
+              }}
+              disabled={!hasContent && !shouldStop}
+              title={shouldStop ? '停止任务' : '发送'}
               className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition ${
-                hasContent
-                  ? 'bg-[#0071e3] text-white hover:brightness-110'
+                hasContent || shouldStop
+                  ? shouldStop
+                    ? 'bg-red-500 text-white hover:brightness-110'
+                    : 'bg-[#0071e3] text-white hover:brightness-110'
                   : 'bg-black/[0.06] text-[var(--ink-soft)]/40 cursor-not-allowed'
               }`}
             >
-              <ArrowUp size={16} />
+              {shouldStop ? <X size={16} /> : <ArrowUp size={16} />}
             </button>
           </div>
         </div>
@@ -544,6 +552,21 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
         <AttachmentPreview
           attachment={previewAttachment}
           onClose={() => setPreviewAttachment(null)}
+        />
+      )}
+
+      {newProjectOpen && (
+        <NewProjectDialog
+          onCancel={() => setNewProjectOpen(false)}
+          onCreateNew={async (name) => {
+            const folderPath = await api.createProjectFolder(name)
+            createProject(name, '📁', folderPath ?? undefined)
+            setNewProjectOpen(false)
+          }}
+          onLoadFolder={async (name, folderPath) => {
+            createProject(name, '📁', folderPath)
+            setNewProjectOpen(false)
+          }}
         />
       )}
     </>
@@ -668,35 +691,35 @@ function AttachmentPreview({ attachment, onClose }: {
 
 /* ---- 输入框上方：项目归属选择器 ---- */
 function ProjectPicker({
-  projects, activeProjectId, onPick, onCreateFromScratch, onPickFolder, open, setOpen
+  projects, activeProjectId, onPick, onClearProject, onCreateProject, open, setOpen
 }: {
   projects: Project[]
   activeProjectId: string
   onPick: (id: string) => void
-  onCreateFromScratch: (name: string) => void
-  onPickFolder: () => void
+  onClearProject: () => void
+  onCreateProject: () => void
   open: boolean
   setOpen: (v: boolean | ((p: boolean) => boolean)) => void
 }) {
-  const [name, setName] = useState('')
-  const [mode, setMode] = useState<'list' | 'create'>('list')
-  const [creating, setCreating] = useState(false)
   const active = projects.find((p) => p.id === activeProjectId)
+  const isNoProject = activeProjectId === DEFAULT_PROJECT_ID
   const sorted = [...projects].sort(
     (a, b) => Number(b.pinned) - Number(a.pinned) || (b.pinnedAt ?? 0) - (a.pinnedAt ?? 0) || a.order - b.order
   )
   const ref = useRef<HTMLDivElement>(null)
 
-  const close = () => { setOpen(false); setMode('list'); setName('') }
+  const close = () => setOpen(false)
 
   return (
-    <div className="relative px-3 pt-2.5">
+    <div className="relative px-3 pb-1.5">
       <button
-        onClick={() => { setOpen(!open); setMode('list') }}
+        onClick={() => setOpen(!open)}
         className="no-drag flex items-center gap-1.5 h-7 px-2 rounded-lg hover:bg-black/[0.05] transition text-left max-w-full"
       >
-        <span className="text-sm leading-none flex-shrink-0">{active?.icon ?? '📁'}</span>
-        <span className="text-xs text-[var(--ink-soft)] truncate max-w-[140px]">{active?.name ?? '选择项目'}</span>
+        <span className="text-sm leading-none flex-shrink-0">{isNoProject ? '⊘' : (active?.icon ?? '📁')}</span>
+        <span className={`text-xs truncate max-w-[140px] ${isNoProject ? 'text-[var(--ink-soft)]/60' : 'text-[var(--ink-soft)]'}`}>
+          {isNoProject ? '无项目' : (active?.name ?? '选择项目')}
+        </span>
         <ChevronDown size={12} className="text-[var(--ink-soft)] flex-shrink-0" />
       </button>
 
@@ -704,64 +727,39 @@ function ProjectPicker({
         <>
           <div className="fixed inset-0 z-40" onClick={close} />
           <div ref={ref} className="absolute left-3 top-9 z-50 w-56 glass rounded-lg shadow-lg py-1 max-h-72 overflow-y-auto">
-            {mode === 'list' ? (
-              <>
-                {sorted.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => onPick(p.id)}
-                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-black/[0.05] transition mx-0.5 rounded-md ${
-                      p.id === activeProjectId ? 'text-[var(--ink)]' : 'text-[var(--ink-soft)]'
-                    }`}
-                  >
-                    <span className="text-sm leading-none flex-shrink-0">{p.icon}</span>
-                    <span className="flex-1 text-xs truncate">{p.name}</span>
-                    {p.id === activeProjectId && <Check size={12} className="text-[#0071e3] flex-shrink-0" />}
-                  </button>
-                ))}
-                <div className="border-t border-white/40 mt-1 pt-1">
-                  <button
-                    onClick={() => { setMode('create'); setName('') }}
-                    className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-[var(--ink-soft)] hover:text-[var(--ink)] transition"
-                  >
-                    <FolderPlus size={13} /> 新建项目
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div className="py-1">
-                <div className="px-2.5 pb-1.5">
-                  <button onClick={() => setMode('list')} className="text-[11px] text-[var(--ink-soft)] hover:text-[var(--ink)]">← 返回</button>
-                </div>
-                <div className="p-2">
-                  <input
-                    autoFocus
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="项目名称"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && name.trim()) { onCreateFromScratch(name.trim()); close() }
-                      if (e.key === 'Escape') close()
-                    }}
-                    className="w-full h-7 px-2 text-xs rounded bg-white border border-black/10 outline-none focus:border-blue-400"
-                  />
-                  <button
-                    disabled={!name.trim() || creating}
-                    onClick={() => { if (name.trim()) { setCreating(true); onCreateFromScratch(name.trim()); close() } }}
-                    className="w-full mt-2 h-7 text-xs rounded bg-[var(--ink)] text-white hover:opacity-90 disabled:opacity-50"
-                  >从零新建</button>
-                </div>
-                <div className="border-t border-white/40 mt-1 pt-1 px-2.5">
-                  <button
-                    disabled={creating}
-                    onClick={() => { onPickFolder(); close() }}
-                    className="w-full flex items-center gap-2 py-1.5 text-xs text-[var(--ink-soft)] hover:text-[var(--ink)] transition disabled:opacity-50"
-                  >
-                    <FolderInput size={13} /> 选择已有文件夹
-                  </button>
-                </div>
-              </div>
-            )}
+            <button
+              onClick={() => onClearProject()}
+              className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-black/[0.05] transition rounded-md ${
+                isNoProject ? 'text-[var(--ink)]' : 'text-[var(--ink-soft)]'
+              }`}
+            >
+              <span className="text-sm leading-none flex-shrink-0">⊘</span>
+              <span className="flex-1 text-xs truncate">无项目</span>
+              {isNoProject && <Check size={12} className="text-[#0071e3] flex-shrink-0" />}
+            </button>
+            <div className="border-t border-white/40 mt-1 pt-1">
+              {sorted.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => onPick(p.id)}
+                  className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-black/[0.05] transition rounded-md ${
+                    p.id === activeProjectId ? 'text-[var(--ink)]' : 'text-[var(--ink-soft)]'
+                  }`}
+                >
+                  <span className="text-sm leading-none flex-shrink-0">{p.icon}</span>
+                  <span className="flex-1 text-xs truncate">{p.name}</span>
+                  {p.id === activeProjectId && <Check size={12} className="text-[#0071e3] flex-shrink-0" />}
+                </button>
+              ))}
+            </div>
+            <div className="border-t border-white/40 mt-1 pt-1">
+              <button
+                onClick={() => { onCreateProject(); close() }}
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-[var(--ink-soft)] hover:text-[var(--ink)] transition"
+              >
+                <FolderPlus size={13} /> 新建项目
+              </button>
+            </div>
           </div>
         </>
       )}

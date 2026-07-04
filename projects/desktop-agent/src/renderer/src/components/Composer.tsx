@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useTaskStore } from '../store/task'
 import { ChatInput } from './ChatInput'
+import { ProgressPill } from './ProgressPill'
 
 export function Composer() {
-  const { status, message, setMessage, startTask, appendInput, taskId, messages } = useTaskStore()
+  const { status, message, setMessage, startTask, appendInput, cancelTask, taskId, messages, currentTurn, approvalPending } = useTaskStore()
   const [pending, setPending] = useState(false)
 
   // idle 状态不渲染底部 Composer（输入框在 HomeView 中间）
@@ -35,12 +36,17 @@ export function Composer() {
       : '输入新任务…'
 
   return (
-    <div className="flex-shrink-0 px-6 py-3 border-t border-black/[0.06]">
-      <div className="mx-auto">
+    <div className="flex-shrink-0 px-6 py-3">
+      <div className="mx-auto max-w-4xl">
+        <div className="mb-2 flex justify-center">
+          <ProgressPill status={status} currentTurn={currentTurn} hasApprovalPending={Boolean(approvalPending)} />
+        </div>
         <ChatInput
           value={message}
           onChange={setMessage}
           onSend={handleSend}
+          onStop={() => void cancelTask()}
+          isRunning={isExecuting}
           placeholder={pending ? '发送中…' : placeholder}
         />
       </div>

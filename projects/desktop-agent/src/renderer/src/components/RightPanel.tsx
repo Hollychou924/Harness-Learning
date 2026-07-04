@@ -1,10 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
-  Check,
-  Loader2,
   AlertCircle,
   Target,
-  ListChecks,
   Coins,
   Clock,
   FileCode,
@@ -15,11 +12,35 @@ import {
 } from 'lucide-react'
 import { useTaskStore } from '../store/task'
 import { api } from '../api'
-import type { ArtifactEntry } from '../store/task'
-import type { ToolCallItem } from '../../../agent/src/items'
+import type { ArtifactEntry, SourceEntry } from '../store/task'
+import type { ToolCallItem, Turn } from '../../../agent/src/items'
 
-// 右栏：目标 + 进度清单 + 用量 + 产物，参考竞品 IDE 的"任务控制台"
-export function RightPanel() {
+function deriveSourcesFromTurns(turns: Turn[], currentTurn: Turn | null): SourceEntry[] {
+  const allTurns = currentTurn ? [...turns, currentTurn] : turns
+  const byKey = new Map<string, SourceEntry>()
+  for (const turn of allTurns) {
+    for (const item of turn.items) {
+      if (item.type !== 'toolCall') continue
+      const filePath = typeof item.args.path === 'string'
+        ? item.args.path
+        : item.kind === 'list_files' && typeof item.args.dir === 'string'
+          ? item.args.dir
+          : undefined
+      if ((item.kind === 'read_file' || item.kind === 'list_files') && filePath) {
+        const path = filePath
+        byKey.set(`file:${path}`, { type: 'file', label: path.split('/').pop() || path, path })
+      }
+      if (item.kind === 'fetch_page' && typeof item.args.url === 'string') {
+        const url = item.args.url
+        byKey.set(`web:${url}`, { type: 'web', label: url, url })
+      }
+    }
+  }
+  return Array.from(byKey.values()).slice(0, 20)
+}
+
+// 右栏：目标状态 + 产物 + 来源 + 用量，优先展示用户能拿走的结果
+export function RightPanel({ collapsed }: { collapsed: boolean }) {
   const { status, goal, turns, currentTurn, artifacts, usage, startedAt, finishedAt, error, message } =
     useTaskStore()
   const hasTask = status !== 'idle'
@@ -28,19 +49,21 @@ export function RightPanel() {
     return null
   }
 
-  // 进度清单：用当前轮次的工具调用条目当"步骤"展示(每次工具调用算一步)
+  // 只保留一行进度摘要，把空间让给产物和来源。
   const latestTurn = currentTurn || turns[turns.length - 1] || null
   const toolItems = (latestTurn?.items ?? []).filter((it): it is ToolCallItem => it.type === 'toolCall')
-  const steps = toolItems.map((t, i) => ({ step: i + 1, total: toolItems.length, summary: t.toolName, done: t.status === 'completed' || t.status === 'failed' }))
-  const total = steps.length
-  const doneCount = steps.filter((s) => s.done).length
-  const isComplete = status === 'completed'
-  const isFailed = status === 'failed'
+  const total = toolItems.length
+  const doneCount = toolItems.filter((t) => t.status === 'completed' || t.status === 'failed' || t.status === 'stopped' || t.status === 'canceled').length
+  const visibleArtifacts = artifacts.filter((a) => a.filePath !== 'inline')
+  const sources = deriveSourcesFromTurns(turns, currentTurn)
 
   return (
-    <aside className="glass-soft w-72 flex-shrink-0 flex flex-col border-l border-white/40">
-      <div className="drag h-9" />
-
+    <aside
+      className={`glass-soft flex-shrink-0 flex flex-col border-l border-white/40 transition-all duration-300 ease-in-out overflow-hidden ${
+        collapsed ? 'w-0 border-l-0' : 'w-72'
+      }`}
+    >
+      <div className="drag h-9 flex-shrink-0" />
       <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-3">
         {/* 目标卡 */}
         <section className="glass rounded-xl p-3">
@@ -54,62 +77,38 @@ export function RightPanel() {
           <p className="text-sm leading-relaxed text-[var(--ink)] line-clamp-4">
             {goal || message || '（未设定）'}
           </p>
-        </section>
-
-        {/* 进度清单 */}
-        <section className="glass rounded-xl p-3">
-          <div className="flex items-center gap-2 mb-2.5">
-            <ListChecks size={14} className="text-[var(--ink-soft)]" />
-            <span className="text-xs font-semibold tracking-wide text-[var(--ink-soft)] uppercase">
-              进度
-            </span>
-            {total > 0 && (
-              <span className="ml-auto text-xs text-[var(--ink-soft)]">
-                {doneCount}/{total}
-              </span>
-            )}
-          </div>
-          {steps.length === 0 ? (
-            <p className="text-xs text-[var(--ink-soft)] py-1">
-              {isFailed ? '任务未完成' : isComplete ? '任务已完成' : '等待 Agent 拆解步骤…'}
-            </p>
-          ) : (
-            <ul className="space-y-1.5">
-              {steps.map((s) => (
-                <li key={s.step} className="flex items-start gap-2 text-sm">
-                  <StepIcon done={s.done} active={status === 'executing' && !s.done} />
-                  <span
-                    className={`leading-snug ${
-                      s.done ? 'text-[var(--ink)]' : 'text-[var(--ink-soft)]'
-                    }`}
-                  >
-                    {s.summary || `步骤 ${s.step}`}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
+          <p className="text-xs text-[var(--ink-soft)] mt-2">
+            {total > 0 ? `已完成 ${doneCount}/${total} 步` : '等待开始'}
+          </p>
         </section>
 
         {/* 产物 */}
-        {artifacts.filter((a) => a.filePath !== 'inline').length > 0 && (
-          <section className="glass rounded-xl p-3">
-            <div className="flex items-center gap-2 mb-2.5">
-              <FileCode size={14} className="text-[var(--ink-soft)]" />
-              <span className="text-xs font-semibold tracking-wide text-[var(--ink-soft)] uppercase">
-                产物
-              </span>
-              <span className="ml-auto text-xs text-[var(--ink-soft)]">
-                {artifacts.length}
-              </span>
-            </div>
-            <ul className="space-y-1">
-              {artifacts.filter((a) => a.filePath !== 'inline').map((a, i) => (
-                <ArtifactItem key={i} art={a} />
-              ))}
-            </ul>
-          </section>
-        )}
+        <section className="glass rounded-xl p-3">
+          <div className="flex items-center gap-2 mb-2.5">
+            <FileCode size={14} className="text-[var(--ink-soft)]" />
+            <span className="text-xs font-semibold tracking-wide text-[var(--ink-soft)] uppercase">产物</span>
+            {visibleArtifacts.length > 0 && <span className="ml-auto text-xs text-[var(--ink-soft)]">{visibleArtifacts.length}</span>}
+          </div>
+          {visibleArtifacts.length === 0 ? (
+            <p className="text-xs text-[var(--ink-soft)] py-1">暂无产物</p>
+          ) : (
+            <ul className="space-y-1">{visibleArtifacts.map((a, i) => <ArtifactItem key={i} art={a} />)}</ul>
+          )}
+        </section>
+
+        {/* 来源 */}
+        <section className="glass rounded-xl p-3">
+          <div className="flex items-center gap-2 mb-2.5">
+            <FileText size={14} className="text-[var(--ink-soft)]" />
+            <span className="text-xs font-semibold tracking-wide text-[var(--ink-soft)] uppercase">来源</span>
+            {sources.length > 0 && <span className="ml-auto text-xs text-[var(--ink-soft)]">{sources.length}</span>}
+          </div>
+          {sources.length === 0 ? (
+            <p className="text-xs text-[var(--ink-soft)] py-1">暂无来源</p>
+          ) : (
+            <ul className="space-y-1">{sources.map((s, i) => <SourceItem key={i} source={s} />)}</ul>
+          )}
+        </section>
 
         {/* 上下文容量指示器 */}
         <ContextCapacityIndicator usedTokens={usage.inputTokens + usage.outputTokens} />
@@ -162,15 +161,6 @@ function StatusBadge({ status, className = '' }: { status: string; className?: s
   )
 }
 
-function StepIcon({ done, active }: { done: boolean; active: boolean }) {
-  if (done) return <Check size={14} className="mt-0.5 text-green-500 flex-shrink-0" />
-  if (active)
-    return <Loader2 size={14} className="mt-0.5 text-sky-500 animate-spin flex-shrink-0" />
-  return (
-    <span className="mt-1 w-3 h-3 rounded-full border border-black/20 flex-shrink-0" />
-  )
-}
-
 function ArtifactItem({ art }: { art: ArtifactEntry }) {
   const meta = ARTIFACT_META[art.type] || ARTIFACT_META.file
   const name = art.filePath.split('/').pop() || art.filePath
@@ -186,6 +176,15 @@ function ArtifactItem({ art }: { art: ArtifactEntry }) {
       {art.removed != null && art.removed > 0 && (
         <span className="text-red-500 font-mono">-{art.removed}</span>
       )}
+    </li>
+  )
+}
+
+function SourceItem({ source }: { source: SourceEntry }) {
+  return (
+    <li className="flex items-center gap-2 text-xs">
+      <span className="text-[var(--ink-soft)] flex-shrink-0">{source.type === 'web' ? '🔗' : '📄'}</span>
+      <span className="truncate text-[var(--ink)]" title={source.path || source.url || source.label}>{source.label}</span>
     </li>
   )
 }

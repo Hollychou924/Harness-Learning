@@ -37,13 +37,20 @@ const api = {
   configGet: (key: string) => ipcRenderer.invoke('config:get', key) as Promise<unknown>,
   saveModelConfig: (cfg: { providerId: string; model: string; apiKey: string; apiBaseUrl: string; apiFormat: 'openai' | 'anthropic'; contextLimit: number; customProviderId?: string; autoApproveLow?: boolean }) =>
     ipcRenderer.invoke('config:saveModel', cfg) as Promise<{ success: boolean }>,
+  getModelList: () => ipcRenderer.invoke('config:getModelList') as Promise<{ configs: Array<Record<string, unknown>>; activeId: string | null }>,
+  setActiveModel: (modelId: string) => ipcRenderer.invoke('config:setActiveModel', modelId) as Promise<{ success: boolean }>,
+  deleteModel: (modelId: string) => ipcRenderer.invoke('config:deleteModel', modelId) as Promise<{ success: boolean }>,
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url) as Promise<void>,
   openPath: (filePath: string) => ipcRenderer.invoke('shell:openPath', filePath) as Promise<void>,
   traceList: (limit?: number) => ipcRenderer.invoke('trace:list', limit) as Promise<unknown[]>,
   traceGet: (traceId: string) => ipcRenderer.invoke('trace:get', traceId) as Promise<unknown>,
   openFiles: () => ipcRenderer.invoke('dialog:openFiles') as Promise<unknown[]>,
   pickFolder: () => ipcRenderer.invoke('project:select') as Promise<string | null>,
-  createProjectFolder: (name: string) => ipcRenderer.invoke('project:create', name) as Promise<string | null>
+  createProjectFolder: (name: string) => ipcRenderer.invoke('project:create', name) as Promise<string | null>,
+  workspaceListFiles: (workspaceDir?: string, subDir?: string) =>
+    ipcRenderer.invoke('workspace:listFiles', { workspaceDir, subDir }) as Promise<{ items: Array<{ name: string; type: string; size: number; path: string }>; error?: string }>,
+  workspaceReadFile: (relPath: string, workspaceDir?: string) =>
+    ipcRenderer.invoke('workspace:readFile', { relPath, workspaceDir }) as Promise<{ content?: string; truncated?: boolean; error?: string }>
 }
 
 contextBridge.exposeInMainWorld('api', api)

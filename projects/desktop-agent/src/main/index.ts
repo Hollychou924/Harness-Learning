@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain, shell, nativeTheme, dialog } from 'electron'
-import { join, resolve, relative } from 'node:path'
+import { isAbsolute, join, resolve, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
@@ -7,6 +7,7 @@ import { readdir as readdirAsync, stat as statAsync } from 'node:fs/promises'
 import { agentBridge } from './agent-bridge.js'
 import { startTrace, logAgentEvent, logUserAction, listTraces, getTrace } from './trace-logger.js'
 import type { StdoutMessage, AgentConfig, MessageAttachment } from '../agent/src/protocol.js'
+import { getModelThinkingConfig } from '../renderer/src/components/providerPresets.js'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 
@@ -53,9 +54,68 @@ function saveConfigFile(cfg: ModelConfig): void {
   writeFileSync(getConfigPath(), JSON.stringify(cfg, null, 2), 'utf-8')
 }
 
+// ── 多模型并存存储 ──────────────────────────────────────────────
+// 存储"已配置模型列表" + 当前激活 id，为输入框快速切换和会话级绑定留基础
+interface ModelConfigStore {
+  configs: ModelConfig[]
+  activeId: string | null
+}
+
+function getModelsStorePath(): string {
+  return join(app.getPath('userData'), 'model-configs.json')
+}
+
+function generateModelId(cfg: ModelConfig): string {
+  const sub = cfg.customProviderId ? `-${cfg.customProviderId}` : ''
+  return `${cfg.providerId}${sub}-${cfg.model}-${Date.now().toString(36)}`
+}
+
+function loadModelsStore(): ModelConfigStore {
+  const storePath = getModelsStorePath()
+  // 新文件存在 → 直接读
+  if (existsSync(storePath)) {
+    try {
+      const raw = readFileSync(storePath, 'utf-8')
+      return JSON.parse(raw) as ModelConfigStore
+    } catch { /* 损坏则走迁移 */ }
+  }
+  // 迁移：旧的单配置文件 → 列表第一项
+  const oldCfg = loadConfig()
+  if (oldCfg && oldCfg.apiKey) {
+    const migrated: ModelConfigStore = {
+      configs: [{ ...oldCfg }],
+      activeId: null
+    }
+    migrated.activeId = generateModelId(oldCfg)
+    ;(migrated.configs[0] as ModelConfig & { _id?: string })._id = migrated.activeId
+    saveModelsStore(migrated)
+    return migrated
+  }
+  return { configs: [], activeId: null }
+}
+
+function saveModelsStore(store: ModelConfigStore): void {
+  writeFileSync(getModelsStorePath(), JSON.stringify(store, null, 2), 'utf-8')
+}
+
+function getActiveModelConfig(): ModelConfig | null {
+  const store = loadModelsStore()
+  if (store.configs.length === 0) return loadConfig() // 兜底旧文件
+  const active = store.configs.find((c) => (c as ModelConfig & { _id?: string })._id === store.activeId)
+  return active || store.configs[0] || null
+}
+
 function buildAgentConfig(): AgentConfig {
-  const saved = loadConfig()
+  const saved = getActiveModelConfig() || loadConfig()
   if (saved && saved.apiKey) {
+    const isMify = saved.providerId === 'mify'
+    const preset = getModelThinkingConfig(
+      saved.providerId,
+      saved.model,
+      isMify,
+      isMify ? saved.customProviderId : undefined
+    )
+    const supportsThinking = preset?.supportsThinking === true
     return {
       provider: saved.apiFormat === 'anthropic' ? 'anthropic' : 'openai',
       model: saved.model,
@@ -67,7 +127,9 @@ function buildAgentConfig(): AgentConfig {
       apiFormat: saved.apiFormat,
       contextLimit: saved.contextLimit,
       customProviderId: saved.customProviderId,
-      autoApproveLow: saved.autoApproveLow ?? false
+      autoApproveLow: saved.autoApproveLow ?? false,
+      thinkingLevel: supportsThinking ? 'auto' : 'off',
+      thinkingConfig: supportsThinking ? preset!.thinkingConfig : undefined
     }
   }
   // 兜底：环境变量
@@ -125,7 +187,7 @@ function createWindow(): void {
   })
 
   // 开发期加载 vite dev server，生产期加载打包文件
-  if (process.env.ELECTRON_RENDERER_URL) {
+if (process.env.ELECTRON_RENDERER_URL) {
     void mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
   } else {
     void mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
@@ -178,9 +240,11 @@ ipcMain.handle('agent:startTask', async (_e, args: { mode: 'work' | 'code'; mess
 
 ipcMain.handle('config:get', async (_e, key: string) => {
   const cfg = loadConfig()
-  if (key === 'hasApiKey') return Boolean(cfg?.apiKey || process.env.ANTHROPIC_API_KEY)
+  if (key === 'hasApiKey') return Boolean(getActiveModelConfig()?.apiKey || cfg?.apiKey || process.env.ANTHROPIC_API_KEY)
   if (key === 'model') return cfg?.model || process.env.XLJ_MODEL || 'claude-sonnet-4-5-20250929'
   if (key === 'modelConfig') {
+    const active = getActiveModelConfig()
+    if (active) return active
     if (cfg) return cfg
     const envKey = process.env.ANTHROPIC_API_KEY
     if (envKey) {
@@ -204,7 +268,51 @@ ipcMain.handle('config:get', async (_e, key: string) => {
 })
 
 ipcMain.handle('config:saveModel', async (_e, cfg: ModelConfig) => {
+  // 同时写入旧单配置(兼容)和多模型存储
   saveConfigFile(cfg)
+  const store = loadModelsStore()
+  const id = generateModelId(cfg)
+  const newEntry = { ...cfg, _id: id } as ModelConfig & { _id: string }
+  // 同 providerId+model 视为同一条，覆盖更新
+  const idx = store.configs.findIndex((c) => c.providerId === cfg.providerId && c.model === cfg.model && c.customProviderId === cfg.customProviderId)
+  if (idx >= 0) {
+    newEntry._id = (store.configs[idx] as ModelConfig & { _id?: string })._id || id
+    store.configs[idx] = newEntry
+  } else {
+    store.configs.push(newEntry)
+  }
+  store.activeId = newEntry._id
+  saveModelsStore(store)
+  return { success: true }
+})
+
+// 获取已配置模型列表
+ipcMain.handle('config:getModelList', async () => {
+  const store = loadModelsStore()
+  return store
+})
+
+// 切换激活模型（输入框快速切换，不进设置页）
+ipcMain.handle('config:setActiveModel', async (_e, modelId: string) => {
+  const store = loadModelsStore()
+  if (store.configs.some((c) => (c as ModelConfig & { _id?: string })._id === modelId)) {
+    store.activeId = modelId
+    saveModelsStore(store)
+    const active = store.configs.find((c) => (c as ModelConfig & { _id?: string })._id === modelId)
+    if (active) saveConfigFile(active) // 同步旧文件
+    return { success: true }
+  }
+  return { success: false }
+})
+
+// 删除已配置模型
+ipcMain.handle('config:deleteModel', async (_e, modelId: string) => {
+  const store = loadModelsStore()
+  store.configs = store.configs.filter((c) => (c as ModelConfig & { _id?: string })._id !== modelId)
+  if (store.activeId === modelId) {
+    store.activeId = store.configs[0] ? (store.configs[0] as ModelConfig & { _id?: string })._id || null : null
+  }
+  saveModelsStore(store)
   return { success: true }
 })
 
@@ -231,7 +339,9 @@ ipcMain.handle('agent:resume', async (_e, args: { taskId: string }) => {
 
 ipcMain.handle('agent:cancel', async (_e, args: { taskId: string }) => {
   if (activeTraceId) logUserAction(activeTraceId, 'task_cancelled', { taskId: args.taskId })
+  // 先尝试优雅取消（发 task_control），再补发 stopped 状态让 UI 立即反映
   agentBridge.send({ type: 'task_control', task_id: args.taskId, action: 'cancel' })
+  agentBridge.cancelAndNotify()
 })
 
 ipcMain.handle('agent:rollback', async (_e, args: { taskId: string }) => {
@@ -323,11 +433,24 @@ ipcMain.handle('session:loadTurns', async (_e, sessionId: string) => {
   }
 })
 
+function resolveWorkspaceRoot(workspaceDir?: string): string {
+  const fallback = join(app.getPath('documents'), '小蓝鲸产出')
+  if (!workspaceDir || typeof workspaceDir !== 'string') return fallback
+  return resolve(workspaceDir)
+}
+
+function isInsideRoot(root: string, target: string): boolean {
+  const rel = relative(root, target)
+  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))
+}
+
 // 列出工作区目录文件(供输入框 @文件引用)
-ipcMain.handle('workspace:listFiles', async (_e, subDir?: string) => {
-  const root = join(app.getPath('documents'), '小蓝鲸产出')
+ipcMain.handle('workspace:listFiles', async (_e, args?: { workspaceDir?: string; subDir?: string } | string) => {
+  const workspaceDir = typeof args === 'string' ? undefined : args?.workspaceDir
+  const subDir = typeof args === 'string' ? args : args?.subDir
+  const root = resolveWorkspaceRoot(workspaceDir)
   const target = subDir ? resolve(root, subDir) : root
-  if (!target.startsWith(root)) return { error: '越界', items: [] }
+  if (!isInsideRoot(root, target)) return { error: '不能读取工作区外的文件', items: [] }
   try {
     const entries = await readdirAsync(target, { withFileTypes: true })
     const items = await Promise.all(
@@ -341,7 +464,7 @@ ipcMain.handle('workspace:listFiles', async (_e, subDir?: string) => {
             path: relative(root, join(target, e.name))
           }
         } catch {
-          return { name: e.name, type: e.isDirectory() ? 'dir' : 'file', path: e.name }
+          return { name: e.name, type: e.isDirectory() ? 'dir' : 'file', size: 0, path: e.name }
         }
       })
     )
@@ -357,10 +480,12 @@ ipcMain.handle('workspace:listFiles', async (_e, subDir?: string) => {
 })
 
 // 读取工作区文件文本内容(供 @文件引用注入上下文)
-ipcMain.handle('workspace:readFile', async (_e, relPath: string) => {
-  const root = join(app.getPath('documents'), '小蓝鲸产出')
-  const abs = resolve(root, relPath)
-  if (!abs.startsWith(root)) return { error: '越界' }
+ipcMain.handle('workspace:readFile', async (_e, args: { relPath: string; workspaceDir?: string } | string) => {
+  const relPath = typeof args === 'string' ? args : args?.relPath
+  const workspaceDir = typeof args === 'string' ? undefined : args?.workspaceDir
+  const root = resolveWorkspaceRoot(workspaceDir)
+  const abs = resolve(root, relPath || '')
+  if (!isInsideRoot(root, abs)) return { error: '不能读取工作区外的文件' }
   try {
     const content = readFileSync(abs, 'utf-8')
     return { content: content.slice(0, 50000), truncated: content.length > 50000 }
