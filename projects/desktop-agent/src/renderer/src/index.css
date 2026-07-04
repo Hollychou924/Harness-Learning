@@ -62,3 +62,28 @@ body {
 }
 
 /* 报告内链接 */
+
+:root {
+  --whale-blue: #0071e3;
+  --whale-blue-soft: rgba(0, 113, 227, 0.12);
+}
+
+.whale-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.whale-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-120%);
+  background: linear-gradient(90deg, transparent, rgba(0, 113, 227, 0.20), transparent);
+  animation: whale-shimmer-sweep 1.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes whale-shimmer-sweep {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(120%); }
+}
