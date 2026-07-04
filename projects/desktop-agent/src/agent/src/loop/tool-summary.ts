@@ -38,9 +38,13 @@ export function summarizeToolResult(toolName: string, args: Record<string, unkno
       return path ? `已写入 ${path}，共 ${lines} 行` : `已写入文件，共 ${lines} 行`
     }
     case 'create_docx':
-      return '已生成 Word 文档'
-    case 'create_xlsx':
-      return '已生成 Excel 表格'
+    case 'create_xlsx': {
+      const fallback = toolName === 'create_docx' ? '文档' : '表格'
+      const path = typeof args.path === 'string' ? args.path.split('/').pop() || fallback : fallback
+      const added = typeof obj.addedChars === 'number' ? obj.addedChars : 0
+      const deleted = typeof obj.deletedChars === 'number' ? obj.deletedChars : 0
+      return `已创建：${path} +${added} -${deleted}`
+    }
     case 'shell': {
       const status = typeof obj.exitCode === 'number' ? obj.exitCode : null
       const stdout = typeof obj.stdout === 'string' ? obj.stdout : ''

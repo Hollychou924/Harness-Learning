@@ -3,7 +3,7 @@
 import type { ToolCallItem, ToolKind } from '../../../agent/src/items'
 
 interface ToolPhrase {
-  doing: (target: string) => string
+  doing: (target: string, item: ToolCallItem) => string
   done: (target: string, item: ToolCallItem) => string
 }
 
@@ -20,6 +20,83 @@ function shortenTarget(kind: ToolKind, item: ToolCallItem): string {
   if (typeof args.path === 'string') return args.path.split('/').pop() || args.path
   if (typeof args.dir === 'string') return args.dir
   return ''
+}
+
+function countVisibleChars(value: string): number {
+  return Array.from(value.replace(/\s/g, '')).length
+}
+
+function fileNameFromPath(value: unknown, fallback: string): string {
+  if (typeof value !== 'string' || !value.trim()) return fallback
+  const normalized = value.replace(/\\/g, '/').replace(/\/+$/, '')
+  return normalized.split('/').pop() || normalized || fallback
+}
+
+function getNumberField(source: Record<string, unknown> | null, key: string): number | null {
+  const value = source?.[key]
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+function parseResultObject(item: ToolCallItem): Record<string, unknown> | null {
+  if (!item.result) return null
+  try {
+    const parsed = JSON.parse(item.result)
+    return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null
+  } catch {
+    return null
+  }
+}
+
+function estimateDocxChars(args: Record<string, unknown>): number {
+  const title = typeof args.title === 'string' ? args.title : ''
+  const sections = Array.isArray(args.sections) ? args.sections : []
+  const tables = Array.isArray(args.tables) ? args.tables : []
+  const parts: string[] = [title]
+  for (const rawSection of sections) {
+    const section = rawSection as Record<string, unknown>
+    if (typeof section.heading === 'string') parts.push(section.heading)
+    if (Array.isArray(section.paragraphs)) {
+      parts.push(...section.paragraphs.filter((item): item is string => typeof item === 'string'))
+    }
+  }
+  for (const rawTable of tables) {
+    const table = rawTable as Record<string, unknown>
+    if (Array.isArray(table.rows)) {
+      for (const rawRow of table.rows) {
+        if (Array.isArray(rawRow)) parts.push(...rawRow.map((cell) => String(cell ?? '')))
+      }
+    }
+  }
+  return countVisibleChars(parts.join(''))
+}
+
+function estimateXlsxChars(args: Record<string, unknown>): number {
+  const sheets = Array.isArray(args.sheets) ? args.sheets : []
+  const parts: string[] = []
+  for (const rawSheet of sheets) {
+    const sheet = rawSheet as Record<string, unknown>
+    if (typeof sheet.name === 'string') parts.push(sheet.name)
+    if (Array.isArray(sheet.rows)) {
+      for (const rawRow of sheet.rows) {
+        if (Array.isArray(rawRow)) parts.push(...rawRow.map((cell) => String(cell ?? '')))
+      }
+    }
+  }
+  return countVisibleChars(parts.join(''))
+}
+
+function changeText(added: number, deleted: number): string {
+  return `+${added} -${deleted}`
+}
+
+function creationLabel(item: ToolCallItem, fallback: string): string {
+  const result = parseResultObject(item)
+  const added = getNumberField(result, 'addedChars') ?? (
+    item.kind === 'create_xlsx' ? estimateXlsxChars(item.args) : estimateDocxChars(item.args)
+  )
+  const deleted = getNumberField(result, 'deletedChars') ?? 0
+  const name = fileNameFromPath(item.args.path, fallback)
+  return `${name} ${changeText(added, deleted)}`
 }
 
 const PHRASES: Record<ToolKind, ToolPhrase> = {
@@ -44,12 +121,12 @@ const PHRASES: Record<ToolKind, ToolPhrase> = {
     done: (t, item) => item.resultSummary || (t ? `已写入 ${t}` : '已写入文件')
   },
   create_docx: {
-    doing: () => '正在生成 Word 文档',
-    done: (_t, item) => item.resultSummary || '已生成 Word 文档'
+    doing: (_t, item) => `正在创建：${creationLabel(item, 'Word 文档')}`,
+    done: (_t, item) => item.resultSummary || `已创建：${creationLabel(item, 'Word 文档')}`
   },
   create_xlsx: {
-    doing: () => '正在生成 Excel 表格',
-    done: (_t, item) => item.resultSummary || '已生成 Excel 表格'
+    doing: (_t, item) => `正在创建：${creationLabel(item, 'Excel 表格')}`,
+    done: (_t, item) => item.resultSummary || `已创建：${creationLabel(item, 'Excel 表格')}`
   },
   shell: {
     doing: () => '正在执行命令',
@@ -69,7 +146,7 @@ const PHRASES: Record<ToolKind, ToolPhrase> = {
 export function describeToolCall(item: ToolCallItem): string {
   const phrase = PHRASES[item.kind] || PHRASES.unknown
   const target = shortenTarget(item.kind, item)
-  if (item.status === 'running' || item.status === 'pending') return phrase.doing(target)
+  if (item.status === 'running' || item.status === 'pending') return phrase.doing(target, item)
   if (item.status === 'failed') return item.error ? `失败：${item.error}` : '执行失败'
   if (item.status === 'stopped') return target ? `已停止：${target}` : '已停止'
   if (item.status === 'canceled') return '已取消'

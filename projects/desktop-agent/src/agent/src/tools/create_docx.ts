@@ -19,6 +19,10 @@ const DocxSchema = z.object({
   })).optional().describe('可选的表格列表')
 })
 
+function countVisibleChars(value: string): number {
+  return Array.from(value.replace(/\s/g, '')).length
+}
+
 export function createDocxTool(workspaceDir?: string): AgentTool {
   const root = workspaceDir ? resolve(workspaceDir) : resolve(homedir(), 'Documents', '小蓝鲸产出')
   return {
@@ -63,6 +67,12 @@ export function createDocxTool(workspaceDir?: string): AgentTool {
         return JSON.stringify({ error: parsed.error.issues[0]?.message ?? '入参校验失败' })
       }
       const { path, title, sections, tables } = parsed.data
+      const textParts = [
+        title || '',
+        ...sections.flatMap((section) => [section.heading || '', ...section.paragraphs]),
+        ...(tables || []).flatMap((table) => table.rows.flatMap((row) => row))
+      ]
+      const addedChars = countVisibleChars(textParts.join(''))
       const abs = path.startsWith('/') ? resolve(path) : resolve(root, path)
       if (!abs.endsWith('.docx')) {
         return JSON.stringify({ error: '文件路径必须以 .docx 结尾' })
@@ -135,7 +145,7 @@ export function createDocxTool(workspaceDir?: string): AgentTool {
         const buffer = await Packer.toBuffer(doc)
         const { writeFile } = await import('node:fs/promises')
         await writeFile(abs, buffer)
-        return JSON.stringify({ ok: true, path: abs, type: 'docx' })
+        return JSON.stringify({ ok: true, path: abs, type: 'docx', addedChars, deletedChars: 0 })
       } catch (e) {
         return JSON.stringify({ error: e instanceof Error ? e.message : String(e), path: abs })
       }

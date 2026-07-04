@@ -14,6 +14,10 @@ const XlsxSchema = z.object({
   })).min(1, '至少需要一个工作表')
 })
 
+function countVisibleChars(value: string): number {
+  return Array.from(value.replace(/\s/g, '')).length
+}
+
 export function createXlsxTool(workspaceDir?: string): AgentTool {
   const root = workspaceDir ? resolve(workspaceDir) : resolve(homedir(), 'Documents', '小蓝鲸产出')
   return {
@@ -52,6 +56,10 @@ export function createXlsxTool(workspaceDir?: string): AgentTool {
         return JSON.stringify({ error: parsed.error.issues[0]?.message ?? '入参校验失败' })
       }
       const { path, sheets } = parsed.data
+      const addedChars = countVisibleChars(sheets.flatMap((sheet) => [
+        sheet.name || '',
+        ...sheet.rows.flatMap((row) => row.map((cell) => cell == null ? '' : String(cell)))
+      ]).join(''))
       const abs = path.startsWith('/') ? resolve(path) : resolve(root, path)
       if (!abs.endsWith('.xlsx')) {
         return JSON.stringify({ error: '文件路径必须以 .xlsx 结尾' })
@@ -94,7 +102,7 @@ export function createXlsxTool(workspaceDir?: string): AgentTool {
         const buffer = await wb.xlsx.writeBuffer()
         const { writeFile } = await import('node:fs/promises')
         await writeFile(abs, Buffer.from(buffer))
-        return JSON.stringify({ ok: true, path: abs, type: 'xlsx' })
+        return JSON.stringify({ ok: true, path: abs, type: 'xlsx', addedChars, deletedChars: 0 })
       } catch (e) {
         return JSON.stringify({ error: e instanceof Error ? e.message : String(e), path: abs })
       }
