@@ -8,7 +8,10 @@ import {
   FileText,
   Eye,
   GitCompare,
-  Flag
+  Flag,
+  CheckCircle2,
+  RotateCcw,
+  Wand2
 } from 'lucide-react'
 import { useTaskStore } from '../store/task'
 import { api } from '../api'
@@ -41,8 +44,25 @@ function deriveSourcesFromTurns(turns: Turn[], currentTurn: Turn | null): Source
 
 // 右栏：目标状态 + 产物 + 来源 + 用量，优先展示用户能拿走的结果
 export function RightPanel({ collapsed }: { collapsed: boolean }) {
-  const { status, goal, turns, currentTurn, artifacts, usage, startedAt, finishedAt, error, message } =
+  const { status, taskId, goal, turns, currentTurn, artifacts, usage, startedAt, finishedAt, error, message, projects, activeProjectId, setMessage, requestManualCompact } =
     useTaskStore()
+  const activeWorkspaceDir = projects.find((p) => p.id === activeProjectId)?.folderPath
+  const [selectedArtifact, setSelectedArtifact] = useState<ArtifactEntry | null>(null)
+  const [previewText, setPreviewText] = useState('')
+  const [previewError, setPreviewError] = useState('')
+  const [artifactAccepted, setArtifactAccepted] = useState(false)
+
+  useEffect(() => {
+    if (!selectedArtifact) return
+    setArtifactAccepted(false)
+    setPreviewText('')
+    setPreviewError('')
+    void api.workspaceReadFile(selectedArtifact.filePath, activeWorkspaceDir).then((res) => {
+      if (res.content) setPreviewText(res.content)
+      else setPreviewError(res.error || '这个产物暂时不能直接预览，可以打开文件查看')
+    })
+  }, [selectedArtifact, activeWorkspaceDir])
+
   const hasTask = status !== 'idle'
 
   if (!hasTask) {
@@ -92,9 +112,22 @@ export function RightPanel({ collapsed }: { collapsed: boolean }) {
           {visibleArtifacts.length === 0 ? (
             <p className="text-xs text-[var(--ink-soft)] py-1">暂无产物</p>
           ) : (
-            <ul className="space-y-1">{visibleArtifacts.map((a, i) => <ArtifactItem key={i} art={a} />)}</ul>
+            <ul className="space-y-1">{visibleArtifacts.map((a, i) => <ArtifactItem key={i} art={a} onPreview={() => setSelectedArtifact(a)} />)}</ul>
           )}
         </section>
+
+        {selectedArtifact && (
+          <ArtifactPreview
+            art={selectedArtifact}
+            content={previewText}
+            error={previewError}
+            accepted={artifactAccepted}
+            onAccept={() => setArtifactAccepted(true)}
+            onRevise={() => setMessage(`请继续修改 ${artifactName(selectedArtifact.filePath)}：`)}
+            onRollback={() => { if (taskId) void api.rollbackTask(taskId) }}
+            onOpen={() => void api.openPath(selectedArtifact.filePath)}
+          />
+        )}
 
         {/* 来源 */}
         <section className="glass rounded-xl p-3">
@@ -111,7 +144,7 @@ export function RightPanel({ collapsed }: { collapsed: boolean }) {
         </section>
 
         {/* 上下文容量指示器 */}
-        <ContextCapacityIndicator usedTokens={usage.inputTokens + usage.outputTokens} />
+        <ContextCapacityIndicator usedTokens={usage.inputTokens + usage.outputTokens} running={status === 'executing'} onManualCompact={requestManualCompact} />
 
         {/* 用量与计时 */}
         <section className="glass rounded-xl p-3 space-y-2">
@@ -161,11 +194,12 @@ function StatusBadge({ status, className = '' }: { status: string; className?: s
   )
 }
 
-function ArtifactItem({ art }: { art: ArtifactEntry }) {
+function ArtifactItem({ art, onPreview }: { art: ArtifactEntry; onPreview: () => void }) {
   const meta = ARTIFACT_META[art.type] || ARTIFACT_META.file
-  const name = art.filePath.split('/').pop() || art.filePath
+  const name = artifactName(art.filePath)
   return (
-    <li className="flex items-center gap-2 text-xs">
+    <li>
+      <button onClick={onPreview} className="w-full flex items-center gap-2 text-xs rounded-md px-1 py-1 hover:bg-black/[0.04] transition text-left">
       <span className="text-[var(--ink-soft)] flex-shrink-0">{meta.icon}</span>
       <span className="truncate text-[var(--ink)]" title={art.filePath}>
         {name}
@@ -176,8 +210,54 @@ function ArtifactItem({ art }: { art: ArtifactEntry }) {
       {art.removed != null && art.removed > 0 && (
         <span className="text-red-500 font-mono">-{art.removed}</span>
       )}
+      </button>
     </li>
   )
+}
+
+function ArtifactPreview({ art, content, error, accepted, onAccept, onRevise, onRollback, onOpen }: {
+  art: ArtifactEntry
+  content: string
+  error: string
+  accepted: boolean
+  onAccept: () => void
+  onRevise: () => void
+  onRollback: () => void
+  onOpen: () => void
+}) {
+  const name = artifactName(art.filePath)
+  return (
+    <section className="glass rounded-xl p-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <Eye size={14} className="text-[var(--ink-soft)]" />
+        <span className="text-xs font-semibold tracking-wide text-[var(--ink-soft)] uppercase">预览</span>
+      </div>
+      <div className="text-xs font-mono text-[var(--ink)] truncate" title={art.filePath}>{name}</div>
+      {content ? (
+        <pre className="max-h-52 overflow-y-auto rounded-lg bg-black/[0.03] px-2.5 py-2 text-[11px] text-[var(--ink-soft)] whitespace-pre-wrap break-all font-mono">
+          {content.slice(0, 5000)}{content.length > 5000 ? '\n...（仅显示前 5000 字）' : ''}
+        </pre>
+      ) : (
+        <div className="rounded-lg bg-black/[0.03] px-2.5 py-2 text-xs text-[var(--ink-soft)]">{error || '正在读取预览...'}</div>
+      )}
+      <div className="grid grid-cols-2 gap-1.5">
+        <button onClick={onAccept} className="h-8 rounded-lg bg-green-50 text-green-700 text-xs font-medium inline-flex items-center justify-center gap-1">
+          <CheckCircle2 size={13} /> {accepted ? '已采用' : '采用'}
+        </button>
+        <button onClick={onRevise} className="h-8 rounded-lg bg-sky-50 text-sky-700 text-xs font-medium inline-flex items-center justify-center gap-1">
+          <Wand2 size={13} /> 继续修改
+        </button>
+        <button onClick={onRollback} className="h-8 rounded-lg glass text-amber-700 text-xs font-medium inline-flex items-center justify-center gap-1">
+          <RotateCcw size={13} /> 回退
+        </button>
+        <button onClick={onOpen} className="h-8 rounded-lg glass text-[var(--ink-soft)] text-xs font-medium">打开文件</button>
+      </div>
+    </section>
+  )
+}
+
+function artifactName(path: string): string {
+  return path.split('/').pop() || path
 }
 
 function SourceItem({ source }: { source: SourceEntry }) {
@@ -246,7 +326,7 @@ function Duration({
 
 const DEFAULT_CONTEXT_LIMIT = 200000
 
-function ContextCapacityIndicator({ usedTokens }: { usedTokens: number }) {
+function ContextCapacityIndicator({ usedTokens, running, onManualCompact }: { usedTokens: number; running: boolean; onManualCompact: () => void }) {
   const [expanded, setExpanded] = useState(false)
   const [contextLimit, setContextLimit] = useState(DEFAULT_CONTEXT_LIMIT)
   useEffect(() => {
@@ -294,7 +374,7 @@ function ContextCapacityIndicator({ usedTokens }: { usedTokens: number }) {
         </span>
       </button>
       {expanded && (
-        <div className="space-y-1 text-xs text-[var(--ink-soft)] pl-1">
+        <div className="space-y-2 text-xs text-[var(--ink-soft)] pl-1">
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full" style={{ background: color }} />
             <span>占用 {percentage.toFixed(1)}%</span>
@@ -302,6 +382,14 @@ function ContextCapacityIndicator({ usedTokens }: { usedTokens: number }) {
             {!isDanger && isWarning && <span className="text-amber-500">接近压缩阈值</span>}
           </div>
           <div>剩余 {formatTokens(Math.max(0, contextLimit - usedTokens))}</div>
+          <button
+            onClick={onManualCompact}
+            disabled={running}
+            className="h-7 px-2 rounded-lg glass text-xs text-[var(--ink)] hover:bg-black/[0.04] disabled:opacity-40 disabled:cursor-not-allowed"
+            title={running ? '任务进行中时，无法手动整理上下文' : '整理旧上下文'}
+          >
+            {running ? '运行中不可整理' : '手动整理上下文'}
+          </button>
         </div>
       )}
     </section>

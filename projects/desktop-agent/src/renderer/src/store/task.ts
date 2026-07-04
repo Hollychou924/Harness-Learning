@@ -152,6 +152,14 @@ export interface TodoItem {
   status: 'pending' | 'in_progress' | 'completed'
 }
 
+
+export interface CompactNotice {
+  id: string
+  state: 'running' | 'done' | 'blocked' | 'failed'
+  label: string
+  createdAt: number
+}
+
 export interface Attachment {
   id: string
   name: string
@@ -190,6 +198,7 @@ export interface TaskRuntime {
   approvalPending: ApprovalRequest | null
   pendingPlan: PendingPlan | null
   pendingQuestion: QuestionRequest | null
+  compactNotice: CompactNotice | null
   todos: TodoItem[]
   subtasks: SubtaskEntry[]
 }
@@ -221,9 +230,13 @@ export interface TaskState {
   approvalPending: ApprovalRequest | null
   pendingPlan: PendingPlan | null
   pendingQuestion: QuestionRequest | null
+  compactNotice: CompactNotice | null
   todos: TodoItem[]
   subtasks: SubtaskEntry[]
   attachments: Attachment[]
+  compactNotice: CompactNotice | null
+  requestManualCompact: () => void
+  clearCompactNotice: () => void
   setAttachments: (a: Attachment[]) => void
   setMode: (m: 'work' | 'code') => void
   setMessage: (s: string) => void
@@ -387,10 +400,39 @@ const initial = {
   approvalPending: null as ApprovalRequest | null,
   pendingPlan: null as PendingPlan | null,
   pendingQuestion: null as QuestionRequest | null,
+  compactNotice: null as CompactNotice | null,
   todos: [] as TodoItem[],
   subtasks: [] as SubtaskEntry[],
   attachments: [] as Attachment[],
   messages: [] as AgentMessage[]
+}
+
+const COMPACT_CHAR_THRESHOLD = 60000
+const COMPACT_KEEP_TAIL = 8
+
+function messageTextLength(messages: AgentMessage[]): number {
+  return messages.reduce((sum, msg) => sum + (msg.content?.length || 0), 0)
+}
+
+function compactMessagesForContext(messages: AgentMessage[]): { messages: AgentMessage[]; changed: boolean } {
+  if (messageTextLength(messages) <= COMPACT_CHAR_THRESHOLD || messages.length <= COMPACT_KEEP_TAIL) {
+    return { messages, changed: false }
+  }
+  const head = messages.slice(0, -COMPACT_KEEP_TAIL)
+  const tail = messages.slice(-COMPACT_KEEP_TAIL)
+  const summaryLines = head
+    .filter((msg) => msg.role === 'user' || msg.role === 'assistant')
+    .map((msg) => `${msg.role === 'user' ? '用户' : '小蓝鲸'}：${msg.content.replace(/\s+/g, ' ').slice(0, 220)}`)
+    .slice(-40)
+  const summary: AgentMessage = {
+    role: 'user',
+    content: `以下是已自动整理过的旧对话摘要，用于继续当前任务：\n${summaryLines.join('\n')}`
+  }
+  return { messages: [summary, ...tail], changed: true }
+}
+
+function compactNotice(state: CompactNotice['state'], label: string): CompactNotice {
+  return { id: `compact-${Date.now()}`, state, label, createdAt: Date.now() }
 }
 
 export const useTaskStore = create<TaskState>((set, get) => ({
@@ -402,6 +444,25 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   sessions: loadSessionsFromStorage(),
   activeProjectId: loadActiveProject(),
   activeSessionId: null,
+  requestManualCompact: () => {
+    const cur = get()
+    if (cur.status === 'executing') {
+      set({ compactNotice: compactNotice('blocked', '任务进行中，暂时不能手动整理上下文') })
+      return
+    }
+    try {
+      set({ compactNotice: compactNotice('running', '正在整理旧上下文') })
+      const compacted = compactMessagesForContext(cur.messages)
+      if (compacted.changed) {
+        set({ messages: compacted.messages, compactNotice: compactNotice('done', '上下文已整理，后续任务会优先使用摘要和最近对话') })
+      } else {
+        set({ compactNotice: compactNotice('done', '当前上下文还不需要整理') })
+      }
+    } catch {
+      set({ compactNotice: compactNotice('failed', '上下文整理失败，已保留当前对话') })
+    }
+  },
+  clearCompactNotice: () => set({ compactNotice: null }),
   setMode: (m) => {
     const cur = get()
     if (cur.mode === m) return
@@ -413,7 +474,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
           [cur.taskId as string]: {
             status: s.status, turns: s.turns, currentTurn: s.currentTurn, summary: s.summary, artifacts: s.artifacts, usage: s.usage,
             error: s.error, startedAt: s.startedAt, finishedAt: s.finishedAt,
-            approvalPending: s.approvalPending, pendingPlan: s.pendingPlan, pendingQuestion: s.pendingQuestion, todos: s.todos, subtasks: s.subtasks
+            approvalPending: s.approvalPending, pendingPlan: s.pendingPlan, pendingQuestion: s.pendingQuestion, compactNotice: s.compactNotice, todos: s.todos, subtasks: s.subtasks
           }
         }
       }))
@@ -588,7 +649,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   reset: () => {
     // 释放附件的 Object URL，防止内存泄漏
     for (const a of get().attachments) { if (a.objectUrl) URL.revokeObjectURL(a.objectUrl) }
-    set({ ...initial, history: get().history, projects: get().projects, sessions: get().sessions, activeProjectId: get().activeProjectId, activeSessionId: get().activeSessionId, mode: get().mode, approvalPending: null, pendingPlan: null, pendingQuestion: null, todos: [], subtasks: [], attachments: [] })
+    set({ ...initial, history: get().history, projects: get().projects, sessions: get().sessions, activeProjectId: get().activeProjectId, activeSessionId: get().activeSessionId, mode: get().mode, approvalPending: null, pendingPlan: null, pendingQuestion: null, compactNotice: null, todos: [], subtasks: [], attachments: [] })
   },
   cancelTask: async () => {
     const { taskId } = get()
@@ -637,7 +698,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         status: 'executing', turns: [], currentTurn: null, summary: '',
         artifacts: [], usage: { inputTokens: 0, outputTokens: 0 },
         error: null, startedAt: Date.now(), finishedAt: null,
-        approvalPending: null, pendingPlan: null, pendingQuestion: null, todos: [], subtasks: []
+        approvalPending: null, pendingPlan: null, pendingQuestion: null, compactNotice: null, todos: [], subtasks: []
       }
 
       if (isTurnItemEvent(msg)) {
@@ -689,8 +750,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     // 可见任务：走原有逻辑更新全局展示，同时同步到 runningTasks
     const syncRT = (extra?: Partial<TaskRuntime>) => {
       const st = get()
-      const old: TaskRuntime = st.runningTasks[evTaskId] || { status: 'executing', turns: [], currentTurn: null, summary: '', artifacts: [], usage: { inputTokens: 0, outputTokens: 0 }, error: null, startedAt: Date.now(), finishedAt: null, approvalPending: null, pendingPlan: null, pendingQuestion: null, todos: [], subtasks: [] }
-      set({ runningTasks: { ...st.runningTasks, [evTaskId]: { ...old, status: st.status, turns: st.turns, currentTurn: st.currentTurn, summary: st.summary, artifacts: st.artifacts, usage: st.usage, error: st.error, startedAt: st.startedAt, finishedAt: st.finishedAt, approvalPending: st.approvalPending, pendingPlan: st.pendingPlan, pendingQuestion: st.pendingQuestion, todos: st.todos, subtasks: st.subtasks, ...extra } } })
+      const old: TaskRuntime = st.runningTasks[evTaskId] || { status: 'executing', turns: [], currentTurn: null, summary: '', artifacts: [], usage: { inputTokens: 0, outputTokens: 0 }, error: null, startedAt: Date.now(), finishedAt: null, approvalPending: null, pendingPlan: null, pendingQuestion: null, compactNotice: null, todos: [], subtasks: [] }
+      set({ runningTasks: { ...st.runningTasks, [evTaskId]: { ...old, status: st.status, turns: st.turns, currentTurn: st.currentTurn, summary: st.summary, artifacts: st.artifacts, usage: st.usage, error: st.error, startedAt: st.startedAt, finishedAt: st.finishedAt, approvalPending: st.approvalPending, pendingPlan: st.pendingPlan, pendingQuestion: st.pendingQuestion, compactNotice: st.compactNotice, todos: st.todos, subtasks: st.subtasks, ...extra } } })
     }
 
     if (isTurnItemEvent(msg)) {
@@ -767,7 +828,16 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const isContinue = Boolean(activeSessionId && messages.length > 0)
     const sessionId = isContinue ? (activeSessionId as string) : undefined
     // 历史只取 user/assistant/tool（不含 system，agent 会自己加 system prompt）
-    const history = isContinue ? messages.filter((m) => m.role !== 'system') : undefined
+    const rawHistory = isContinue ? messages.filter((m) => m.role !== 'system') : undefined
+    let history = rawHistory
+    if (rawHistory) {
+      const compacted = compactMessagesForContext(rawHistory)
+      if (compacted.changed) {
+        set({ compactNotice: compactNotice('running', '正在自动整理旧上下文') })
+        history = compacted.messages
+        set({ compactNotice: compactNotice('done', '上下文已自动整理，当前任务会继续使用最近对话') })
+      }
+    }
     // 把本轮用户消息加入消息流
     const userMsg: AgentMessage = { role: 'user', content: message }
     set({
@@ -780,6 +850,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       approvalPending: null,
       pendingPlan: null,
       pendingQuestion: null,
+      compactNotice: null,
       todos: [],
       subtasks: [],
       attachments: [],
@@ -791,7 +862,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       messages: [...messages, userMsg]
     })
     // 注册到隔离存储，切走后事件继续写入对应任务
-    set((st) => ({ runningTasks: { ...st.runningTasks, [get().taskId as string]: { status: 'executing', turns: get().turns, currentTurn: null, summary: '', artifacts: [], usage: { inputTokens: 0, outputTokens: 0 }, error: null, startedAt: Date.now(), finishedAt: null, approvalPending: null, pendingPlan: null, pendingQuestion: null, todos: [], subtasks: [] } } }))
+    set((st) => ({ runningTasks: { ...st.runningTasks, [get().taskId as string]: { status: 'executing', turns: get().turns, currentTurn: null, summary: '', artifacts: [], usage: { inputTokens: 0, outputTokens: 0 }, error: null, startedAt: Date.now(), finishedAt: null, approvalPending: null, pendingPlan: null, pendingQuestion: null, compactNotice: null, todos: [], subtasks: [] } } }))
     const settingsState = useSettingsStore.getState()
     // 发送前把 objectUrl 图片转成 dataUrl(agent 子进程需要 base64)
     const sendAttachments = await Promise.all(attachments.map(async (a) => {
@@ -838,7 +909,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
           [cur.taskId as string]: {
             status: s.status, turns: s.turns, currentTurn: s.currentTurn, summary: s.summary, artifacts: s.artifacts, usage: s.usage,
             error: s.error, startedAt: s.startedAt, finishedAt: s.finishedAt,
-            approvalPending: s.approvalPending, pendingPlan: s.pendingPlan, pendingQuestion: s.pendingQuestion, todos: s.todos, subtasks: s.subtasks
+            approvalPending: s.approvalPending, pendingPlan: s.pendingPlan, pendingQuestion: s.pendingQuestion, compactNotice: s.compactNotice, todos: s.todos, subtasks: s.subtasks
           }
         }
       }))

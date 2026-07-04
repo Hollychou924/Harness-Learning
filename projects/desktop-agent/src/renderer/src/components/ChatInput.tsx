@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, ArrowUp, ChevronDown, Check, X, FileText, Image as ImageIcon, Eye, AlertCircle, FolderPlus } from 'lucide-react'
+import { Plus, ArrowUp, ChevronDown, Check, X, FileText, Image as ImageIcon, Eye, AlertCircle, FolderPlus, FolderOpen, History, AtSign, Target } from 'lucide-react'
 import { api, type ModelConfig, type AttachmentFile } from '../api'
 import { useSettingsStore } from './settings/settingsStore'
 import { NewProjectDialog } from './Dialogs'
@@ -38,11 +38,12 @@ function hasWeirdLineBreaks(text: string): boolean {
 export function ChatInput({ value, onChange, onSend, onStop, isRunning = false, placeholder, showProjectPicker = false }: Props) {
   const [config, setConfig] = useState<ModelConfig | null>(null)
   const [modelMenuOpen, setModelMenuOpen] = useState(false)
+  const [addMenuOpen, setAddMenuOpen] = useState(false)
   const [menuPos, setMenuPos] = useState<{ left: number; bottom: number } | null>(null)
   const modelBtnRef = useRef<HTMLButtonElement>(null)
   const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null)
   const { openSettings, modelConfig: storeConfig } = useSettingsStore()
-  const { attachments, setAttachments, projects, activeProjectId, setActiveProject, createProject } = useTaskStore()
+  const { attachments, setAttachments, projects, sessions, activeProjectId, activeSessionId, setActiveProject, createProject } = useTaskStore()
   const activeProject = projects.find((p) => p.id === activeProjectId)
   const activeWorkspaceDir = activeProject?.folderPath
   const taRef = useRef<HTMLTextAreaElement>(null)
@@ -284,6 +285,35 @@ export function ChatInput({ value, onChange, onSend, onStop, isRunning = false, 
     addAttachments(newAtts)
   }
 
+
+  const openMentionPicker = useCallback(() => {
+    const prefix = value && !value.endsWith(' ') && !value.endsWith('\n') ? `${value} @` : `${value}@`
+    onChange(prefix)
+    mentionStartRef.current = prefix.lastIndexOf('@')
+    setMentionQuery('')
+    setMentionOpen(true)
+    setAddMenuOpen(false)
+    void loadMentionItems('')
+    setTimeout(() => taRef.current?.focus(), 0)
+  }, [value, onChange, loadMentionItems])
+
+  const handlePickFolderAsProject = useCallback(async () => {
+    const folderPath = await api.pickFolder()
+    if (!folderPath) return
+    const name = folderPath.split('/').filter(Boolean).pop() || '新项目'
+    const id = createProject(name, '📁', folderPath)
+    setActiveProject(id)
+    setAddMenuOpen(false)
+  }, [createProject, setActiveProject])
+
+  const appendQuickContext = useCallback((text: string) => {
+    const next = value.trim() ? `${value}
+${text}` : text
+    onChange(next)
+    setAddMenuOpen(false)
+    setTimeout(() => taRef.current?.focus(), 0)
+  }, [value, onChange])
+
   // ── 拖拽上传 ──
   const dragHasFiles = (e: React.DragEvent): boolean => {
     return Array.from(e.dataTransfer?.types ?? []).includes('Files')
@@ -427,13 +457,27 @@ export function ChatInput({ value, onChange, onSend, onStop, isRunning = false, 
 
         {/* 底部行：左下 + 号，右下 模型选择 + 发送 */}
         <div className="flex items-center justify-between px-2.5 pb-2 pt-1">
-          <button
-            onClick={handleFileSelect}
-            className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[var(--ink-soft)] hover:bg-black/[0.06] hover:text-[var(--ink)] transition"
-            title="添加文件"
-          >
-            <Plus size={18} />
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setAddMenuOpen((v) => !v)}
+              className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[var(--ink-soft)] hover:bg-black/[0.06] hover:text-[var(--ink)] transition"
+              title="添加上下文"
+            >
+              <Plus size={18} />
+            </button>
+            {addMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setAddMenuOpen(false)} />
+                <div className="absolute left-0 bottom-10 z-40 w-64 glass rounded-xl shadow-xl p-1.5 border border-white/50">
+                  <AddMenuItem icon={<FileText size={14} />} label="添加本地文件" desc="图片、文档、文本都可以" onClick={handleFileSelect} />
+                  <AddMenuItem icon={<AtSign size={14} />} label="引用项目文件" desc="从当前项目里选择文件" onClick={openMentionPicker} />
+                  <AddMenuItem icon={<FolderOpen size={14} />} label="添加本地文件夹" desc="作为新的项目上下文" onClick={handlePickFolderAsProject} />
+                  <AddMenuItem icon={<History size={14} />} label="引用当前对话" desc={activeSessionId ? '让小蓝鲸延续已有上下文' : '当前还没有可引用的对话'} disabled={!activeSessionId} onClick={() => appendQuickContext('请参考当前对话历史继续处理：')} />
+                  <AddMenuItem icon={<Target size={14} />} label="补充目标" desc="把验收标准写进输入框" onClick={() => appendQuickContext('补充目标：')} />
+                </div>
+              </>
+            )}
+          </div>
 
           <div className="flex items-center gap-2">
             <div className="relative">
@@ -570,6 +614,30 @@ export function ChatInput({ value, onChange, onSend, onStop, isRunning = false, 
         />
       )}
     </>
+  )
+}
+
+
+function AddMenuItem({ icon, label, desc, onClick, disabled = false }: {
+  icon: React.ReactNode
+  label: string
+  desc: string
+  onClick: () => void
+  disabled?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="w-full flex items-start gap-2 px-2.5 py-2 rounded-lg text-left hover:bg-black/[0.05] transition disabled:opacity-40 disabled:cursor-not-allowed"
+    >
+      <span className="mt-0.5 text-[var(--ink-soft)] flex-shrink-0">{icon}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm text-[var(--ink)]">{label}</span>
+        <span className="block text-xs text-[var(--ink-soft)] mt-0.5">{desc}</span>
+      </span>
+    </button>
   )
 }
 
