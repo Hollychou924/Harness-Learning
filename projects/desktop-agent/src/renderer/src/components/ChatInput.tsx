@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, ArrowUp, ChevronDown, Check, X, FileText, Image as ImageIcon, Eye, AlertCircle, FolderPlus, FolderOpen, History, AtSign, Target } from 'lucide-react'
+import { Plus, ArrowUp, ChevronDown, Check, X, FileText, Image as ImageIcon, Eye, AlertCircle, FolderPlus, FolderOpen, History, AtSign, Target, StopCircle } from 'lucide-react'
 import { api, type ModelConfig, type AttachmentFile } from '../api'
 import { useSettingsStore } from './settings/settingsStore'
 import { NewProjectDialog } from './Dialogs'
@@ -555,7 +555,7 @@ ${text}` : text
                   : 'bg-black/[0.06] text-[var(--ink-soft)]/40 cursor-not-allowed'
               }`}
             >
-              {shouldStop ? <X size={16} /> : <ArrowUp size={16} />}
+              {shouldStop ? <StopCircle size={18} /> : <ArrowUp size={16} />}
             </button>
           </div>
         </div>

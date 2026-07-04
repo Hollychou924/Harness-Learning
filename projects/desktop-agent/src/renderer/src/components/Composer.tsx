@@ -4,7 +4,7 @@ import { ChatInput } from './ChatInput'
 import { ProgressPill } from './ProgressPill'
 
 export function Composer() {
-  const { status, message, setMessage, startTask, appendInput, cancelTask, taskId, messages, currentTurn, approvalPending } = useTaskStore()
+  const { status, message, setMessage, startTask, appendInput, cancelTask, taskId, messages, currentTurn, approvalPending, todos } = useTaskStore()
   const [pending, setPending] = useState(false)
 
   // idle 状态不渲染底部 Composer（输入框在 HomeView 中间）
@@ -39,7 +39,7 @@ export function Composer() {
     <div className="flex-shrink-0 px-6 py-3">
       <div className="mx-auto max-w-4xl">
         <div className="mb-2 flex justify-center">
-          <ProgressPill status={status} currentTurn={currentTurn} hasApprovalPending={Boolean(approvalPending)} />
+          <ProgressPill status={status} currentTurn={currentTurn} todos={todos} hasApprovalPending={Boolean(approvalPending)} />
         </div>
         <ChatInput
           value={message}
