@@ -28,8 +28,10 @@ const api = {
     ipcRenderer.invoke('agent:cancel', { taskId }) as Promise<void>,
   rollbackTask: (taskId: string) =>
     ipcRenderer.invoke('agent:rollback', { taskId }) as Promise<{ success: boolean }>,
-  sendApproval: (requestId: string, approved: boolean) =>
-    ipcRenderer.invoke('agent:approval', { requestId, approved }) as Promise<void>,
+  sendApproval: (requestId: string, approved: boolean, scope?: 'once' | 'task' | 'always') =>
+    ipcRenderer.invoke('agent:approval', { requestId, approved, scope }) as Promise<void>,
+  sendQuestionResponse: (requestId: string, selectedOptionIds?: string[], customAnswer?: string, skipped?: boolean) =>
+    ipcRenderer.invoke('agent:questionResponse', { requestId, selectedOptionIds, customAnswer, skipped }) as Promise<void>,
   sendPlanResponse: (requestId: string, decision: 'approve' | 'reject_stop' | 'reject_revise', feedback?: string) =>
     ipcRenderer.invoke('agent:planResponse', { requestId, decision, feedback }) as Promise<void>,
   appendInput: (taskId: string, message: string, mode?: 'inject' | 'queue') =>

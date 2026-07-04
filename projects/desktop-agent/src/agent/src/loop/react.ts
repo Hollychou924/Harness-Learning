@@ -3,8 +3,10 @@ import type { Item, ItemStatus, ToolCallItem, ToolKind } from '../items.js'
 import { isSafe, isBlocked } from '../tools/index.js'
 import { shellRiskLevel } from '../tools/shell.js'
 import { parsePlanArgs, clearPendingPlanRequestId } from '../tools/plan.js'
+import { parseQuestionArgs } from '../tools/question.js'
 import { makeTodoExecuteHandler } from '../tools/todo.js'
-import { waitForApproval } from '../approval.js'
+import { hasRememberedApproval, rememberApproval, waitForApproval } from '../approval.js'
+import { waitForQuestion } from '../question.js'
 import { randomUUID } from 'node:crypto'
 import { AnthropicProvider, type LlmProvider } from '../providers/anthropic.js'
 import { OpenAIProvider } from '../providers/openai.js'
@@ -305,6 +307,62 @@ export async function runReact(
 
     // 有工具调用，执行工具
     const tool = tools.find((t) => t.name === toolUse.name)
+
+    if (toolUse.name === 'ask_question') {
+      const parsedQuestion = parseQuestionArgs(toolUse.args)
+      const questionRequestId = `question-${randomUUID()}`
+      const questionItemId = `questionItem-${randomUUID()}`
+      const questionItem: Item = {
+        type: 'question',
+        id: questionItemId,
+        requestId: questionRequestId,
+        question: parsedQuestion.question,
+        detail: parsedQuestion.detail,
+        options: parsedQuestion.options,
+        multiple: parsedQuestion.multiple,
+        allowCustom: parsedQuestion.allowCustom,
+        allowSkip: parsedQuestion.allowSkip,
+        decision: 'pending'
+      }
+      onEvent({ type: 'item_started', turn_id: turnId, item: questionItem })
+      onEvent({
+        type: 'question_proposed',
+        request_id: questionRequestId,
+        question: parsedQuestion.question,
+        detail: parsedQuestion.detail,
+        options: parsedQuestion.options,
+        multiple: parsedQuestion.multiple,
+        allow_custom: parsedQuestion.allowCustom,
+        allow_skip: parsedQuestion.allowSkip
+      })
+
+      const answer = await waitForQuestion(questionRequestId)
+      const completedQuestion: Item = {
+        ...questionItem,
+        decision: answer.skipped ? 'skipped' : 'answered',
+        selectedOptionIds: answer.selectedOptionIds,
+        customAnswer: answer.customAnswer
+      }
+      onEvent({ type: 'item_completed', turn_id: turnId, item: completedQuestion })
+
+      const selectedLabels = parsedQuestion.options
+        .filter((option) => answer.selectedOptionIds.includes(option.id))
+        .map((option) => option.label)
+      const result = JSON.stringify({
+        skipped: answer.skipped,
+        selected_option_ids: answer.selectedOptionIds,
+        selected_options: selectedLabels,
+        custom_answer: answer.customAnswer
+      })
+      messages.push({
+        role: 'assistant',
+        content: assistantText,
+        ...(turnThinkingText && turnThinkingSignature ? { thinkingBlocks: [{ type: 'thinking' as const, thinking: turnThinkingText, signature: turnThinkingSignature }] } : {}),
+        tool_calls: [{ id: toolUse.id, type: 'function', function: { name: toolUse.name, arguments: JSON.stringify(toolUse.args) } }]
+      })
+      messages.push({ role: 'tool', tool_call_id: toolUse.id, content: result })
+      continue
+    }
     const toolItemId = `toolCall-${randomUUID()}`
     const toolKind = toolKindOf(toolUse.name)
     const toolStartedAt = Date.now()
@@ -364,9 +422,10 @@ export async function runReact(
       ? shellRiskLevel(toolUse.args.command)
       : tool.riskLevel
     const autoApprove = config.autoApproveLow !== false
-    const needsApproval = !autoApprove
+    const rememberedApproval = taskId ? hasRememberedApproval(taskId, toolUse.name, toolUse.args) : false
+    const needsApproval = !rememberedApproval && (!autoApprove
       ? !isSafe(toolUse.name) && effectiveRisk !== 'low'
-      : effectiveRisk === 'high' || effectiveRisk === 'critical'
+      : effectiveRisk === 'high' || effectiveRisk === 'critical')
 
     if (needsApproval) {
       const approvalId = `approval-${randomUUID()}`
@@ -393,14 +452,15 @@ export async function runReact(
         can_rollback: effectiveRisk !== 'critical'
       })
 
-      const approved = await waitForApproval(approvalId)
+      const approval = await waitForApproval(approvalId)
+      if (approval.approved && taskId) rememberApproval(taskId, toolUse.name, toolUse.args, approval.scope)
       onEvent({
         type: 'item_completed',
         turn_id: turnId,
-        item: { ...approvalItem, decision: approved ? 'approved' : 'rejected' }
+        item: { ...approvalItem, decision: approval.approved ? 'approved' : 'rejected' }
       })
 
-      if (!approved) {
+      if (!approval.approved) {
         finishToolItem('failed', undefined, '用户拒绝执行此操作')
         messages.push({
           role: 'assistant',

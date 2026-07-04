@@ -62,7 +62,8 @@ export interface MessageAttachment {
 export type StdinMessage =
   | { type: 'chat_request'; session_id: string; message: string; config: AgentConfig; history?: AgentMessage[]; workspace_dir?: string; attachments?: MessageAttachment[] }
   | { type: 'task_control'; task_id: string; action: 'pause' | 'resume' | 'cancel' | 'rollback' }
-  | { type: 'approval_response'; request_id: string; approved: boolean }
+  | { type: 'approval_response'; request_id: string; approved: boolean; scope?: 'once' | 'task' | 'always' }
+  | { type: 'question_response'; request_id: string; selected_option_ids?: string[]; custom_answer?: string; skipped?: boolean }
   | { type: 'append_input'; task_id: string; message: string; mode?: 'inject' | 'queue' }
   | { type: 'plan_response'; request_id: string; decision: 'approve' | 'reject_stop' | 'reject_revise'; feedback?: string }
 
@@ -79,6 +80,7 @@ export type StdoutMessage =
   // 审批/计划的用户决策结果（决策本身也会同步进对应 item，这里额外发一份用于旧组件兼容）
   | { type: 'approval_request'; request_id: string; tool_name: string; args: Record<string, unknown>; risk_level: 'low' | 'medium' | 'high' | 'critical'; impact: string; can_rollback: boolean }
   | { type: 'plan_proposed'; request_id: string; plan: string; steps: PlanStep[] }
+  | { type: 'question_proposed'; request_id: string; question: string; detail?: string; options: QuestionOption[]; multiple: boolean; allow_custom: boolean; allow_skip: boolean }
   | { type: 'todo_update'; todos: TodoItem[] }
   // 用量与产物
   | { type: 'usage'; inputTokens: number; outputTokens: number }
@@ -89,6 +91,12 @@ export type StdoutMessage =
   | { type: 'subtask_started'; subtask_id: string; title: string; agent_id?: string }
   | { type: 'subtask_completed'; subtask_id: string; title: string; duration_ms: number; tool_count: number; tokens: number }
   | { type: 'subtask_failed'; subtask_id: string; title: string; error: string }
+
+export interface QuestionOption {
+  id: string
+  label: string
+  description?: string
+}
 
 export interface PlanStep {
   step: number

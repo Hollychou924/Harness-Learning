@@ -350,9 +350,15 @@ ipcMain.handle('agent:rollback', async (_e, args: { taskId: string }) => {
 })
 
 // 权限审批通道（转发为 stdin approval_response）
-ipcMain.handle('agent:approval', async (_e, args: { requestId: string; approved: boolean }) => {
-  if (activeTraceId) logUserAction(activeTraceId, 'approval_response', { requestId: args.requestId, approved: args.approved })
-  agentBridge.send({ type: 'approval_response', request_id: args.requestId, approved: args.approved })
+ipcMain.handle('agent:approval', async (_e, args: { requestId: string; approved: boolean; scope?: 'once' | 'task' | 'always' }) => {
+  if (activeTraceId) logUserAction(activeTraceId, 'approval_response', { requestId: args.requestId, approved: args.approved, scope: args.scope })
+  agentBridge.send({ type: 'approval_response', request_id: args.requestId, approved: args.approved, scope: args.scope })
+})
+
+// 反问响应通道（转发为 stdin question_response）
+ipcMain.handle('agent:questionResponse', async (_e, args: { requestId: string; selectedOptionIds?: string[]; customAnswer?: string; skipped?: boolean }) => {
+  if (activeTraceId) logUserAction(activeTraceId, 'question_response', { requestId: args.requestId, selectedOptionIds: args.selectedOptionIds, customAnswer: args.customAnswer, skipped: args.skipped })
+  agentBridge.send({ type: 'question_response', request_id: args.requestId, selected_option_ids: args.selectedOptionIds, custom_answer: args.customAnswer, skipped: args.skipped })
 })
 
 // 计划响应通道（转发为 stdin plan_response）

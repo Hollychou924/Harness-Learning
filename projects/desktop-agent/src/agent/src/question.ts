@@ -1,0 +1,30 @@
+export interface QuestionResponse {
+  selectedOptionIds: string[]
+  customAnswer: string
+  skipped: boolean
+}
+
+const pendingQuestions = new Map<string, { resolve: (response: QuestionResponse) => void; timer: ReturnType<typeof setTimeout> }>()
+
+export function waitForQuestion(requestId: string): Promise<QuestionResponse> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      pendingQuestions.delete(requestId)
+      resolve({ selectedOptionIds: [], customAnswer: '', skipped: true })
+    }, 30 * 60 * 1000)
+    pendingQuestions.set(requestId, { resolve, timer })
+  })
+}
+
+export function resolveQuestion(requestId: string, response: Partial<QuestionResponse>): boolean {
+  const pending = pendingQuestions.get(requestId)
+  if (!pending) return false
+  clearTimeout(pending.timer)
+  pendingQuestions.delete(requestId)
+  pending.resolve({
+    selectedOptionIds: response.selectedOptionIds || [],
+    customAnswer: response.customAnswer || '',
+    skipped: Boolean(response.skipped)
+  })
+  return true
+}

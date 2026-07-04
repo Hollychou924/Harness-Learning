@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { Loader2, Check, AlertCircle, ChevronRight, FilePlus } from 'lucide-react'
-import type { Turn, ToolCallItem } from '../../../agent/src/items'
+import type { QuestionItem, Turn, ToolCallItem } from '../../../agent/src/items'
 import { ReasoningBlock } from './ReasoningBlock'
 import { ToolActivityGroupView, groupToolItems } from './ToolActivityGroup'
 import { CollapsedTurnBar } from './CollapsedTurnBar'
 import { ProcessFold } from './ProcessFold'
+import { QuestionCard } from './QuestionCard'
 import { useDetailLevelStore } from './detailLevelStore'
 
 // 单轮内条目的纯展示：思考块 + 文件变更 + 工具活动组，历史轮次和当前实时轮次共用这一份渲染逻辑
@@ -45,6 +46,7 @@ export function TurnItemsView({ turn, showThinking, showStatusLine }: { turn: Tu
   const items = turn.items
   const toolItems = items.filter((it): it is ToolCallItem => it.type === 'toolCall')
   const reasoningItems = items.filter((it) => it.type === 'reasoning')
+  const questionItems = items.filter((it): it is QuestionItem => it.type === 'question')
   const fileChanges = collectFileChanges(toolItems)
   const finalAnswerStarted = items.some((it) => it.type === 'agentMessage' && it.phase === 'final_answer')
 
@@ -53,19 +55,23 @@ export function TurnItemsView({ turn, showThinking, showStatusLine }: { turn: Tu
   const isCompleted = turn.status === 'completed'
   const groups = groupToolItems(toolItems)
 
-  if (toolItems.length === 0 && reasoningItems.length === 0) return null
+  if (toolItems.length === 0 && reasoningItems.length === 0 && questionItems.length === 0) return null
 
   // 只看结论模式：过程完全不渲染
   if (detailLevel === 'conclusionOnly') return null
 
   // 轮内折叠判定(复刻 Codex tIn)：已完成 + 最终回复已出现 + 有过程内容 → 过程默认收起
   // expandAll 模式：不折叠
-  const shouldCollapse = detailLevel === 'expandAll' ? false : (isCompleted && finalAnswerStarted && (toolItems.length > 0 || reasoningItems.length > 0))
+  const shouldCollapse = detailLevel === 'expandAll' ? false : (isCompleted && finalAnswerStarted && (toolItems.length > 0 || reasoningItems.length > 0 || questionItems.length > 0))
 
   const processContent = (
     <>
       {showThinking && reasoningItems.map((r) => (
         <ReasoningBlock key={r.id} item={r} finalAnswerStarted={finalAnswerStarted} />
+      ))}
+
+      {questionItems.map((q) => (
+        <QuestionCard key={q.id} item={q} />
       ))}
 
       {fileChanges.length > 0 && (

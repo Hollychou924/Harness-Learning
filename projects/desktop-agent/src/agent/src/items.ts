@@ -109,6 +109,28 @@ export interface PlanItem {
   requestId: string
 }
 
+
+export interface QuestionOptionItem {
+  id: string
+  label: string
+  description?: string
+}
+
+export interface QuestionItem {
+  type: 'question'
+  id: string
+  requestId: string
+  question: string
+  detail?: string
+  options: QuestionOptionItem[]
+  multiple: boolean
+  allowCustom: boolean
+  allowSkip: boolean
+  decision: 'pending' | 'answered' | 'skipped'
+  selectedOptionIds?: string[]
+  customAnswer?: string
+}
+
 export interface ApprovalItem {
   type: 'approval'
   id: string
@@ -127,6 +149,7 @@ export type Item =
   | ReasoningItem
   | ToolCallItem
   | PlanItem
+  | QuestionItem
   | ApprovalItem
 
 export type TurnStatus = 'running' | 'completed' | 'failed' | 'cancelled'

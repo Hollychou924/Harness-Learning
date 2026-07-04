@@ -1,26 +1,56 @@
-// 审批等待器：agent loop 发出审批条目后阻塞等待主进程回传 approval_response
-// 事件发射(item_started/item_completed)由调用方(loop/react.ts)负责，这里只管等待决策本身
+export type ApprovalScope = 'once' | 'task' | 'always'
+export interface ApprovalDecision {
+  approved: boolean
+  scope: ApprovalScope
+}
 
-const pendingApprovals = new Map<string, { resolve: (approved: boolean) => void; timer: ReturnType<typeof setTimeout> }>()
+const pendingApprovals = new Map<string, { resolve: (decision: ApprovalDecision) => void; timer: ReturnType<typeof setTimeout> }>()
+const taskApprovalMemory = new Map<string, Set<string>>()
+const globalApprovalMemory = new Set<string>()
 
-const APPROVAL_TIMEOUT_MS = 5 * 60 * 1000
+export function approvalMemoryKey(toolName: string, args: Record<string, unknown>): string {
+  if (toolName === 'shell' && typeof args.command === 'string') return `shell:${args.command.trim()}`
+  if ((toolName === 'write_file' || toolName === 'read_file') && typeof args.path === 'string') return `${toolName}:${args.path}`
+  if (toolName === 'list_files' && typeof args.dir === 'string') return `${toolName}:${args.dir}`
+  return `${toolName}:${JSON.stringify(args)}`
+}
 
-/** 注册一个等待中的审批，返回 Promise，超时或收到回执后 resolve */
-export function waitForApproval(requestId: string): Promise<boolean> {
+export function hasRememberedApproval(taskId: string, toolName: string, args: Record<string, unknown>): boolean {
+  const key = approvalMemoryKey(toolName, args)
+  return Boolean(taskApprovalMemory.get(taskId)?.has(key) || globalApprovalMemory.has(key))
+}
+
+export function rememberApproval(taskId: string, toolName: string, args: Record<string, unknown>, scope: ApprovalScope): void {
+  if (scope === 'once') return
+  const key = approvalMemoryKey(toolName, args)
+  if (scope === 'always') {
+    globalApprovalMemory.add(key)
+    return
+  }
+  const set = taskApprovalMemory.get(taskId) || new Set<string>()
+  set.add(key)
+  taskApprovalMemory.set(taskId, set)
+}
+
+export function clearTaskApprovalMemory(taskId: string): void {
+  taskApprovalMemory.delete(taskId)
+}
+
+export function waitForApproval(requestId: string): Promise<ApprovalDecision> {
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
       pendingApprovals.delete(requestId)
-      resolve(false)
-    }, APPROVAL_TIMEOUT_MS)
+      resolve({ approved: false, scope: 'once' })
+    }, 5 * 60 * 1000)
     pendingApprovals.set(requestId, { resolve, timer })
   })
 }
 
-export function resolveApproval(requestId: string, approved: boolean): boolean {
+export function resolveApproval(requestId: string, approved: boolean, scope: ApprovalScope = 'once'): boolean {
   const pending = pendingApprovals.get(requestId)
   if (!pending) return false
   clearTimeout(pending.timer)
   pendingApprovals.delete(requestId)
-  pending.resolve(approved)
+  pending.resolve({ approved, scope })
   return true
 }

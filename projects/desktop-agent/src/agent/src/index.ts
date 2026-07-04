@@ -2,7 +2,8 @@ import { createInterface } from 'node:readline'
 import type { StdinMessage, StdoutMessage, AgentMessage } from './protocol.js'
 import { send } from './protocol.js'
 import { runReact } from './loop/react.js'
-import { resolveApproval } from './approval.js'
+import { clearTaskApprovalMemory, resolveApproval } from './approval.js'
+import { resolveQuestion } from './question.js'
 
 // Agent 子进程入口：读 stdin JSON Lines，写 stdout JSON Lines
 // 不依赖任何 Electron API（依据 docs/03 第四章进程边界）
@@ -60,6 +61,7 @@ async function handleStdin(msg: StdinMessage): Promise<void> {
       )
       sessionHistory.set(session_id, result.messages.slice(1))
       appendInputQueues.delete(session_id)
+      clearTaskApprovalMemory(session_id)
 
       // 产出报告产物
       onEvent({
@@ -74,6 +76,7 @@ async function handleStdin(msg: StdinMessage): Promise<void> {
       onEvent({ type: 'error', message: errMsg })
       onEvent({ type: 'completed', task_id: session_id, summary: `任务失败：${errMsg}` })
       appendInputQueues.delete(session_id)
+      clearTaskApprovalMemory(session_id)
     }
     return
   }
@@ -85,7 +88,16 @@ async function handleStdin(msg: StdinMessage): Promise<void> {
   }
 
   if (msg.type === 'approval_response') {
-    resolveApproval(msg.request_id, msg.approved)
+    resolveApproval(msg.request_id, msg.approved, msg.scope)
+    return
+  }
+
+  if (msg.type === 'question_response') {
+    resolveQuestion(msg.request_id, {
+      selectedOptionIds: msg.selected_option_ids,
+      customAnswer: msg.custom_answer,
+      skipped: msg.skipped
+    })
     return
   }
 

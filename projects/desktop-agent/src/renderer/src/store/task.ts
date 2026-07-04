@@ -117,6 +117,23 @@ export interface ApprovalRequest {
   canRollback: boolean
 }
 
+
+export interface QuestionOption {
+  id: string
+  label: string
+  description?: string
+}
+
+export interface QuestionRequest {
+  requestId: string
+  question: string
+  detail?: string
+  options: QuestionOption[]
+  multiple: boolean
+  allowCustom: boolean
+  allowSkip: boolean
+}
+
 export interface PlanStep {
   step: number
   title: string
@@ -172,6 +189,7 @@ export interface TaskRuntime {
   finishedAt: number | null
   approvalPending: ApprovalRequest | null
   pendingPlan: PendingPlan | null
+  pendingQuestion: QuestionRequest | null
   todos: TodoItem[]
   subtasks: SubtaskEntry[]
 }
@@ -202,6 +220,7 @@ export interface TaskState {
   activeSessionId: string | null
   approvalPending: ApprovalRequest | null
   pendingPlan: PendingPlan | null
+  pendingQuestion: QuestionRequest | null
   todos: TodoItem[]
   subtasks: SubtaskEntry[]
   attachments: Attachment[]
@@ -213,7 +232,8 @@ export interface TaskState {
   continueSession: (sessionId: string) => Promise<void>
   cancelTask: () => Promise<void>
   appendInput: (text: string) => Promise<void>
-  respondApproval: (approved: boolean) => Promise<void>
+  respondApproval: (approved: boolean, scope?: 'once' | 'task' | 'always') => Promise<void>
+  respondQuestion: (selectedOptionIds?: string[], customAnswer?: string, skipped?: boolean) => Promise<void>
   respondPlan: (decision: 'approve' | 'reject_stop' | 'reject_revise', feedback?: string) => Promise<void>
   reset: () => void
   loadHistory: () => void
@@ -366,6 +386,7 @@ const initial = {
   finishedAt: null as number | null,
   approvalPending: null as ApprovalRequest | null,
   pendingPlan: null as PendingPlan | null,
+  pendingQuestion: null as QuestionRequest | null,
   todos: [] as TodoItem[],
   subtasks: [] as SubtaskEntry[],
   attachments: [] as Attachment[],
@@ -392,7 +413,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
           [cur.taskId as string]: {
             status: s.status, turns: s.turns, currentTurn: s.currentTurn, summary: s.summary, artifacts: s.artifacts, usage: s.usage,
             error: s.error, startedAt: s.startedAt, finishedAt: s.finishedAt,
-            approvalPending: s.approvalPending, pendingPlan: s.pendingPlan, todos: s.todos, subtasks: s.subtasks
+            approvalPending: s.approvalPending, pendingPlan: s.pendingPlan, pendingQuestion: s.pendingQuestion, todos: s.todos, subtasks: s.subtasks
           }
         }
       }))
@@ -403,7 +424,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       artifacts: cur.artifacts, usage: cur.usage, error: cur.error,
       startedAt: cur.startedAt, finishedAt: cur.finishedAt, todos: cur.todos,
       subtasks: cur.subtasks, attachments: cur.attachments, messages: cur.messages,
-      approvalPending: null, pendingPlan: null
+      approvalPending: null, pendingPlan: null, pendingQuestion: null
     })
     // 恢复目标模式状态
     const snap = modeSnapshots.get(m)
@@ -567,7 +588,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   reset: () => {
     // 释放附件的 Object URL，防止内存泄漏
     for (const a of get().attachments) { if (a.objectUrl) URL.revokeObjectURL(a.objectUrl) }
-    set({ ...initial, history: get().history, projects: get().projects, sessions: get().sessions, activeProjectId: get().activeProjectId, activeSessionId: get().activeSessionId, mode: get().mode, approvalPending: null, pendingPlan: null, todos: [], subtasks: [], attachments: [] })
+    set({ ...initial, history: get().history, projects: get().projects, sessions: get().sessions, activeProjectId: get().activeProjectId, activeSessionId: get().activeSessionId, mode: get().mode, approvalPending: null, pendingPlan: null, pendingQuestion: null, todos: [], subtasks: [], attachments: [] })
   },
   cancelTask: async () => {
     const { taskId } = get()
@@ -583,11 +604,18 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       set({ message: '', attachments: [] })
     }
   },
-  respondApproval: async (approved: boolean) => {
+  respondApproval: async (approved: boolean, scope: 'once' | 'task' | 'always' = 'once') => {
     const { approvalPending } = get()
     if (approvalPending) {
-      await api.sendApproval(approvalPending.requestId, approved)
+      await api.sendApproval(approvalPending.requestId, approved, scope)
       set({ approvalPending: null })
+    }
+  },
+  respondQuestion: async (selectedOptionIds?: string[], customAnswer?: string, skipped?: boolean) => {
+    const { pendingQuestion } = get()
+    if (pendingQuestion) {
+      await api.sendQuestionResponse(pendingQuestion.requestId, selectedOptionIds, customAnswer, skipped)
+      set({ pendingQuestion: null })
     }
   },
   respondPlan: async (decision: 'approve' | 'reject_stop' | 'reject_revise', feedback?: string) => {
@@ -609,7 +637,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         status: 'executing', turns: [], currentTurn: null, summary: '',
         artifacts: [], usage: { inputTokens: 0, outputTokens: 0 },
         error: null, startedAt: Date.now(), finishedAt: null,
-        approvalPending: null, pendingPlan: null, todos: [], subtasks: []
+        approvalPending: null, pendingPlan: null, pendingQuestion: null, todos: [], subtasks: []
       }
 
       if (isTurnItemEvent(msg)) {
@@ -624,6 +652,10 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         case 'artifact': patch = { artifacts: [...base.artifacts, { type: msg.artifact_type, filePath: msg.file_path }] }; break
         case 'usage': patch = { usage: { inputTokens: base.usage.inputTokens + msg.inputTokens, outputTokens: base.usage.outputTokens + msg.outputTokens } }; break
         case 'error': patch = { error: msg.message, status: 'failed', finishedAt: Date.now() }; break
+        case 'approval_request': patch = { approvalPending: { requestId: msg.request_id, toolName: msg.tool_name, args: msg.args, riskLevel: msg.risk_level, impact: msg.impact, canRollback: msg.can_rollback } }; break
+        case 'plan_proposed': patch = { pendingPlan: { requestId: msg.request_id, plan: msg.plan, steps: msg.steps } }; break
+        case 'question_proposed': patch = { pendingQuestion: { requestId: msg.request_id, question: msg.question, detail: msg.detail, options: msg.options, multiple: msg.multiple, allowCustom: msg.allow_custom, allowSkip: msg.allow_skip } }; break
+        case 'todo_update': patch = { todos: msg.todos }; break
         case 'completed': {
           // 后台任务完成：累积轮次落盘，但不更新全局展示
           const assistantText = getFinalAnswerOfTurn(base.currentTurn) || msg.summary || ''
@@ -657,8 +689,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     // 可见任务：走原有逻辑更新全局展示，同时同步到 runningTasks
     const syncRT = (extra?: Partial<TaskRuntime>) => {
       const st = get()
-      const old: TaskRuntime = st.runningTasks[evTaskId] || { status: 'executing', turns: [], currentTurn: null, summary: '', artifacts: [], usage: { inputTokens: 0, outputTokens: 0 }, error: null, startedAt: Date.now(), finishedAt: null, approvalPending: null, pendingPlan: null, todos: [], subtasks: [] }
-      set({ runningTasks: { ...st.runningTasks, [evTaskId]: { ...old, status: st.status, turns: st.turns, currentTurn: st.currentTurn, summary: st.summary, artifacts: st.artifacts, usage: st.usage, error: st.error, startedAt: st.startedAt, finishedAt: st.finishedAt, approvalPending: st.approvalPending, pendingPlan: st.pendingPlan, todos: st.todos, subtasks: st.subtasks, ...extra } } })
+      const old: TaskRuntime = st.runningTasks[evTaskId] || { status: 'executing', turns: [], currentTurn: null, summary: '', artifacts: [], usage: { inputTokens: 0, outputTokens: 0 }, error: null, startedAt: Date.now(), finishedAt: null, approvalPending: null, pendingPlan: null, pendingQuestion: null, todos: [], subtasks: [] }
+      set({ runningTasks: { ...st.runningTasks, [evTaskId]: { ...old, status: st.status, turns: st.turns, currentTurn: st.currentTurn, summary: st.summary, artifacts: st.artifacts, usage: st.usage, error: st.error, startedAt: st.startedAt, finishedAt: st.finishedAt, approvalPending: st.approvalPending, pendingPlan: st.pendingPlan, pendingQuestion: st.pendingQuestion, todos: st.todos, subtasks: st.subtasks, ...extra } } })
     }
 
     if (isTurnItemEvent(msg)) {
@@ -703,6 +735,10 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         set({ pendingPlan: { requestId: msg.request_id, plan: msg.plan, steps: msg.steps } })
         syncRT()
         break
+      case 'question_proposed':
+        set({ pendingQuestion: { requestId: msg.request_id, question: msg.question, detail: msg.detail, options: msg.options, multiple: msg.multiple, allowCustom: msg.allow_custom, allowSkip: msg.allow_skip } })
+        syncRT()
+        break
       case 'todo_update':
         set({ todos: msg.todos })
         syncRT()
@@ -743,6 +779,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       error: null,
       approvalPending: null,
       pendingPlan: null,
+      pendingQuestion: null,
       todos: [],
       subtasks: [],
       attachments: [],
@@ -754,7 +791,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       messages: [...messages, userMsg]
     })
     // 注册到隔离存储，切走后事件继续写入对应任务
-    set((st) => ({ runningTasks: { ...st.runningTasks, [get().taskId as string]: { status: 'executing', turns: get().turns, currentTurn: null, summary: '', artifacts: [], usage: { inputTokens: 0, outputTokens: 0 }, error: null, startedAt: Date.now(), finishedAt: null, approvalPending: null, pendingPlan: null, todos: [], subtasks: [] } } }))
+    set((st) => ({ runningTasks: { ...st.runningTasks, [get().taskId as string]: { status: 'executing', turns: get().turns, currentTurn: null, summary: '', artifacts: [], usage: { inputTokens: 0, outputTokens: 0 }, error: null, startedAt: Date.now(), finishedAt: null, approvalPending: null, pendingPlan: null, pendingQuestion: null, todos: [], subtasks: [] } } }))
     const settingsState = useSettingsStore.getState()
     // 发送前把 objectUrl 图片转成 dataUrl(agent 子进程需要 base64)
     const sendAttachments = await Promise.all(attachments.map(async (a) => {
@@ -801,7 +838,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
           [cur.taskId as string]: {
             status: s.status, turns: s.turns, currentTurn: s.currentTurn, summary: s.summary, artifacts: s.artifacts, usage: s.usage,
             error: s.error, startedAt: s.startedAt, finishedAt: s.finishedAt,
-            approvalPending: s.approvalPending, pendingPlan: s.pendingPlan, todos: s.todos, subtasks: s.subtasks
+            approvalPending: s.approvalPending, pendingPlan: s.pendingPlan, pendingQuestion: s.pendingQuestion, todos: s.todos, subtasks: s.subtasks
           }
         }
       }))

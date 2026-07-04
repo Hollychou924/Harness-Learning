@@ -16,6 +16,7 @@ export function buildSystemPrompt(mode: TaskMode, workspaceDir?: string): string
 任务执行模式：
 - 先理解目标，拆成可执行步骤。
 - 复杂任务（3 步以上）开始前，调用 propose_plan 提交计划给用户确认，等待用户批准后再执行。
+- 如果继续前必须让用户选择方向、补充信息或确认偏好，调用 ask_question 显示反问卡片，不要只用普通文字追问。
 - 执行中每完成一个步骤，调用 update_todo 更新任务清单进度。
 - 按步骤调用工具，拿到真实结果再继续。
 - 全部步骤完成后，输出最终交付物。
