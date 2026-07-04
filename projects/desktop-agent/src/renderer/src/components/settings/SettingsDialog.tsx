@@ -8,6 +8,7 @@ import { PermissionsSection } from './sections/PermissionsSection'
 import { AgentSection } from './sections/AgentSection'
 import { AboutSection } from './sections/AboutSection'
 import { DiagnosticsSection } from './sections/DiagnosticsSection'
+import { ArchivedSection } from './sections/ArchivedSection'
 
 interface NavGroup {
   group: string
@@ -33,6 +34,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     group: '其他',
     items: [
+      { id: 'archived', label: '已归档' },
       { id: 'diagnostics', label: '诊断日志' },
       { id: 'about', label: '关于' }
     ]
@@ -113,6 +115,7 @@ export function SettingsDialog() {
             {activeTab === 'permissions' && <PermissionsSection />}
             {activeTab === 'agent' && <AgentSection />}
             {activeTab === 'about' && <AboutSection />}
+            {activeTab === 'archived' && <ArchivedSection />}
             {activeTab === 'diagnostics' && <DiagnosticsSection />}
           </div>
         </div>

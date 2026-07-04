@@ -1,6 +1,7 @@
 import type { AgentConfig, AgentMessage, StdoutMessage, MessageAttachment } from '../protocol.js'
 import type { Item, ItemStatus, ToolCallItem, ToolKind } from '../items.js'
 import { isSafe, isBlocked } from '../tools/index.js'
+import { shellRiskLevel } from '../tools/shell.js'
 import { parsePlanArgs, clearPendingPlanRequestId } from '../tools/plan.js'
 import { makeTodoExecuteHandler } from '../tools/todo.js'
 import { waitForApproval } from '../approval.js'
@@ -103,33 +104,70 @@ export async function runReact(
   /** 上一个失败的工具调用条目 id，用于把下一次同名重试串成"失败→重试→成功"链条 */
   let lastFailedToolItemId: string | null = null
 
-  function emitReasoning(text: string): void {
-    const itemId = `reasoning-${randomUUID()}`
-    const now = Date.now()
-    const item: Item = {
-      type: 'reasoning',
-      id: itemId,
-      summary: [text],
-      content: [text],
-      status: 'completed',
-      startedAt: now,
-      finishedAt: now
-    }
-    onEvent({ type: 'item_started', turn_id: turnId, item })
-    onEvent({ type: 'item_completed', turn_id: turnId, item })
-  }
-
   for (let iter = 0; iter < config.maxIterations; iter++) {
-    emitReasoning(`第 ${iter + 1} 轮思考`)
-
     let assistantText = ''
     let toolUse: { id: string; name: string; args: Record<string, unknown> } | null = null
     let inputTokens = 0
     let outputTokens = 0
     let agentMessageItemId: string | null = null
+    let reasoningItemId: string | null = null
+    let reasoningStartedAt = 0
+    let reasoningCompleted = false
+    let reasoningContentIndex = 0
+    // 累积本轮思考内容 + signature，回传给下一轮 Anthropic 请求
+    let turnThinkingText = ''
+    let turnThinkingSignature = ''
 
     try {
       for await (const ev of provider.stream(messages, config, tools)) {
+        if (ev.type === 'thinking' && ev.thinking) {
+          if (!reasoningItemId) {
+            reasoningItemId = `reasoning-${randomUUID()}`
+            reasoningStartedAt = Date.now()
+            onEvent({
+              type: 'item_started',
+              turn_id: turnId,
+              item: {
+                type: 'reasoning',
+                id: reasoningItemId,
+                summary: [],
+                content: [],
+                status: 'running',
+                startedAt: reasoningStartedAt
+              }
+            })
+          }
+          turnThinkingText += ev.thinking
+          if (ev.thinkingSignature) turnThinkingSignature = ev.thinkingSignature
+          onEvent({
+            type: 'item_delta',
+            turn_id: turnId,
+            item_id: reasoningItemId,
+            target: { field: 'reasoningContent', index: reasoningContentIndex },
+            delta: ev.thinking
+          })
+          reasoningContentIndex++
+          continue
+        }
+        // 第一个 text/tool_use 到来时，把思考条目标记为完成
+        // summary = 截断版（前80字），content = 完整原文，保证点开有增量
+        if (reasoningItemId && !reasoningCompleted && (ev.type === 'text' || ev.type === 'tool_use')) {
+          reasoningCompleted = true
+          const summaryText = turnThinkingText.slice(0, 80) + (turnThinkingText.length > 80 ? '…' : '')
+          onEvent({
+            type: 'item_completed',
+            turn_id: turnId,
+            item: {
+              type: 'reasoning',
+              id: reasoningItemId,
+              summary: summaryText ? [summaryText] : [],
+              content: turnThinkingText ? [turnThinkingText] : [],
+              status: 'completed',
+              startedAt: reasoningStartedAt || Date.now(),
+              finishedAt: Date.now()
+            }
+          })
+        }
         if (ev.type === 'text' && ev.text) {
           if (!agentMessageItemId) {
             agentMessageItemId = `agentMessage-${randomUUID()}`
@@ -161,7 +199,7 @@ export async function runReact(
       // 图片兼容退回：模型不支持图片时，移除图片后重试一次本轮
       if (hasImages && !imagesDisabled && isImageUnsupportedError(msg)) {
         imagesDisabled = true
-        emitReasoning('当前模型不支持图片，已自动移除图片并用纯文字重试')
+        // 图片退回提示走系统消息，不用假思考占位
         const lastUser = messages.slice().reverse().find((m: AgentMessage) => m.role === 'user')
         if (lastUser) {
           lastUser.attachments = undefined
@@ -183,6 +221,17 @@ export async function runReact(
       throw e
     }
 
+    // 兜底：若本轮有 reasoning item 但未在收到 text/tool_use 时完成（模型只输出思考无后续），在此完成
+    if (reasoningItemId && !reasoningCompleted) {
+      reasoningCompleted = true
+      const summaryText = turnThinkingText.slice(0, 80) + (turnThinkingText.length > 80 ? '…' : '')
+      onEvent({
+        type: 'item_completed',
+        turn_id: turnId,
+        item: { type: 'reasoning', id: reasoningItemId, summary: summaryText ? [summaryText] : [], content: turnThinkingText ? [turnThinkingText] : [], status: 'completed', startedAt: reasoningStartedAt || Date.now(), finishedAt: Date.now() }
+      })
+    }
+
     if (agentMessageItemId) {
       onEvent({
         type: 'item_completed',
@@ -199,10 +248,10 @@ export async function runReact(
     if (!assistantText && !toolUse) {
       if (!emptyRetried) {
         emptyRetried = true
-        emitReasoning('模型返回空，重试一次')
+        // 空回复重试，不输出假思考
         continue
       }
-      emitReasoning('模型再次返回空，结束')
+      // 空回复二次失败，结束
       break
     }
 
@@ -255,6 +304,7 @@ export async function runReact(
       messages.push({
         role: 'assistant',
         content: assistantText,
+        ...(turnThinkingText && turnThinkingSignature ? { thinkingBlocks: [{ type: 'thinking' as const, thinking: turnThinkingText, signature: turnThinkingSignature }] } : {}),
         tool_calls: [
           {
             id: toolUse.id,
@@ -272,10 +322,14 @@ export async function runReact(
     }
 
     // 权限判定：根据 autoApproveLow 开关和工具风险等级决定是否需要审批
+    // shell 工具的风险按命令内容动态判定（只读查询=low，写操作=medium，高风险=high）
+    const effectiveRisk = toolUse.name === 'shell' && typeof toolUse.args.command === 'string'
+      ? shellRiskLevel(toolUse.args.command)
+      : tool.riskLevel
     const autoApprove = config.autoApproveLow !== false
     const needsApproval = !autoApprove
-      ? !isSafe(toolUse.name)
-      : tool.riskLevel === 'high' || tool.riskLevel === 'critical'
+      ? !isSafe(toolUse.name) && effectiveRisk !== 'low'
+      : effectiveRisk === 'high' || effectiveRisk === 'critical'
 
     if (needsApproval) {
       const approvalId = `approval-${randomUUID()}`
@@ -286,9 +340,9 @@ export async function runReact(
         requestId: approvalId,
         toolName: toolUse.name,
         args: toolUse.args,
-        riskLevel: tool.riskLevel,
+        riskLevel: effectiveRisk,
         impact: tool.description.slice(0, 120),
-        canRollback: tool.riskLevel !== 'critical',
+        canRollback: effectiveRisk !== 'critical',
         decision: 'pending'
       }
       onEvent({ type: 'item_started', turn_id: turnId, item: approvalItem })
@@ -297,9 +351,9 @@ export async function runReact(
         request_id: approvalId,
         tool_name: toolUse.name,
         args: toolUse.args,
-        risk_level: tool.riskLevel,
+        risk_level: effectiveRisk,
         impact: tool.description.slice(0, 120),
-        can_rollback: tool.riskLevel !== 'critical'
+        can_rollback: effectiveRisk !== 'critical'
       })
 
       const approved = await waitForApproval(approvalId)
@@ -314,6 +368,7 @@ export async function runReact(
         messages.push({
           role: 'assistant',
           content: assistantText,
+          ...(turnThinkingText && turnThinkingSignature ? { thinkingBlocks: [{ type: 'thinking' as const, thinking: turnThinkingText, signature: turnThinkingSignature }] } : {}),
           tool_calls: [{ id: toolUse.id, type: 'function', function: { name: toolUse.name, arguments: JSON.stringify(toolUse.args) } }]
         })
         messages.push({ role: 'tool', tool_call_id: toolUse.id, content: JSON.stringify({ error: '用户拒绝执行此操作' }) })
@@ -361,6 +416,7 @@ export async function runReact(
     messages.push({
       role: 'assistant',
       content: assistantText,
+      ...(turnThinkingText && turnThinkingSignature ? { thinkingBlocks: [{ type: 'thinking' as const, thinking: turnThinkingText, signature: turnThinkingSignature }] } : {}),
       tool_calls: [
         {
           id: toolUse.id,

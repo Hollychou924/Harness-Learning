@@ -1,4 +1,4 @@
-import { useSettingsStore, MIFY_PROVIDER_ID_CHIPS, MIFY_PROVIDER_MODELS } from '../settingsStore'
+import { useSettingsStore, MIFY_PROVIDER_ID_CHIPS, getMifyModelIds } from '../settingsStore'
 
 export function MifySection() {
   const { modelConfig } = useSettingsStore()
@@ -37,7 +37,7 @@ export function MifySection() {
           <label className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-soft)]">可用路由供应商</label>
           <div className="grid grid-cols-2 gap-2 mt-2">
             {MIFY_PROVIDER_ID_CHIPS.map((chip) => {
-              const models = MIFY_PROVIDER_MODELS[chip.id] || []
+              const models = getMifyModelIds(chip.id)
               return (
                 <div key={chip.id} className="glass-soft rounded-xl px-3 py-2.5">
                   <div className="flex items-center justify-between">

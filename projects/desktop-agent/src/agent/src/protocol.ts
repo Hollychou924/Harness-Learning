@@ -18,6 +18,14 @@ export interface AgentConfig {
   contextLimit?: number
   customProviderId?: string
   autoApproveLow?: boolean
+  /** 思考深度：auto=按模型能力自动、off=关闭。默认 auto */
+  thinkingLevel?: 'auto' | 'off'
+  /** 思考配置（由 preset 注入，agent 层读取用于请求参数） */
+  thinkingConfig?: {
+    bodyParams: Record<string, unknown>
+    disabledBodyParams?: Record<string, unknown>
+    forceTemperature?: number
+  }
   embedding?: {
     apiBaseUrl: string
     model: string
@@ -34,6 +42,8 @@ export interface AgentMessage {
     function: { name: string; arguments: string }
   }>
   attachments?: MessageAttachment[]
+  /** Anthropic 扩展思考块：回传给下一轮请求必须带 thinking + signature，否则 API 报 400 */
+  thinkingBlocks?: Array<{ type: 'thinking'; thinking: string; signature: string }>
 }
 
 // 多模态附件：图片/文本，随用户消息一起传给模型

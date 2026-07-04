@@ -1,3 +1,28 @@
+/** 思考配置：每个模型独立配置如何开启/关闭思考 */
+export interface ThinkingConfig {
+  /** 开启思考时注入请求的参数 */
+  bodyParams: Record<string, unknown>
+  /** 关闭思考时注入的参数（省略则不注入） */
+  disabledBodyParams?: Record<string, unknown>
+  /** 思考时强制温度（Anthropic 要求 1） */
+  forceTemperature?: number
+}
+
+/** 单个模型的能力与思考配置。在 models 字典里 key 即模型 id，id 可省略；在 mify 列表里需填 id */
+export interface ModelPreset {
+  id?: string
+  /** 是否支持思考 */
+  supportsThinking?: boolean
+  /** 思考配置（supportsThinking 为 true 时必填） */
+  thinkingConfig?: ThinkingConfig
+  /** 思考时输出上限（思考模型需更高，mify 实战不得低于 16000） */
+  maxOutputTokens?: number
+  /** 思考档位（高级用户可调，普通用户默认自动不暴露） */
+  reasoningEffortLevels?: string[]
+  /** 默认思考档位 */
+  defaultReasoningEffort?: string
+}
+
 export interface ProviderPreset {
   label: string
   apiFormat: 'openai' | 'anthropic'
@@ -9,6 +34,12 @@ export interface ProviderPreset {
   builtinApiKey?: string
   /** 是否支持图片输入(vision) */
   supportsVision?: boolean
+  /** 是否支持函数调用(工具) */
+  supportsFunctionCall?: boolean
+  /** 同厂商最优协议端点（固定不走运行时切换，避免复杂度） */
+  preferredApiFormat?: 'anthropic' | 'openai'
+  /** 每个模型的思考配置，key 为模型 id */
+  models?: Record<string, ModelPreset>
 }
 
 export const PROVIDER_PRESETS: Record<string, ProviderPreset> = {
@@ -19,7 +50,13 @@ export const PROVIDER_PRESETS: Record<string, ProviderPreset> = {
     keyPlaceholder: 'sk-ant-...',
     modelCandidates: ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-sonnet-4-5-20250929'],
     contextLimit: 200_000,
-    supportsVision: true
+    supportsVision: true,
+    supportsFunctionCall: true,
+    models: {
+      'claude-sonnet-4-6': { supportsThinking: true, thinkingConfig: { bodyParams: { thinking: { type: 'adaptive' } }, forceTemperature: 1 } },
+      'claude-opus-4-6': { supportsThinking: true, thinkingConfig: { bodyParams: { thinking: { type: 'adaptive' } }, forceTemperature: 1 } },
+      'claude-sonnet-4-5-20250929': { supportsThinking: true, thinkingConfig: { bodyParams: { thinking: { type: 'enabled', budget_tokens: 4096 } }, forceTemperature: 1 } }
+    }
   },
   minimax: {
     label: 'MiniMax',
@@ -28,7 +65,11 @@ export const PROVIDER_PRESETS: Record<string, ProviderPreset> = {
     keyPlaceholder: 'eyJ... (MiniMax API Key)',
     modelCandidates: ['MiniMax-M2.5', 'MiniMax-M2.1'],
     contextLimit: 1_000_000,
-    supportsVision: true
+    supportsVision: true,
+    supportsFunctionCall: true,
+    models: {
+      'MiniMax-M2.5': { supportsThinking: true, thinkingConfig: { bodyParams: { thinking: { type: 'enabled' } }, disabledBodyParams: { thinking: { type: 'disabled' } }, forceTemperature: 1 } }
+    }
   },
   kimi: {
     label: 'Kimi (月之暗面)',
@@ -36,7 +77,11 @@ export const PROVIDER_PRESETS: Record<string, ProviderPreset> = {
     baseUrl: 'https://api.moonshot.cn/anthropic',
     keyPlaceholder: 'sk-...',
     modelCandidates: ['kimi-k2.5'],
-    contextLimit: 128_000
+    contextLimit: 128_000,
+    supportsFunctionCall: true,
+    models: {
+      'kimi-k2.5': { supportsThinking: true, thinkingConfig: { bodyParams: { thinking: { type: 'enabled' } }, disabledBodyParams: { thinking: { type: 'disabled' } }, forceTemperature: 1 } }
+    }
   },
   glm: {
     label: '智谱 GLM',
@@ -45,7 +90,12 @@ export const PROVIDER_PRESETS: Record<string, ProviderPreset> = {
     keyPlaceholder: '智谱开放平台 API Key',
     modelCandidates: ['glm-5', 'glm-4.7'],
     contextLimit: 128_000,
-    supportsVision: true
+    supportsVision: true,
+    supportsFunctionCall: true,
+    models: {
+      'glm-5': { supportsThinking: true, thinkingConfig: { bodyParams: { thinking: { type: 'enabled' } }, disabledBodyParams: { thinking: { type: 'disabled' } } } },
+      'glm-4.7': { supportsThinking: true, thinkingConfig: { bodyParams: { thinking: { type: 'enabled' } }, disabledBodyParams: { thinking: { type: 'disabled' } } } }
+    }
   },
   seed: {
     label: '豆包 (火山引擎)',
@@ -53,7 +103,11 @@ export const PROVIDER_PRESETS: Record<string, ProviderPreset> = {
     baseUrl: 'https://ark.cn-beijing.volces.com/api/compatible',
     keyPlaceholder: '火山方舟 API Key',
     modelCandidates: ['ark-code-latest', 'doubao-seed-2-0-pro-260215', 'doubao-seed-2-0-lite-260215'],
-    contextLimit: 128_000
+    contextLimit: 128_000,
+    supportsFunctionCall: true,
+    models: {
+      'doubao-seed-2-0-pro-260215': { supportsThinking: true, thinkingConfig: { bodyParams: { reasoning_effort: 'medium' } } }
+    }
   },
   qwen: {
     label: '阿里通义千问 (Qwen)',
@@ -62,7 +116,12 @@ export const PROVIDER_PRESETS: Record<string, ProviderPreset> = {
     keyPlaceholder: '阿里云百炼 API Key',
     modelCandidates: ['qwen3.5-plus', 'qwen3-coder-plus'],
     contextLimit: 128_000,
-    supportsVision: true
+    supportsVision: true,
+    supportsFunctionCall: true,
+    models: {
+      'qwen3.5-plus': { supportsThinking: true, thinkingConfig: { bodyParams: { thinking: { type: 'enabled' } }, disabledBodyParams: { thinking: { type: 'disabled' } } } },
+      'qwen3-coder-plus': { supportsThinking: true, thinkingConfig: { bodyParams: { thinking: { type: 'enabled' } }, disabledBodyParams: { thinking: { type: 'disabled' } } } }
+    }
   },
   deepseek: {
     label: 'DeepSeek',
@@ -71,7 +130,11 @@ export const PROVIDER_PRESETS: Record<string, ProviderPreset> = {
     keyPlaceholder: 'sk-...',
     modelCandidates: ['deepseek-reasoner', 'deepseek-chat'],
     contextLimit: 64_000,
-    supportsVision: false
+    supportsVision: false,
+    supportsFunctionCall: true,
+    models: {
+      'deepseek-reasoner': { supportsThinking: true, thinkingConfig: { bodyParams: { enable_thinking: true }, disabledBodyParams: { enable_thinking: false } } }
+    }
   },
   openai: {
     label: 'OpenAI',
@@ -80,7 +143,12 @@ export const PROVIDER_PRESETS: Record<string, ProviderPreset> = {
     keyPlaceholder: 'sk-...',
     modelCandidates: ['gpt-5.2-2025-12-11', 'gpt-5.2-codex'],
     contextLimit: 128_000,
-    supportsVision: true
+    supportsVision: true,
+    supportsFunctionCall: true,
+    models: {
+      'gpt-5.2-2025-12-11': { supportsThinking: true, thinkingConfig: { bodyParams: { reasoning_effort: 'medium' }, disabledBodyParams: { reasoning_effort: 'low' } } },
+      'gpt-5.2-codex': { supportsThinking: true, thinkingConfig: { bodyParams: { reasoning_effort: 'medium' }, disabledBodyParams: { reasoning_effort: 'low' } } }
+    }
   },
   google: {
     label: 'Google Gemini',
@@ -89,7 +157,12 @@ export const PROVIDER_PRESETS: Record<string, ProviderPreset> = {
     keyPlaceholder: 'AIza...',
     modelCandidates: ['gemini-3-pro-preview', 'gemini-3.1-pro-preview', 'gemini-3-flash-preview'],
     contextLimit: 1_000_000,
-    supportsVision: true
+    supportsVision: true,
+    supportsFunctionCall: true,
+    models: {
+      'gemini-3-pro-preview': { supportsThinking: true, thinkingConfig: { bodyParams: { reasoning_effort: 'medium' } } },
+      'gemini-3.1-pro-preview': { supportsThinking: true, thinkingConfig: { bodyParams: { reasoning_effort: 'medium' } } }
+    }
   },
   xai: {
     label: 'xAI (Grok)',
@@ -98,7 +171,11 @@ export const PROVIDER_PRESETS: Record<string, ProviderPreset> = {
     keyPlaceholder: 'xAI API Key',
     modelCandidates: ['grok-4', 'grok-3-mini'],
     contextLimit: 131_072,
-    supportsVision: true
+    supportsVision: true,
+    supportsFunctionCall: true,
+    models: {
+      'grok-3-mini': { supportsThinking: true, thinkingConfig: { bodyParams: { reasoning_effort: 'medium' } } }
+    }
   },
   mify: {
     label: 'Mify 推理网关',
@@ -139,22 +216,70 @@ export const MIFY_PROVIDER_ID_CHIPS: ReadonlyArray<{ id: string; label: string }
   { id: 'ppio', label: '派欧云' }
 ]
 
-export const MIFY_PROVIDER_MODELS: Record<string, string[]> = {
-  xiaomi: ['mimo-v2-pro', 'mimo-v2-flash', 'mimo-v2-omni'],
-  azure_openai: ['gpt-5.4-pro', 'gpt-5.4'],
-  tongyi: ['qwen3.5-122b-a10b', 'qwen3.5-plus-2026-02-15'],
-  volcengine_maas: ['doubao-seed-2-0-code-preview-260215', 'doubao-seed-2-0-pro-260215'],
-  zhipuai: ['glm-5-turbo', 'glm-5'],
-  siliconflow: ['Pro/zai-org/GLM-5', 'Pro/moonshotai/Kimi-K2.5'],
-  vertex_ai: ['gemini-3.1-flash-lite-preview', 'gemini-3.1-pro-preview-pt', 'gemini-3.1-pro-preview'],
-  minimax: ['MiniMax-M2.7', 'MiniMax-M2.5'],
-  ppio: ['pa/claude-sonnet-4-5-20250929', 'pa/claude-haiku-4-5-20251001', 'pa/claude-opus-4-6', 'pa/claude-sonnet-4-6', 'grok-4', 'gpt-5-mini', 'gpt-5-nano']
+/** Mify 子厂商模型 + 思考配置。mify 统一走 OpenAI 协议，思考输出统一读 reasoning_content。 */
+export const MIFY_PROVIDER_MODELS: Record<string, ModelPreset[]> = {
+  xiaomi: [
+    { id: 'mimo-v2-pro', supportsThinking: true, thinkingConfig: { bodyParams: { thinking: { type: 'enabled' } }, disabledBodyParams: { thinking: { type: 'disabled' } } } },
+    { id: 'mimo-v2-flash', supportsThinking: true, thinkingConfig: { bodyParams: { thinking: { type: 'enabled' } }, disabledBodyParams: { thinking: { type: 'disabled' } } } },
+    { id: 'mimo-v2-omni', supportsThinking: true, thinkingConfig: { bodyParams: { thinking: { type: 'enabled' } }, disabledBodyParams: { thinking: { type: 'disabled' } } } }
+  ],
+  azure_openai: [
+    { id: 'gpt-5.4-pro', supportsThinking: true, thinkingConfig: { bodyParams: { reasoning_effort: 'medium' } } },
+    { id: 'gpt-5.4', supportsThinking: true, thinkingConfig: { bodyParams: { reasoning_effort: 'medium' } } }
+  ],
+  tongyi: [
+    { id: 'qwen3.5-122b-a10b', supportsThinking: true, thinkingConfig: { bodyParams: { thinking: { type: 'enabled' } }, disabledBodyParams: { thinking: { type: 'disabled' } } } },
+    { id: 'qwen3.5-plus-2026-02-15', supportsThinking: true, thinkingConfig: { bodyParams: { thinking: { type: 'enabled' } }, disabledBodyParams: { thinking: { type: 'disabled' } } } }
+  ],
+  volcengine_maas: [
+    { id: 'doubao-seed-2-0-code-preview-260215' },
+    { id: 'doubao-seed-2-0-pro-260215', supportsThinking: true, thinkingConfig: { bodyParams: { reasoning_effort: 'medium' } } }
+  ],
+  zhipuai: [
+    { id: 'glm-5-turbo' },
+    { id: 'glm-5', supportsThinking: true, thinkingConfig: { bodyParams: { thinking: { type: 'enabled' } }, disabledBodyParams: { thinking: { type: 'disabled' } } } }
+  ],
+  siliconflow: [
+    { id: 'Pro/zai-org/GLM-5', supportsThinking: true, thinkingConfig: { bodyParams: { thinking: { type: 'enabled' } }, disabledBodyParams: { thinking: { type: 'disabled' } } } },
+    { id: 'Pro/moonshotai/Kimi-K2.5', supportsThinking: true, thinkingConfig: { bodyParams: { thinking: { type: 'enabled' } }, disabledBodyParams: { thinking: { type: 'disabled' } }, forceTemperature: 1 } }
+  ],
+  vertex_ai: [
+    { id: 'gemini-3.1-flash-lite-preview' },
+    { id: 'gemini-3.1-pro-preview-pt', supportsThinking: true, thinkingConfig: { bodyParams: { reasoning_effort: 'medium' } } },
+    { id: 'gemini-3.1-pro-preview', supportsThinking: true, thinkingConfig: { bodyParams: { reasoning_effort: 'medium' } } }
+  ],
+  minimax: [
+    { id: 'MiniMax-M2.7', supportsThinking: true, thinkingConfig: { bodyParams: { thinking: { type: 'enabled' } }, disabledBodyParams: { thinking: { type: 'disabled' } }, forceTemperature: 1 } },
+    { id: 'MiniMax-M2.5', supportsThinking: true, thinkingConfig: { bodyParams: { thinking: { type: 'enabled' } }, disabledBodyParams: { thinking: { type: 'disabled' } }, forceTemperature: 1 } }
+  ],
+  ppio: [
+    { id: 'pa/claude-sonnet-4-5-20250929', supportsThinking: true, thinkingConfig: { bodyParams: { thinking: { type: 'enabled', budget_tokens: 4096 } }, forceTemperature: 1 } },
+    { id: 'pa/claude-haiku-4-5-20251001' },
+    { id: 'pa/claude-opus-4-6', supportsThinking: true, thinkingConfig: { bodyParams: { thinking: { type: 'adaptive' } }, forceTemperature: 1 } },
+    { id: 'pa/claude-sonnet-4-6', supportsThinking: true, thinkingConfig: { bodyParams: { thinking: { type: 'adaptive' } }, forceTemperature: 1 } },
+    { id: 'grok-4' },
+    { id: 'gpt-5-mini', supportsThinking: true, thinkingConfig: { bodyParams: { reasoning_effort: 'medium' } } },
+    { id: 'gpt-5-nano' }
+  ]
 }
 
 export const MIFY_GATEWAY_DEFAULT_MODEL_ID = 'mimo-v2-pro'
 
 export function getContextLimit(providerKey: string): number {
   return PROVIDER_PRESETS[providerKey]?.contextLimit ?? 128_000
+}
+
+/** 取 mify 子厂商的模型 id 列表 */
+export function getMifyModelIds(providerId: string): string[] {
+  return (MIFY_PROVIDER_MODELS[providerId] || []).map((m) => m.id).filter(Boolean) as string[]
+}
+
+/** 取某模型的思考配置（普通厂商 + mify 统一入口） */
+export function getModelThinkingConfig(providerId: string, model: string, isMify = false, mifySubProvider?: string): ModelPreset | undefined {
+  if (isMify && mifySubProvider) {
+    return (MIFY_PROVIDER_MODELS[mifySubProvider] || []).find((m) => m.id === model)
+  }
+  return PROVIDER_PRESETS[providerId]?.models?.[model]
 }
 
 

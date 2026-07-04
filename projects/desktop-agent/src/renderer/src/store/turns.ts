@@ -61,7 +61,19 @@ export function reduceTurnsEvent(state: TurnsReducerState, msg: StdoutMessage): 
     }
     case 'turn_completed': {
       if (!state.currentTurn || state.currentTurn.id !== msg.turn_id) return state
-      const finished: Turn = { ...state.currentTurn, status: msg.status, finishedAt: Date.now() }
+      // 取消时把正在运行的工具标记为 stopped（来自综合方案：用户主动停止用 stopped 态）
+      const items = msg.status === 'cancelled'
+        ? state.currentTurn.items.map((it) => {
+            if (it.type === 'toolCall' && (it.status === 'running' || it.status === 'pending')) {
+              return { ...it, status: 'stopped' as const, finishedAt: Date.now() }
+            }
+            if (it.type === 'reasoning' && it.status === 'running') {
+              return { ...it, status: 'stopped' as const, finishedAt: Date.now() }
+            }
+            return it
+          })
+        : state.currentTurn.items
+      const finished: Turn = { ...state.currentTurn, items, status: msg.status, finishedAt: Date.now() }
       return { turns: [...state.turns, finished], currentTurn: null }
     }
     default:

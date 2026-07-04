@@ -71,6 +71,8 @@ export function describeToolCall(item: ToolCallItem): string {
   const target = shortenTarget(item.kind, item)
   if (item.status === 'running' || item.status === 'pending') return phrase.doing(target)
   if (item.status === 'failed') return item.error ? `失败：${item.error}` : '执行失败'
+  if (item.status === 'stopped') return target ? `已停止：${target}` : '已停止'
+  if (item.status === 'canceled') return '已取消'
   return phrase.done(target, item)
 }
 
@@ -88,8 +90,114 @@ const GROUP_LABELS: Record<ToolKind, { doing: string; done: string }> = {
   unknown: { doing: '正在执行', done: '已完成' }
 }
 
-export function describeToolGroup(kind: ToolKind, count: number, allDone: boolean): string {
+/**
+ * 折叠摘要标题：多个同类调用合并时用，定制摘要（来自 opencowork 智能分组）
+ * 如"读取了 3 个文件"、"执行了 3 条命令"
+ */
+export function describeToolGroup(kind: ToolKind, count: number, allDone: boolean, items?: ToolCallItem[]): string {
+  if (count <= 1) {
+    const label = GROUP_LABELS[kind] || GROUP_LABELS.unknown
+    return allDone ? label.done : label.doing
+  }
+
+  // 有 items 时算定制摘要
+  if (items && items.length > 0) {
+    const summary = computeGroupSummary(kind, items, allDone)
+    if (summary) return summary
+  }
+
+  // 降级：通用"共 N 次"
   const label = GROUP_LABELS[kind] || GROUP_LABELS.unknown
   const text = allDone ? label.done : label.doing
-  return count > 1 ? `${text}，共 ${count} 次` : text
+  return `${text}，共 ${count} 次`
+}
+
+function computeGroupSummary(kind: ToolKind, items: ToolCallItem[], allDone: boolean): string | null {
+  const done = allDone ? '了' : ''
+  switch (kind) {
+    case 'read_file': {
+      const files = new Set(items.map((it) => typeof it.args.path === 'string' ? it.args.path : '').filter(Boolean))
+      return `读取${done}${files.size > 0 ? files.size : items.length} 个文件`
+    }
+    case 'write_file': {
+      const files = new Set(items.map((it) => typeof it.args.path === 'string' ? it.args.path : '').filter(Boolean))
+      return `写入${done}${files.size > 0 ? files.size : items.length} 个文件`
+    }
+    case 'list_files': {
+      return `检索${done}${items.length} 个目录`
+    }
+    case 'shell': {
+      return `执行${done}${items.length} 条命令`
+    }
+    case 'fetch_page':
+    case 'parse_page': {
+      return `访问${done}${items.length} 个网页`
+    }
+    case 'create_docx': {
+      return `生成${done}${items.length} 个文档`
+    }
+    case 'create_xlsx': {
+      return `生成${done}${items.length} 个表格`
+    }
+    case 'mcp': {
+      return `调用${done}${items.length} 次外部工具`
+    }
+    default:
+      return null
+  }
+}
+
+/**
+ * 行内摘要节点：折叠态就在标签旁边显示关键结果，不用点开就知道"有没有用"
+ * 来自 MyAgents getToolSummaryNode 理念，如 Edit +5 -3 / Grep 12 matches / Bash exit 0
+ */
+export function getToolSummaryNode(item: ToolCallItem): string | null {
+  if (item.status === 'running' || item.status === 'pending') return null
+  if (item.resultSummary) return item.resultSummary
+
+  // write_file：从 content 算行数
+  if (item.kind === 'write_file' && typeof item.args.content === 'string') {
+    const lines = item.args.content === '' ? 0 : item.args.content.split('\n').length
+    return `+${lines} 行`
+  }
+
+  // shell：从 result 提取退出码
+  if (item.kind === 'shell' && item.result) {
+    const match = item.result.match(/exit[_\s]*(\d+)/i)
+    if (match) return `exit ${match[1]}`
+    if (item.status === 'completed') return 'done'
+  }
+
+  // read_file / list_files：从 result 算行数或文件数
+  if ((item.kind === 'read_file' || item.kind === 'list_files') && item.result) {
+    const lines = item.result.split('\n').length
+    if (lines > 1) return `${lines} 行`
+  }
+
+  return null
+}
+
+/**
+ * 工具状态色系映射：每个状态对应一个 tailwind 色类
+ * 来自 opencowork CompactToolCallHeader + MyAgents 圆点色
+ */
+export function getToolStatusColor(status: ToolCallItem['status']): {
+  dot: string
+  text: string
+} {
+  switch (status) {
+    case 'running':
+    case 'pending':
+      return { dot: 'bg-sky-500 animate-pulse', text: 'text-sky-500' }
+    case 'completed':
+      return { dot: 'bg-[var(--ink-muted)]/40', text: 'text-[var(--ink)]' }
+    case 'failed':
+      return { dot: 'bg-red-500', text: 'text-red-500' }
+    case 'stopped':
+      return { dot: 'bg-amber-500', text: 'text-amber-500' }
+    case 'canceled':
+      return { dot: 'bg-[var(--ink-muted)]/40', text: 'text-[var(--ink-soft)]' }
+    default:
+      return { dot: 'bg-[var(--ink-muted)]/40', text: 'text-[var(--ink)]' }
+  }
 }

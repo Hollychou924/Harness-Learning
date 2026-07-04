@@ -5,8 +5,9 @@ import {
   BUILTIN_PROVIDER_ORDER,
   getContextLimit,
   MIFY_PROVIDER_ID_CHIPS,
-  MIFY_PROVIDER_MODELS,
-  MIFY_GATEWAY_DEFAULT_MODEL_ID
+  MIFY_GATEWAY_DEFAULT_MODEL_ID,
+  getMifyModelIds,
+  getModelThinkingConfig
 } from '../providerPresets'
 
 export type SettingsTab =
@@ -15,6 +16,7 @@ export type SettingsTab =
   | 'mify'
   | 'permissions'
   | 'agent'
+  | 'archived'
   | 'diagnostics'
   | 'about'
 
@@ -105,6 +107,7 @@ export {
   BUILTIN_PROVIDER_ORDER,
   getContextLimit,
   MIFY_PROVIDER_ID_CHIPS,
-  MIFY_PROVIDER_MODELS,
-  MIFY_GATEWAY_DEFAULT_MODEL_ID
+  MIFY_GATEWAY_DEFAULT_MODEL_ID,
+  getMifyModelIds,
+  getModelThinkingConfig
 }

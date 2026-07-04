@@ -8,6 +8,7 @@ import { listFilesTool } from './list_files.js'
 import { readFileTool } from './read_file.js'
 import { createDocxTool } from './create_docx.js'
 import { createXlsxTool } from './create_xlsx.js'
+import { shellTool } from './shell.js'
 
 export interface AgentTool {
   name: string
@@ -58,12 +59,13 @@ export async function getAvailableTools(workspaceDir?: string): Promise<AgentToo
     writeFileTool(workspaceDir),
     createDocxTool(workspaceDir),
     createXlsxTool(workspaceDir),
+    shellTool(),
     planTool,
     todoTool
   ]
 }
 
-export { fetchPageTool, parsePageTool, writeFileTool, listFilesTool, readFileTool, createDocxTool, createXlsxTool }
+export { fetchPageTool, parsePageTool, writeFileTool, listFilesTool, readFileTool, createDocxTool, createXlsxTool, shellTool }
 
 // 导出给 provider 用的 JSON Schema 形式
 export function toolToFunctionSchema(tool: AgentTool) {
