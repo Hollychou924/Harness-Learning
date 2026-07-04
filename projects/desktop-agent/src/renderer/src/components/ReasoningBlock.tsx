@@ -87,7 +87,7 @@ export function ReasoningBlock({
         onClick={handleToggle}
         className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition ${
           forceExpanded ? 'cursor-default' : 'hover:bg-black/[0.02] cursor-pointer'
-        }`}
+        } ${isActive ? 'whale-shimmer bg-sky-50/40' : ''}`}
       >
         {getStatusIcon(item.status)}
         <span className={`flex-shrink-0 ${isFailed ? 'text-red-500' : isStopped ? 'text-amber-500' : 'text-[var(--ink)]'}`}>

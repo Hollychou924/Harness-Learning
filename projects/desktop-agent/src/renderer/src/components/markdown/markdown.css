@@ -37,7 +37,7 @@
 .md-engine :not(pre) > code {
   font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
   font-size: 0.88em;
-  color: #d4380d;
+  color: var(--whale-blue);
   padding: 0.15em 0.4em;
   border-radius: 5px;
   background: rgba(0,0,0,0.06);
@@ -164,7 +164,7 @@
 
 /* 引用块 */
 .md-engine blockquote {
-  border-left: 3px solid #0071e3;
+  border-left: 3px solid var(--whale-blue);
   padding: 0.3em 0.9em;
   margin: 0.8em 0;
   background: rgba(0,113,227,0.04);
@@ -174,7 +174,7 @@
 .md-engine blockquote p { margin: 0.2em 0; }
 
 /* 链接 */
-.md-engine a { color: #0071e3; text-decoration: none; }
+.md-engine a { color: var(--whale-blue); text-decoration: none; }
 .md-engine a:hover { text-decoration: underline; text-underline-offset: 2px; }
 
 /* 分割线 */
