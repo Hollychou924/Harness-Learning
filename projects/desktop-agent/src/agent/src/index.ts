@@ -70,7 +70,7 @@ async function handleStdin(msg: StdinMessage): Promise<void> {
         file_path: 'inline'
       })
 
-      onEvent({ type: 'completed', task_id: session_id, summary: result.finalText })
+      onEvent({ type: 'completed', task_id: session_id, summary: result.finalText, messages: result.messages.slice(1) })
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e)
       onEvent({ type: 'error', message: errMsg })
