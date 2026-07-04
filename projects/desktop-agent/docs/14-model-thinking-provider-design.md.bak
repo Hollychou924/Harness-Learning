@@ -1,0 +1,307 @@
+# 模型配置与思考能力统一方案
+
+## 一、调研结论
+
+### 核查范围
+8 个本地桌面 Agent 竞品源码（competitor-references/01-desktop-apps）：
+- opencowork、hexclaw-desktop、Kun、AionUi、lobsterai、MyAgents、harnessclaw、kuse-cowork
+另有：desktop-claw（参考实现，三家 provider 完整源码）、Codex 桌面客户端（app.asar 解包）。
+
+### 竞品模型支持广度对比
+
+| 竞品 | 预置厂商数 | 协议策略 | 思考支持 |
+|---|---|---|---|
+| opencowork | 22 家 | 按协议分(anthropic/openai/各厂独立) | ✅ 最完整，每模型带 thinkingConfig |
+| hexclaw-desktop | 14 家 | 全走 OpenAI 兼容 | 部分(Qwen/DeepSeek) |
+| 小蓝鲸(现状) | 12 家 | anthropic/openai 两协议 | ❌ 假占位 |
+| desktop-claw | 3 协议 | anthropic/openai/google 原生 | ✅ 三级降级 |
+| Kun | 多家 | 多 provider client + 端点探测 | 部分 |
+| AionUi | 多家 | — | think标签过滤 |
+| lobsterai | 多家 | ProviderRegistry | — |
+
+### opencowork 的做法（最值得参考，22 家全部支持思考）
+
+**数据模型（每个模型独立配置思考）**
+```
+ThinkingConfig {
+  bodyParams: Record<string, unknown>      // 开启思考时注入的请求参数
+  disabledBodyParams?: Record<string, unknown>  // 关闭思考时的参数
+  forceTemperature?: number                 // 思考时强制温度(Anthropic=1)
+  reasoningEffortLevels?: Level[]           // 思考档位
+  defaultReasoningEffort?: Level
+}
+```
+
+**各家思考参数实测对照（从源码提取，非推测）**
+
+| 厂商 | bodyParams | 协议 | 备注 |
+|---|---|---|---|
+| Anthropic 4.6/4.7/4.8 | `thinking:{type:'adaptive'}` | anthropic | forceTemperature=1 |
+| OpenAI(o系) | `{}` + reasoningEffortLevels | openai-responses | effort 透传 |
+| DeepSeek | `enable_thinking:true` | openai | disabledBodyParams 关闭 |
+| 通义千问 | `thinking:{type:'enabled'}` | openai | disabled 关闭 |
+| 智谱GLM | glmThinkingConfig() | openai | — |
+| 豆包(火山) | `{}` + reasoningEffortLevels | openai | effort 档位 |
+| Kimi(月之暗面) | `thinking:{type:'enabled'}` | openai | forceTemperature=1 |
+| MiniMax | `thinking:{type:'enabled'}` | openai | forceTemperature=1 |
+| 百度文心 | `enable_thinking:true` | openai | — |
+| Google Gemini | `reasoning_effort:'medium'` | openai | — |
+
+**关键发现**：国内厂商的思考参数五花八门，但都走 OpenAI 兼容协议，靠 bodyParams 注入不同字段。不需要每家单独写 provider，而是"统一 OpenAI 协议 + 每模型配 bodyParams"。
+
+### desktop-claw 的做法（三级降级机制）
+- Anthropic: adaptive → enabled → off，端点能力探测+缓存。
+- OpenAI: reasoning_content + reasoning 双字段识别，参数报错降级。
+- Google: 原生 thinkingConfig + thoughtSignature。
+- 协议层 thinking 是一等公民事件。
+
+### AionUi 的发现（think 标签混入正文）
+- MiniMax 等模型把思考用 `<thinkthinking>` 标签混在回复正文里。
+- 前端需要 stripThinkTags 过滤，把思考从正文分离出来单独展示。
+
+## 二、小蓝鲸现状问题
+
+1. AgentConfig 无 thinkingLevel，无法配置思考。
+2. anthropic.ts 不发 thinking 参数，不识别 thinking_delta。
+3. openai.ts 不识别 reasoning_content/reasoning。
+4. react.ts 的 emitReasoning 是硬编码占位假文本。
+5. ReasoningBlock 展示假文本，摘要与完整思考相同，无增量。
+6. 缺 bodyParams 机制，无法按模型注入不同思考参数。
+
+## 三、技术方案
+
+### 核心思路：借鉴 opencowork 的 thinkingConfig + desktop-claw 的降级机制
+
+不按厂商写 provider，而是"统一协议 + 每模型配思考参数"。这样 22 家都能支持，不用每家写代码。
+
+### 第1层：数据模型（providerPresets + protocol）
+
+**ProviderPreset 每个模型加思考配置**
+```
+thinkingConfig?: {
+  bodyParams: Record<string, unknown>       // 开启时注入
+  disabledBodyParams?: Record<string, unknown>
+  forceTemperature?: number
+  reasoningEffortLevels?: string[]          // 档位
+}
+supportsThinking?: boolean
+```
+
+**AgentConfig 加**
+```
+thinkingLevel?: 'off' | 'low' | 'medium' | 'high'
+```
+
+**StreamEvent 加**
+```
+| { type: 'thinking'; text: string }
+```
+
+### 第2层：Provider 层
+
+**anthropic.ts**
+- 请求注入 thinkingConfig.bodyParams（adaptive/enabled）。
+- forceTemperature=1。
+- thinking_delta 采集，yield thinking 事件。
+- signature 回传：assistant 消息带 thinking block + signature。
+- 降级：报错去 thinking 参数重试。
+
+**openai.ts**
+- 请求注入 thinkingConfig.bodyParams（enable_thinking/reasoning_effort 等）。
+- 识别 delta.reasoning_content + delta.reasoning。
+- think 标签兜底：若正文含 `<thinkthinking>`，剥离作为思考（AionUi 方案）。
+- 参数报错降级。
+
+### 第3层：Agent 循环（react.ts）
+- 删除 emitReasoning 占位。
+- 收到 thinking 事件创建 reasoning item，content=完整，summary=截断。
+- 无 thinking 不创建，不显示思考区。
+
+### 第4层：展示层
+- ReasoningBlock 无数据不渲染。
+- 摘要(截断) vs 完整原文，点开有增量。
+- 设置里加思考深度选项（每模型独立）。
+
+## 四、用户体验
+
+### 设置里配置任意模型
+- 12 家预设 + 自定义，每家填 Key 即用。
+- 每个模型独立配思考深度（关/低/中/高），默认中。
+- 支持思考的模型自动展示思考档位选择。
+
+### 思考展示（真实思考）
+- 支持思考的模型：实时流式显示思考，完成后折叠摘要+展开完整。
+- 不支持的模型：不显示思考区，干净不造假。
+- MiniMax 等标签混入的：自动剥离，思考归思考、正文归正文。
+
+### 兼容性（探测降级）
+- 端点不支持思考参数时自动降级，用户无感不报错。
+
+### 各家预期表现
+
+| 模型 | 思考 | 工具调用 |
+|---|---|---|
+| Claude 4.6/4.7/4.8 | ✅ adaptive | ✅ |
+| DeepSeek-Reasoner | ✅ enable_thinking | ✅ |
+| GPT-5/o系 | ✅ reasoning_effort | ✅ |
+| 通义千问 | ✅ thinking:enabled | ✅ |
+| 智谱GLM | ✅ | ✅ |
+| 豆包 | ✅ reasoning_effort | ✅ |
+| Kimi/MiniMax | ✅ thinking:enabled | ✅ |
+| Gemini | ✅ reasoning_effort | ✅ |
+| 普通模型 | ❌ 不显示 | ✅ |
+
+## 五、实施计划
+
+1. 数据模型：ProviderPreset/AgentConfig/StreamEvent 加思考字段。
+2. anthropic.ts：bodyParams 注入 + thinking_delta 采集 + signature 回传 + 降级。
+3. openai.ts：bodyParams 注入 + reasoning_content/reasoning 采集 + think标签兜底 + 降级。
+4. react.ts：删占位，接真实 thinking。
+5. ReasoningBlock：无数据不渲染，摘要/原文区分。
+6. 设置界面：思考深度选项。
+7. 实测：逐厂商验证透传情况。
+
+## 六、Mify 专项支持（核查 mify_proxy-for-coding 源码后补充）
+
+### Mify 的特殊性（源码确认，非推测）
+
+1. **一个端点 + 一个内置 Key**：`model.mify.ai.srv/v1`，靠 `X-Model-Provider-Id` header 路由到 9 个子厂商（小米/通义/火山/智谱/硅基/Vertex/MiniMax/ppio/Azure）。
+2. **统一输出 OpenAI 兼容格式**：无论子厂商原始协议是什么（Claude 是 Anthropic、Gemini 是 Google），mify 网关都转成 OpenAI 的 `delta.reasoning_content` / `delta.reasoning` 输出思考。**所以小蓝鲸对接 mify 永远是 OpenAI 协议，思考永远读 reasoning_content，不用关心子厂商差异。**
+3. **Claude 走 ppio 的 /anthropic 端点**：网关内部转 Anthropic 协议。思考参数 `thinking:{type:'adaptive'}` 能否透传取决于网关，但思考**输出**统一成 reasoning_content。
+4. **思考模型的三个坑**（源码里的实战经验）：
+   - max_tokens 地板：qwen/kimi/deepseek-r/glm-5 等思考模型，思考阶段吃 token，max_tokens 太小会导致思考吃光额度、回复为空。必须给地板值 8192。
+   - tool_choice 降级：通义/月之暗面思考模式不支持 `required`/固定工具选择，要降级成 `auto`。
+   - 思考模型识别：按模型名前缀判断（qwen/kimi/deepseek-r/deepseek-v4/glm-5）。
+
+### Mify 思考参数配置（每子厂商模型独立）
+
+升级 `MIFY_PROVIDER_MODELS`，给每个模型配 thinkingConfig：
+
+| mify 子厂商模型 | providerId | 思考参数 | 思考输出字段 |
+|---|---|---|---|
+| pa/claude-sonnet-4-6 | ppio | 网关转 adaptive（透传） | reasoning_content |
+| pa/claude-opus-4-8 | ppio | 网关转 adaptive | reasoning_content |
+| mimo-v2.5 | xiaomi | 不支持思考 | — |
+| deepseek-v4-pro | deepseek/tongyi | enable_thinking | reasoning_content |
+| kimi-k2.7-code | moonshot | thinking:enabled | reasoning_content |
+| qwen3.7-max | tongyi | thinking:enabled | reasoning_content |
+| glm-5.2 | zhipuai | enable_thinking | reasoning_content |
+| doubao-seed-2-1-pro | volcengine | reasoning_effort | reasoning_content |
+| gpt-5.4 | azure_openai | reasoning_effort | reasoning_content |
+| gemini-3.5-flash | vertex_ai | reasoning_effort | reasoning_content |
+
+**关键**：小蓝鲸侧只需配"请求时注入什么参数"，思考**采集**统一读 reasoning_content——因为 mify 网关已经统一了输出。
+
+### Provider 层 mify 适配
+
+- mify 永远走 openai.ts（OpenAI 协议）。
+- 识别 isMify 时，按所选模型查 MIFY_PROVIDER_MODELS 的 thinkingConfig 注入 bodyParams。
+- 思考模型识别：按模型名前缀，给 max_tokens 地板 8192，tool_choice 降级 auto。
+- 思考采集：统一读 delta.reasoning_content / delta.reasoning。
+
+## 七、做到最强的差距与补全
+
+### 与 opencowork 对比后的差距
+
+| 能力 | opencowork | 当前方案 | 补全后 |
+|---|---|---|---|
+| 厂商数 | 22 家 | 12 家 | 12 家(够用) |
+| 思考参数配置 | 每模型 thinkingConfig | 方案已含 | ✅ 追平 |
+| 思考档位 | 5档(低中高xhigh max) | 4档 | 对齐5档 |
+| 能力位 | vision/functionCall/thinking | 仅vision | 补全3个 |
+| 降级机制 | 无 | 三级降级+缓存 | ✅ 我们更强 |
+| think标签剥离 | — | 已含 | ✅ |
+| mify 支持 | 无 | 专项适配 | ✅ 我们更强 |
+| 思考模型max_tokens地板 | 无 | 已含 | ✅ 我们更强 |
+| 思考模型tool_choice降级 | 无 | 已含 | ✅ 我们更强 |
+
+### 补全后的"最强"点（超越所有竞品）
+
+1. **mify 专项适配**：opencowork/hexclaw 都没有，只有我们支持 mify 网关多子厂商思考。
+2. **三级降级 + 端点缓存**：desktop-claw 有，opencowork 没有。兼容性更强。
+3. **思考模型实战坑处理**：max_tokens 地板 + tool_choice 降级，mify proxy 实战经验，其他竞品没有。
+4. **think 标签剥离**：AionUi 有，其他没有。MiniMax 等标签混正文也能正确分离。
+
+## 八、极简配置体验设计（学习所有竞品优点）
+
+### 当前问题
+现在配置一个模型要进设置页 → 选厂商 → 填 API Key + Base URL + 模型 + (mify还要选路由) → 保存，4-5 个字段，步骤多。
+
+### 竞品优点学习
+- **lobsterai**：输入框旁直接挂模型选择器，下拉即切，不用进设置。
+- **hexclaw**：会话级模型绑定，每个对话可不同模型。
+- **opencowork**：defaultEnabled，选厂商即启用。
+- **hexclaw**：BaseURL 预填，用户只需填 Key。
+- **小蓝鲸已有**：mify 内置 Key 零配置、厂商预填 BaseURL。
+
+### 极简配置原则：只输入必要的东西，一键生效
+
+**核心原则：厂商选好，BaseURL/协议/思考参数全自动预填，用户最多只填一个 API Key。**
+
+### 配置分三档复杂度
+
+**第一档：零配置（mify）**
+- mify 内置 Key + 内置端点，用户什么都不用填。
+- 进设置选"Mify 推理网关" → 选子厂商 → 选模型 → 直接保存生效。
+- 无 Key 输入框、无 BaseURL 输入框。
+
+**第二档：一键配置（有内置 Key 的厂商，目前只有 mify）**
+- 选厂商 → 选模型 → 保存。Key 已预置，不展示 Key 输入框。
+- 只在用户想换自己的 Key 时，点"使用自定义 Key"才展开 Key 输入框。
+
+**第三档：极简配置（其他厂商）**
+- 选厂商 → 填 API Key → 选模型 → 保存。**只有这一个必填字段。**
+- BaseURL 自动预填（从 preset），默认折叠不展示。
+- 模型默认选第一个推荐模型，用户可下拉换。
+- 思考深度不在这里配——默认"自动"，按模型能力自动开启（见下）。
+
+### 思考深度：默认自动，不暴露给普通用户
+
+借鉴 opencowork 的 supportsThinking + defaultReasoningEffort：
+- 每个模型 preset 自带"是否支持思考"和"默认思考档位"。
+- 用户**不需要手动配思考深度**——模型支持就自动开，不支持就不开。
+- 只在"高级设置"里给一个总开关：思考 开/关/自动（默认自动），不暴露 low/medium/high 这种细节给普通用户。
+
+### 输入框旁快速切模型（学 lobsterai）
+
+- 输入框底部加一个模型快速切换器（已有 modelMenuOpen）。
+- 下拉列出所有已配置可用的模型，点一下即切，不用进设置。
+- 当前模型显示模型名 + 厂商图标。
+- 这样新对话时能快速换模型，不用离开对话界面。
+
+### 配置界面精简后的字段
+
+| 场景 | 用户要填的字段 | 展示的字段 |
+|---|---|---|
+| mify | 无（选子厂商+模型即可） | 子厂商选择、模型选择 |
+| 内置Key厂商 | 无（选模型即可） | 模型选择 |
+| 普通厂商 | API Key（1个） | API Key、模型选择 |
+| 高级用户 | API Key + 可选展开 | +BaseURL(折叠)、思考开关(折叠) |
+
+### 界面交互流程（极简版）
+
+1. 设置 → 模型：看到厂商列表（卡片式，带图标）。
+2. 点一个厂商：
+   - mify/内置Key：直接选模型，点"使用此模型"即生效。
+   - 其他：填 Key（一个框），选模型，点"使用此模型"即生效。
+3. BaseURL 默认折叠在"高级"里，99% 用户不用碰。
+4. 思考默认"自动"，高级里可手动关。
+5. 配完即生效，不用额外"保存"步骤（或保存按钮即生效按钮）。
+
+### 配置存储：支持多模型并存（学 hexclaw 会话级绑定）
+
+- 不再只存"一个当前模型配置"，改为存"已配置的模型列表"。
+- 每个模型配置独立（厂商+Key+模型名+思考设置）。
+- 输入框旁的切换器在这些已配置模型间切。
+- 为未来"每对话绑定不同模型"留好基础（hexclaw 的会话级绑定）。
+
+## 九、最终最强能力清单
+
+集成所有竞品优点后，小蓝鲸模型配置与思考能力达到：
+
+1. **厂商最全**：12 预置 + mify 网关 9 子厂商 + 自定义，覆盖国内外主流。
+2. **思考最强**：每模型独立 thinkingConfig + 三级降级 + think标签剥离 + max_tokens地板 + tool_choice降级。
+3. **配置最简**：零配置(mify) / 一键(内置Key) / 一字段(普通)三档，BaseURL和思考默认折叠。
+4. **切换最快**：输入框旁下拉切模型，不离开对话。
+5. **多模型并存**：已配置模型列表，为会话级绑定留基础。
+6. **能力自描述**：每模型带 vision/functionCall/thinking 三个能力位，UI 自动展示该模型能做什么。
