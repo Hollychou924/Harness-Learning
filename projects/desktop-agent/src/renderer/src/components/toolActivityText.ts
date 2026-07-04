@@ -52,7 +52,7 @@ const PHRASES: Record<ToolKind, ToolPhrase> = {
     done: (_t, item) => item.resultSummary || '已生成 Excel 表格'
   },
   shell: {
-    doing: (t) => (t ? `正在执行：${t}` : '正在执行命令'),
+    doing: () => '正在执行命令',
     done: (_t, item) => item.resultSummary || '命令已执行'
   },
   mcp: {

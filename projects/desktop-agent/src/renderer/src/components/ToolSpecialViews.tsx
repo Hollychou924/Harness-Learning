@@ -157,7 +157,7 @@ export function WriteFileDiffView({ item }: { item: ToolCallItem }) {
 
 /** shell 的终端输出展示：运行中动画、耗时、长命令缩略、复制和错误说明。 */
 export function ShellOutputView({ item }: { item: ToolCallItem }) {
-  const [open, setOpen] = useState(item.status === 'running' || item.status === 'failed')
+  const [open, setOpen] = useState(false)
   const command = typeof item.args.command === 'string' ? item.args.command : ''
   const parsed = parseResult(item.result)
   const stdout = typeof parsed?.stdout === 'string' ? parsed.stdout : ''
@@ -176,7 +176,7 @@ export function ShellOutputView({ item }: { item: ToolCallItem }) {
     <div className={`rounded-lg overflow-hidden text-sm border ${hasError ? 'border-red-200 bg-red-50/25' : hasDeletionRisk ? 'border-amber-200 bg-amber-50/30' : 'border-black/[0.06]'}`}>
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-black/[0.02] transition"
+        className={`w-full flex items-center gap-2 px-3 py-1.5 hover:bg-black/[0.02] transition ${isRunning ? 'whale-shimmer bg-sky-50/40' : ''}`}
       >
         {isRunning ? <Loader2 size={14} className="text-sky-500 animate-spin flex-shrink-0" /> : <Terminal size={14} className="text-[var(--ink-soft)] flex-shrink-0" />}
         <span className="text-[var(--ink)] font-mono truncate flex-1 text-left" title={command}>$ {shortCommand || '命令'}</span>
