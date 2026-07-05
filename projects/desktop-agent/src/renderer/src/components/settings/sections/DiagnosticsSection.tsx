@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ChevronLeft, ChevronRight, Download, Loader2, MessageSquareWarning } from 'lucide-react'
-import { api, type TraceMeta, type TraceEvent, type FeedbackTicket, type DiagnosticPackageLevel } from '../../../api'
+import { api, type TraceMeta, type TraceEvent, type FeedbackTicket, type DiagnosticPackageLevel, type DiagnosticsOverview } from '../../../api'
 
 export function DiagnosticsSection() {
   const [traces, setTraces] = useState<TraceMeta[]>([])
@@ -10,13 +10,17 @@ export function DiagnosticsSection() {
   const [notice, setNotice] = useState('')
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [feedbackList, setFeedbackList] = useState<FeedbackTicket[]>([])
+  const [overview, setOverview] = useState<DiagnosticsOverview | null>(null)
+  const [query, setQuery] = useState('')
 
   const refresh = useCallback(async () => {
     setLoading(true)
     const list = (await api.traceList(50)) as TraceMeta[]
-    const tickets = (await api.feedbackList(20)) as FeedbackTicket[]
+    const tickets = (await api.feedbackList(200)) as FeedbackTicket[]
+    const summary = await api.diagnosticsOverview(200)
     setTraces(list)
     setFeedbackList(tickets)
+    setOverview(summary)
     setLoading(false)
   }, [])
 
@@ -33,6 +37,22 @@ export function DiagnosticsSection() {
     } else {
       setNotice(result.error || '导出失败，请重试')
     }
+  }
+
+  const searchById = () => {
+    const text = query.trim()
+    if (!text) return
+    const feedback = feedbackList.find((item) => item.feedbackId === text)
+    if (feedback?.traceId) {
+      setSelectedId(feedback.traceId)
+      return
+    }
+    const trace = traces.find((item) => item.traceId === text || item.taskId === text || shortId(item.traceId) === text)
+    if (trace) {
+      setSelectedId(trace.traceId)
+      return
+    }
+    setNotice('没有找到对应的反馈或任务记录')
   }
 
   if (selectedId) {
@@ -78,6 +98,24 @@ export function DiagnosticsSection() {
           }}
         />
       )}
+
+      <div className="mb-4 rounded-xl glass-soft px-4 py-3">
+        <div className="mb-2 text-xs font-semibold text-[var(--ink-soft)]">按编号查询</div>
+        <div className="flex gap-2">
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') searchById() }}
+            placeholder="输入反馈编号、任务编号或记录编号"
+            className="h-9 flex-1 rounded-lg bg-black/[0.04] px-3 text-sm text-[var(--ink)] outline-none"
+          />
+          <button onClick={searchById} className="rounded-lg bg-[var(--ink)] px-4 text-xs font-medium text-white hover:brightness-110 transition">
+            查询
+          </button>
+        </div>
+      </div>
+
+      {overview && <DiagnosticsOverviewPanel overview={overview} />}
 
       {feedbackList.length > 0 && (
         <div className="mb-4 rounded-xl glass-soft px-4 py-3">
@@ -532,6 +570,71 @@ function FeedbackForm({
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+function DiagnosticsOverviewPanel({ overview }: { overview: DiagnosticsOverview }) {
+  return (
+    <div className="mb-4 space-y-3">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+        <MetricCard label="任务总数" value={String(overview.total)} />
+        <MetricCard label="成功" value={String(overview.completed)} />
+        <MetricCard label="失败" value={String(overview.failed)} tone={overview.failed > 0 ? 'warn' : undefined} />
+        <MetricCard label="取消" value={String(overview.cancelled)} />
+        <MetricCard label="失败率" value={`${overview.failureRate}%`} tone={overview.failureRate > 10 ? 'warn' : undefined} />
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-3">
+        <RankPanel title="失败原因" empty="暂无失败记录" items={overview.failureCategories.map((item) => ({
+          label: item.category,
+          value: `${item.count} 次`
+        }))} />
+        <RankPanel title="模型稳定性和消耗" empty="暂无模型记录" items={overview.models.slice(0, 5).map((item) => ({
+          label: item.name,
+          value: `${item.total} 次 / 失败 ${item.failed} / ${item.inputTokens + item.outputTokens} 字量`
+        }))} />
+        <RankPanel title="工具成功率" empty="暂无工具记录" items={overview.tools.slice(0, 5).map((item) => ({
+          label: item.name,
+          value: `${item.total - item.failed}/${item.total} 成功`
+        }))} />
+      </div>
+
+      {overview.versions.length > 0 && (
+        <RankPanel title="版本对比" empty="暂无版本记录" items={overview.versions.slice(0, 3).map((item) => ({
+          label: item.name,
+          value: `${item.total} 次 / 失败 ${item.failed}`
+        }))} />
+      )}
+    </div>
+  )
+}
+
+function MetricCard({ label, value, tone }: { label: string; value: string; tone?: 'warn' }) {
+  return (
+    <div className="rounded-xl glass-soft px-3 py-2">
+      <div className="text-[11px] text-[var(--ink-soft)]">{label}</div>
+      <div className={`mt-1 text-lg font-semibold ${tone === 'warn' ? 'text-red-500' : 'text-[var(--ink)]'}`}>{value}</div>
+    </div>
+  )
+}
+
+function RankPanel({ title, empty, items }: { title: string; empty: string; items: Array<{ label: string; value: string }> }) {
+  return (
+    <div className="rounded-xl glass-soft px-4 py-3">
+      <div className="mb-2 text-xs font-semibold text-[var(--ink-soft)]">{title}</div>
+      {items.length === 0 ? (
+        <div className="text-xs text-[var(--ink-soft)]">{empty}</div>
+      ) : (
+        <div className="space-y-2">
+          {items.map((item) => (
+            <div key={`${title}-${item.label}`} className="flex items-start justify-between gap-3 text-xs">
+              <span className="min-w-0 flex-1 truncate text-[var(--ink)]">{item.label}</span>
+              <span className="shrink-0 text-[var(--ink-soft)]">{item.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

@@ -28,6 +28,9 @@ export interface TraceMeta {
   taskId: string
   sessionId: string
   conversationId: string
+  appVersion?: string
+  platform?: string
+  arch?: string
   message: string
   mode: string
   model: string
@@ -80,6 +83,20 @@ export interface FeedbackInput {
   includeConversation?: boolean
   includeFileSummary?: boolean
   allowDiagnosticPackage?: boolean
+}
+
+export interface DiagnosticsOverview {
+  total: number
+  completed: number
+  failed: number
+  cancelled: number
+  running: number
+  failureRate: number
+  feedbackCount: number
+  failureCategories: Array<{ category: string; count: number }>
+  models: Array<{ name: string; total: number; failed: number; inputTokens: number; outputTokens: number }>
+  tools: Array<{ name: string; total: number; failed: number }>
+  versions: Array<{ name: string; total: number; failed: number }>
 }
 
 const tracesDir = () => join(app.getPath('userData'), 'logs', 'traces')
@@ -180,6 +197,9 @@ export function startTrace(traceId: string, opts: {
   }
   const meta: TraceMeta = {
     ...identity,
+    appVersion: app.getVersion(),
+    platform: process.platform,
+    arch: process.arch,
     message: safeTitle(opts.message),
     mode: opts.mode,
     model: opts.model,
@@ -505,6 +525,91 @@ export function createFeedbackTicket(input: FeedbackInput): { success: boolean; 
 
 export function listFeedbackTickets(limit = 50): FeedbackTicket[] {
   return loadFeedbackIndex().slice(0, limit)
+}
+
+export function getDiagnosticsOverview(limit = 200): DiagnosticsOverview {
+  const traces = listTraces(limit)
+  const details = traces.map((trace) => ({ meta: trace, events: getTrace(trace.traceId).events }))
+  const statusCounts = {
+    completed: traces.filter((trace) => trace.status === 'completed').length,
+    failed: traces.filter((trace) => trace.status === 'failed').length,
+    cancelled: traces.filter((trace) => trace.status === 'cancelled').length,
+    running: traces.filter((trace) => trace.status === 'running').length
+  }
+  const failureCategories = countBy(
+    details.filter((detail) => detail.meta.status === 'failed').map((detail) => classifyFailure(detail.events))
+  ).map(([category, count]) => ({ category, count }))
+
+  const models = Array.from(details.reduce((map, detail) => {
+    const key = `${detail.meta.provider} / ${detail.meta.model}`
+    const item = map.get(key) || { name: key, total: 0, failed: 0, inputTokens: 0, outputTokens: 0 }
+    item.total++
+    if (detail.meta.status === 'failed') item.failed++
+    for (const event of detail.events) {
+      if (event.type === 'usage') {
+        item.inputTokens += Number(event.data.inputTokens || 0)
+        item.outputTokens += Number(event.data.outputTokens || 0)
+      }
+    }
+    map.set(key, item)
+    return map
+  }, new Map<string, { name: string; total: number; failed: number; inputTokens: number; outputTokens: number }>()).values())
+    .sort((a, b) => b.total - a.total)
+
+  const tools = Array.from(details.reduce((map, detail) => {
+    for (const event of detail.events) {
+      if (event.phase !== 'tool' || event.type !== 'item_completed') continue
+      const item = event.data.item as Record<string, unknown> | undefined
+      const name = String(item?.toolName || item?.toolKind || '未知工具')
+      const stat = map.get(name) || { name, total: 0, failed: 0 }
+      stat.total++
+      if (item?.status === 'failed' || item?.error) stat.failed++
+      map.set(name, stat)
+    }
+    return map
+  }, new Map<string, { name: string; total: number; failed: number }>()).values())
+    .sort((a, b) => b.total - a.total)
+
+  const versions = Array.from(traces.reduce((map, trace) => {
+    const name = `${trace.appVersion || app.getVersion()} / ${trace.platform || process.platform}`
+    const item = map.get(name) || { name, total: 0, failed: 0 }
+    item.total++
+    if (trace.status === 'failed') item.failed++
+    map.set(name, item)
+    return map
+  }, new Map<string, { name: string; total: number; failed: number }>()).values())
+    .sort((a, b) => b.total - a.total)
+
+  return {
+    total: traces.length,
+    ...statusCounts,
+    failureRate: traces.length ? Math.round((statusCounts.failed / traces.length) * 1000) / 10 : 0,
+    feedbackCount: listFeedbackTickets(limit).length,
+    failureCategories,
+    models,
+    tools,
+    versions
+  }
+}
+
+function classifyFailure(events: TraceEvent[]): string {
+  const text = events
+    .filter((event) => event.phase === 'error' || event.type === 'item_completed' || event.type === 'status')
+    .map((event) => JSON.stringify(event.data))
+    .join(' ')
+    .toLowerCase()
+  if (/apikey|api key|401|403|unauthorized|模型访问|model|provider|rate limit|timeout/.test(text)) return '模型问题'
+  if (/approval|permission|denied|拒绝|权限/.test(text)) return '权限问题'
+  if (/tool|shell|file|workspace|mcp|工具/.test(text)) return '工具问题'
+  if (/cancel|cancelled|用户取消|停止/.test(text)) return '用户取消'
+  if (/crash|exit|spawn|econn|程序|进程/.test(text)) return '程序异常'
+  return '未知问题'
+}
+
+function countBy(values: string[]): Array<[string, number]> {
+  const map = new Map<string, number>()
+  for (const value of values) map.set(value, (map.get(value) || 0) + 1)
+  return Array.from(map.entries()).sort((a, b) => b[1] - a[1])
 }
 
 function normalizeExportOptions(input?: string | DiagnosticExportOptions): Required<DiagnosticExportOptions> {

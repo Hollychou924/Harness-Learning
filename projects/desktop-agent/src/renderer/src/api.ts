@@ -74,6 +74,20 @@ export interface FeedbackTicket {
   createdAt: number
 }
 
+export interface DiagnosticsOverview {
+  total: number
+  completed: number
+  failed: number
+  cancelled: number
+  running: number
+  failureRate: number
+  feedbackCount: number
+  failureCategories: Array<{ category: string; count: number }>
+  models: Array<{ name: string; total: number; failed: number; inputTokens: number; outputTokens: number }>
+  tools: Array<{ name: string; total: number; failed: number }>
+  versions: Array<{ name: string; total: number; failed: number }>
+}
+
 type Api = {
   startTask: (args: { mode: 'work' | 'code'; message: string; workspaceDir?: string; maxIterations?: number; autoApproveLow?: boolean; sessionId?: string; history?: unknown[]; attachments?: unknown[] }) =>
     Promise<{ taskId: string; traceId?: string; error?: string }>
@@ -109,6 +123,7 @@ type Api = {
   traceExport: (traceId?: string) => Promise<{ success: boolean; path?: string; error?: string }>
   feedbackCreate: (input: { traceId?: string; category: string; description: string; contact?: string; packageLevel?: DiagnosticPackageLevel; includeConversation?: boolean; includeFileSummary?: boolean; allowDiagnosticPackage?: boolean }) => Promise<{ success: boolean; feedback?: FeedbackTicket; packagePath?: string; error?: string }>
   feedbackList: (limit?: number) => Promise<FeedbackTicket[]>
+  diagnosticsOverview: (limit?: number) => Promise<DiagnosticsOverview>
 }
 
 const noop = () => {}
@@ -145,7 +160,20 @@ const empty: Api = {
   traceGet: async () => ({ meta: null, events: [] }),
   traceExport: async () => ({ success: false, error: 'preload 未就绪' }),
   feedbackCreate: async () => ({ success: false, error: 'preload 未就绪' }),
-  feedbackList: async () => []
+  feedbackList: async () => [],
+  diagnosticsOverview: async () => ({
+    total: 0,
+    completed: 0,
+    failed: 0,
+    cancelled: 0,
+    running: 0,
+    failureRate: 0,
+    feedbackCount: 0,
+    failureCategories: [],
+    models: [],
+    tools: [],
+    versions: []
+  })
 }
 
 export const api: Api = (globalThis as { api?: Api }).api ?? empty

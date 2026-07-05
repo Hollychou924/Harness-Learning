@@ -50,6 +50,7 @@ const api = {
   feedbackCreate: (input: { traceId?: string; category: string; description: string; contact?: string; packageLevel?: 'basic' | 'enhanced' | 'full'; includeConversation?: boolean; includeFileSummary?: boolean; allowDiagnosticPackage?: boolean }) =>
     ipcRenderer.invoke('feedback:create', input) as Promise<{ success: boolean; feedback?: unknown; packagePath?: string; error?: string }>,
   feedbackList: (limit?: number) => ipcRenderer.invoke('feedback:list', limit) as Promise<unknown[]>,
+  diagnosticsOverview: (limit?: number) => ipcRenderer.invoke('diagnostics:overview', limit) as Promise<unknown>,
   openFiles: () => ipcRenderer.invoke('dialog:openFiles') as Promise<unknown[]>,
   pickFolder: () => ipcRenderer.invoke('project:select') as Promise<string | null>,
   createProjectFolder: (name: string) => ipcRenderer.invoke('project:create', name) as Promise<string | null>,
