@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, ArrowUp, ChevronDown, Check, X, FileText, Image as ImageIcon, Eye, AlertCircle, FolderPlus, FolderOpen, History, AtSign, Target, StopCircle, RefreshCw, Loader2 } from 'lucide-react'
+import { Plus, ArrowUp, ChevronDown, Check, X, FileText, Image as ImageIcon, Eye, AlertCircle, FolderPlus, FolderOpen, Folder, History, AtSign, Target, StopCircle, RefreshCw, Loader2, Hand, ShieldCheck, ShieldAlert } from 'lucide-react'
 import { api, type ModelConfig, type AttachmentFile } from '../api'
-import { useSettingsStore } from './settings/settingsStore'
-import { NewProjectDialog } from './Dialogs'
+import { useSettingsStore, type ApprovalMode } from './settings/settingsStore'
 import { useTaskStore, type Attachment, type Project, DEFAULT_PROJECT_ID } from '../store/task'
 import { PROVIDER_PRESETS, BUILTIN_PROVIDER_ORDER, modelSupportsVision } from './providerPresets'
 import { WhaleTooltip } from './WhaleTooltip'
@@ -27,6 +26,40 @@ const COMPOSE_GUARD_MS = 120
 // 非标准换行：\r\n / \r / U+2028 / U+2029，textarea 原生不折行需手动规范化
 const WEIRD_LINE_BREAKS = /\r\n?|[\u2028\u2029]/g
 const WEIRD_DETECT = /\r|[\u2028\u2029]/
+
+const APPROVAL_MODE_OPTIONS: Array<{
+  id: ApprovalMode
+  label: string
+  desc: string
+  icon: ReactNode
+  activeClass: string
+  iconClass: string
+}> = [
+  {
+    id: 'always_ask',
+    label: '始终询问',
+    desc: '编辑文件时，每次都向你确认',
+    icon: <Hand size={15} />,
+    activeClass: 'text-[var(--ink-soft)]',
+    iconClass: 'text-[var(--ink-soft)]'
+  },
+  {
+    id: 'risk_only',
+    label: '仅风险询问',
+    desc: '仅在有高风险操作才请求确认',
+    icon: <ShieldCheck size={15} />,
+    activeClass: 'text-[#1f8fff]',
+    iconClass: 'text-[#1f8fff]'
+  },
+  {
+    id: 'auto',
+    label: '全自动执行',
+    desc: '不受限制访问文件',
+    icon: <ShieldAlert size={15} />,
+    activeClass: 'text-[#ff5a1f]',
+    iconClass: 'text-[#ff5a1f]'
+  }
+]
 
 function normalizePastedText(text: string): string {
   return text.replace(WEIRD_LINE_BREAKS, '\n')
@@ -117,18 +150,20 @@ export function ChatInput({ value, onChange, onSend, onStop, isRunning = false, 
   const [config, setConfig] = useState<ModelConfig | null>(null)
   const [modelMenuOpen, setModelMenuOpen] = useState(false)
   const [addMenuOpen, setAddMenuOpen] = useState(false)
+  const [approvalMenuOpen, setApprovalMenuOpen] = useState(false)
   const [menuPos, setMenuPos] = useState<{ left: number; bottom: number } | null>(null)
   const modelBtnRef = useRef<HTMLButtonElement>(null)
+  const addMenuRef = useRef<HTMLDivElement>(null)
+  const addButtonRef = useRef<HTMLButtonElement>(null)
+  const approvalMenuRef = useRef<HTMLDivElement>(null)
+  const approvalButtonRef = useRef<HTMLButtonElement>(null)
   const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null)
-  const { openSettings, modelConfig: storeConfig } = useSettingsStore()
-  const { attachments, setAttachments, projects, sessions, activeProjectId, activeSessionId, setActiveProject, createProject } = useTaskStore()
+  const { openSettings, modelConfig: storeConfig, approvalMode, saveGeneral, maxIterations, showThinking } = useSettingsStore()
+  const { attachments, setAttachments, projects, activeProjectId, activeSessionId, setActiveProject, createProject } = useTaskStore()
   const activeProject = projects.find((p) => p.id === activeProjectId)
   const activeWorkspaceDir = activeProject?.folderPath
   const taRef = useRef<HTMLTextAreaElement>(null)
   const [projectMenuOpen, setProjectMenuOpen] = useState(false)
-  const [newProjectName, setNewProjectName] = useState('')
-  const [newProjectOpen, setNewProjectOpen] = useState(false)
-  const [creatingProject, setCreatingProject] = useState(false)
 
   // IME 合成态跟踪
   const composingRef = useRef(false)
@@ -158,13 +193,40 @@ export function ChatInput({ value, onChange, onSend, onStop, isRunning = false, 
     if (storeConfig) setConfig(storeConfig)
   }, [storeConfig])
 
+  useEffect(() => {
+    if (!addMenuOpen) return
+    const closeOnOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (addMenuRef.current?.contains(target)) return
+      if (addButtonRef.current?.contains(target)) return
+      setAddMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOnOutsidePointerDown, true)
+    return () => document.removeEventListener('pointerdown', closeOnOutsidePointerDown, true)
+  }, [addMenuOpen])
+
+  useEffect(() => {
+    if (!approvalMenuOpen) return
+    const closeOnOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (approvalMenuRef.current?.contains(target)) return
+      if (approvalButtonRef.current?.contains(target)) return
+      setApprovalMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOnOutsidePointerDown, true)
+    return () => document.removeEventListener('pointerdown', closeOnOutsidePointerDown, true)
+  }, [approvalMenuOpen])
+
   // textarea 自适应高度
   useEffect(() => {
     const ta = taRef.current
     if (!ta) return
     ta.style.height = 'auto'
-    ta.style.height = Math.min(ta.scrollHeight, 160) + 'px'
-  }, [value])
+    const minHeight = showProjectPicker ? 46 : 52
+    ta.style.height = Math.min(Math.max(ta.scrollHeight, minHeight), 180) + 'px'
+  }, [value, showProjectPicker])
 
   const hasBlockedAttachment = attachments.some((a) => attachmentStatusOf(a) !== 'ready')
   const readyAttachmentCount = attachments.filter((a) => attachmentStatusOf(a) === 'ready').length
@@ -174,6 +236,7 @@ export function ChatInput({ value, onChange, onSend, onStop, isRunning = false, 
   const modelLabel = config
     ? PROVIDER_PRESETS[config.providerId]?.label || config.providerId
     : '未配置'
+  const activeApprovalMode = APPROVAL_MODE_OPTIONS.find((option) => option.id === approvalMode) || APPROVAL_MODE_OPTIONS[0]
 
   const currentModelSupportsVision = config
     ? modelSupportsVision(config.providerId, config.model)
@@ -342,6 +405,7 @@ export function ChatInput({ value, onChange, onSend, onStop, isRunning = false, 
 
   // ── 文件选择 ──
   const handleFileSelect = async () => {
+    setAddMenuOpen(false)
     const files = (await api.openFiles()) as AttachmentFile[]
     if (files.length === 0) return
     const newAtts: Attachment[] = files.map((f, i) => attachmentFromPickedFile(f, `file-${Date.now()}-${i}`))
@@ -367,6 +431,15 @@ export function ChatInput({ value, onChange, onSend, onStop, isRunning = false, 
     const id = createProject(name, '📁', folderPath)
     setActiveProject(id)
     setAddMenuOpen(false)
+    setProjectMenuOpen(false)
+  }, [createProject, setActiveProject])
+
+  const handleCreateBlankProject = useCallback(async (name: string) => {
+    const folderPath = await api.createProjectFolder(name)
+    if (!folderPath) throw new Error('项目目录创建失败')
+    const id = createProject(name, '📁', folderPath)
+    setActiveProject(id)
+    setProjectMenuOpen(false)
   }, [createProject, setActiveProject])
 
   const appendQuickContext = useCallback((text: string) => {
@@ -438,20 +511,25 @@ ${text}` : text
 
   return (
     <>
-      {/* 项目归属选择器：输入框外、紧贴上方，仅新对话时显示 */}
-      {showProjectPicker && (
-        <ProjectPicker
-          projects={projects}
-          activeProjectId={activeProjectId}
-          onPick={(id) => { setActiveProject(id); setProjectMenuOpen(false) }}
-          onClearProject={() => { setActiveProject(DEFAULT_PROJECT_ID); setProjectMenuOpen(false) }}
-          onCreateProject={() => { setProjectMenuOpen(false); setNewProjectOpen(true) }}
-          open={projectMenuOpen}
-          setOpen={setProjectMenuOpen}
-        />
-      )}
+      <div className="relative w-full max-w-4xl">
+        {/* 新对话首页：项目归属条，贴在输入框上方 */}
+        {showProjectPicker && (
+          <ProjectPicker
+            projects={projects}
+            activeProjectId={activeProjectId}
+            onPick={(id) => { setActiveProject(id); setProjectMenuOpen(false) }}
+            onClearProject={() => { setActiveProject(DEFAULT_PROJECT_ID); setProjectMenuOpen(false) }}
+            onLoadExistingProject={handlePickFolderAsProject}
+            onCreateBlankProject={handleCreateBlankProject}
+            open={projectMenuOpen}
+            setOpen={setProjectMenuOpen}
+          />
+        )}
+
       <div
-        className="relative w-full max-w-4xl glass rounded-2xl shadow-lg transition-all"
+        className={`relative w-full floating-surface transition-all ${
+          showProjectPicker ? '-mt-px rounded-t-[20px] rounded-b-[28px]' : 'rounded-[28px]'
+        }`}
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -488,7 +566,7 @@ ${text}` : text
         )}
 
         {/* 输入框 */}
-        <div className="px-3 pt-2.5">
+        <div className={`px-4 ${showProjectPicker ? 'pt-1.5' : 'pt-3'}`}>
           <textarea
             ref={taRef}
             value={value}
@@ -501,34 +579,88 @@ ${text}` : text
             onCompositionEnd={handleCompositionEnd}
             onPaste={handlePaste}
             placeholder={placeholder || '描述你要做的事…'}
-            rows={1}
-            className="w-full bg-transparent resize-none outline-none py-1 text-sm leading-relaxed min-h-[36px] max-h-[160px]"
+            rows={2}
+            className={`w-full bg-transparent resize-none outline-none py-1 text-sm leading-[22px] max-h-[180px] ${showProjectPicker ? 'min-h-[46px]' : 'min-h-[52px]'}`}
           />
         </div>
 
         {/* 底部行：左下 + 号，右下 模型选择 + 发送 */}
-        <div className="flex items-center justify-between px-2.5 pb-2 pt-1">
-          <div className="relative">
-            <WhaleTooltip label="添加上下文">
+        <div className={`flex items-center justify-between px-3 ${showProjectPicker ? 'pb-1.5 pt-0' : 'pb-3 pt-1'}`}>
+          <div className="flex items-center gap-1">
+            <div className="relative">
+              <WhaleTooltip label="添加上下文">
+                <button
+                  ref={addButtonRef}
+                  onClick={() => setAddMenuOpen((v) => !v)}
+                  className={`flex-shrink-0 rounded-lg flex items-center justify-center text-[var(--ink-soft)] hover:bg-black/[0.06] hover:text-[var(--ink)] transition ${showProjectPicker ? 'w-7 h-7' : 'w-8 h-8'}`}
+                >
+                  <Plus size={showProjectPicker ? 17 : 18} />
+                </button>
+              </WhaleTooltip>
+              {addMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setAddMenuOpen(false)} />
+                  <div ref={addMenuRef} className="absolute left-0 bottom-10 z-40 w-64 floating-surface rounded-xl p-1.5">
+                    <AddMenuItem icon={<FileText size={14} />} label="添加本地文件" desc="图片、文档、文本都可以" onClick={handleFileSelect} />
+                    <AddMenuItem icon={<AtSign size={14} />} label="引用项目文件" desc="从当前项目里选择文件" onClick={openMentionPicker} />
+                    <AddMenuItem icon={<FolderOpen size={14} />} label="添加本地文件夹" desc="作为新的项目上下文" onClick={handlePickFolderAsProject} />
+                    <AddMenuItem icon={<History size={14} />} label="引用当前对话" desc={activeSessionId ? '让小蓝鲸延续已有上下文' : '当前还没有可引用的对话'} disabled={!activeSessionId} onClick={() => appendQuickContext('请参考当前对话历史继续处理：')} />
+                    <AddMenuItem icon={<Target size={14} />} label="补充目标" desc="把验收标准写进输入框" onClick={() => appendQuickContext('补充目标：')} />
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="relative">
               <button
-                onClick={() => setAddMenuOpen((v) => !v)}
-                className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[var(--ink-soft)] hover:bg-black/[0.06] hover:text-[var(--ink)] transition"
+                ref={approvalButtonRef}
+                onClick={() => {
+                  setAddMenuOpen(false)
+                  setApprovalMenuOpen((v) => !v)
+                }}
+                className={`flex items-center gap-1.5 px-1.5 rounded-lg text-[13px] font-medium hover:bg-black/[0.04] transition ${showProjectPicker ? 'py-1' : 'py-1.5'} ${activeApprovalMode.activeClass}`}
               >
-                <Plus size={18} />
+                <span className={activeApprovalMode.iconClass}>{activeApprovalMode.icon}</span>
+                <span className="truncate max-w-[96px]">{activeApprovalMode.label}</span>
+                <ChevronDown size={13} />
               </button>
-            </WhaleTooltip>
-            {addMenuOpen && (
-              <>
-                <div className="fixed inset-0 z-30" onClick={() => setAddMenuOpen(false)} />
-                <div className="absolute left-0 bottom-10 z-40 w-64 floating-surface rounded-xl p-1.5">
-                  <AddMenuItem icon={<FileText size={14} />} label="添加本地文件" desc="图片、文档、文本都可以" onClick={handleFileSelect} />
-                  <AddMenuItem icon={<AtSign size={14} />} label="引用项目文件" desc="从当前项目里选择文件" onClick={openMentionPicker} />
-                  <AddMenuItem icon={<FolderOpen size={14} />} label="添加本地文件夹" desc="作为新的项目上下文" onClick={handlePickFolderAsProject} />
-                  <AddMenuItem icon={<History size={14} />} label="引用当前对话" desc={activeSessionId ? '让小蓝鲸延续已有上下文' : '当前还没有可引用的对话'} disabled={!activeSessionId} onClick={() => appendQuickContext('请参考当前对话历史继续处理：')} />
-                  <AddMenuItem icon={<Target size={14} />} label="补充目标" desc="把验收标准写进输入框" onClick={() => appendQuickContext('补充目标：')} />
-                </div>
-              </>
-            )}
+
+              {approvalMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setApprovalMenuOpen(false)} />
+                  <div ref={approvalMenuRef} className="absolute left-0 bottom-10 z-40 w-[23rem] max-w-[calc(100vw-2rem)] floating-surface rounded-2xl p-2">
+                    <div className="px-2.5 pb-1.5 pt-1 text-[12px] text-[var(--ink-soft)]">
+                      选择小蓝鲸什么时候需要问你
+                    </div>
+                    {APPROVAL_MODE_OPTIONS.map((option) => {
+                      const selected = option.id === approvalMode
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          onClick={() => {
+                            saveGeneral({ maxIterations, approvalMode: option.id, showThinking })
+                            setApprovalMenuOpen(false)
+                          }}
+                          className={`w-full flex items-center gap-3 px-2.5 py-2.5 rounded-xl text-left transition ${
+                            selected ? 'bg-black/[0.04]' : 'hover:bg-black/[0.04]'
+                          }`}
+                        >
+                          <span className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 bg-black/[0.04] ${option.iconClass}`}>
+                            {option.icon}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-semibold text-[var(--ink)]">{option.label}</span>
+                            <span className="block text-xs text-[var(--ink-soft)] mt-0.5">{option.desc}</span>
+                          </span>
+                          {selected && <Check size={16} className="text-[var(--ink-soft)] flex-shrink-0" />}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -537,7 +669,12 @@ ${text}` : text
                 onClick={() => {
                   if (!modelMenuOpen && modelBtnRef.current) {
                     const rect = modelBtnRef.current.getBoundingClientRect()
-                    setMenuPos({ left: rect.left, bottom: window.innerHeight - rect.top + 4 })
+                    const menuWidth = Math.min(288, window.innerWidth - 24)
+                    const left = Math.min(
+                      window.innerWidth - menuWidth - 12,
+                      Math.max(12, rect.right - menuWidth)
+                    )
+                    setMenuPos({ left, bottom: window.innerHeight - rect.top + 8 })
                   }
                   setModelMenuOpen(!modelMenuOpen)
                 }}
@@ -552,14 +689,17 @@ ${text}` : text
                 <>
                   <div className="fixed inset-0 z-[9998]" onClick={() => setModelMenuOpen(false)} />
                   <div
-                    className="fixed z-[9999] w-72 rounded-xl p-2 floating-surface"
+                    className="fixed z-[9999] w-72 max-w-[calc(100vw-24px)] rounded-xl p-2 floating-surface overflow-hidden"
                     style={{
                       left: menuPos.left,
                       bottom: menuPos.bottom,
                       background: 'var(--floating-bg)'
                     }}
                   >
-                    <div className="max-h-80 overflow-y-auto space-y-0.5">
+                    <div
+                      className="overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden space-y-0.5"
+                      style={{ maxHeight: 'min(20rem, calc(100vh - 7rem))' }}
+                    >
                       {BUILTIN_PROVIDER_ORDER.map((id) => {
                         const preset = PROVIDER_PRESETS[id]
                         const isActive = config?.providerId === id
@@ -567,18 +707,18 @@ ${text}` : text
                           <button
                             key={id}
                             onClick={() => { setModelMenuOpen(false); openSettings('model') }}
-                            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition ${
+                            className={`w-full min-w-0 flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition ${
                               isActive ? 'bg-sky-50 text-sky-600' : 'hover:bg-black/[0.06] text-[var(--ink)]'
                             }`}
                           >
-                            <span className="flex-1 text-left">{preset.label}</span>
+                            <span className="flex-1 min-w-0 text-left truncate">{preset.label}</span>
                             {preset.supportsVision && (
                               <WhaleTooltip label="支持图片输入">
-                                <span className="text-[10px] text-sky-500">👁</span>
+                                <span className="text-[10px] text-sky-500 flex-shrink-0">👁</span>
                               </WhaleTooltip>
                             )}
-                            {preset.builtinApiKey && <span className="text-[10px] text-green-500">内置</span>}
-                            {isActive && <Check size={13} className="text-sky-500" />}
+                            {preset.builtinApiKey && <span className="text-[10px] text-green-500 flex-shrink-0">内置</span>}
+                            {isActive && <Check size={13} className="text-sky-500 flex-shrink-0" />}
                           </button>
                         )
                       })}
@@ -599,7 +739,7 @@ ${text}` : text
                   if (hasContent) onSend()
                 }}
                 disabled={!hasContent && !shouldStop}
-                className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition ${
+                className={`flex-shrink-0 rounded-lg flex items-center justify-center transition ${showProjectPicker ? 'w-7 h-7' : 'w-8 h-8'} ${
                   hasContent || shouldStop
                     ? shouldStop
                       ? 'bg-red-500 text-white hover:brightness-110'
@@ -607,7 +747,7 @@ ${text}` : text
                     : 'bg-black/[0.06] text-[var(--ink-soft)]/40 cursor-not-allowed'
                 }`}
               >
-                {shouldStop ? <StopCircle size={18} /> : <ArrowUp size={16} />}
+                {shouldStop ? <StopCircle size={showProjectPicker ? 17 : 18} /> : <ArrowUp size={showProjectPicker ? 15 : 16} />}
               </button>
             </WhaleTooltip>
           </div>
@@ -638,6 +778,7 @@ ${text}` : text
           )}
         </div>
       )}
+      </div>
 
       {previewAttachment && (
         <AttachmentPreview
@@ -646,20 +787,6 @@ ${text}` : text
         />
       )}
 
-      {newProjectOpen && (
-        <NewProjectDialog
-          onCancel={() => setNewProjectOpen(false)}
-          onCreateNew={async (name) => {
-            const folderPath = await api.createProjectFolder(name)
-            createProject(name, '📁', folderPath ?? undefined)
-            setNewProjectOpen(false)
-          }}
-          onLoadFolder={async (name, folderPath) => {
-            createProject(name, '📁', folderPath)
-            setNewProjectOpen(false)
-          }}
-        />
-      )}
     </>
   )
 }
@@ -843,13 +970,14 @@ function AttachmentPreview({ attachment, onClose }: {
 
 /* ---- 输入框上方：项目归属选择器 ---- */
 function ProjectPicker({
-  projects, activeProjectId, onPick, onClearProject, onCreateProject, open, setOpen
+  projects, activeProjectId, onPick, onClearProject, onLoadExistingProject, onCreateBlankProject, open, setOpen
 }: {
   projects: Project[]
   activeProjectId: string
   onPick: (id: string) => void
   onClearProject: () => void
-  onCreateProject: () => void
+  onLoadExistingProject: () => Promise<void>
+  onCreateBlankProject: (name: string) => Promise<void>
   open: boolean
   setOpen: (v: boolean | ((p: boolean) => boolean)) => void
 }) {
@@ -859,61 +987,183 @@ function ProjectPicker({
     (a, b) => Number(b.pinned) - Number(a.pinned) || (b.pinnedAt ?? 0) - (a.pinnedAt ?? 0) || a.order - b.order
   )
   const ref = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const nameRef = useRef<HTMLInputElement>(null)
+  const [blankOpen, setBlankOpen] = useState(false)
+  const [blankName, setBlankName] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [menuStyle, setMenuStyle] = useState<{ left: number; top: number; maxHeight: number } | null>(null)
 
   const close = () => setOpen(false)
+  const updateMenuPosition = useCallback(() => {
+    const rect = buttonRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const width = 320
+    const gap = 8
+    const margin = 12
+    const listRows = sorted.length > 0 ? Math.min(sorted.length, 5) : 1
+    const expectedHeight = 88 + listRows * 36 + 142 + (blankOpen ? 76 : 0)
+    const availableHeight = window.innerHeight - margin * 2
+    const height = Math.min(expectedHeight, availableHeight)
+    const left = Math.min(window.innerWidth - width - margin, Math.max(margin, rect.left))
+    const belowTop = rect.bottom + gap
+    const aboveTop = rect.top - height - gap
+    const hasRoomBelow = belowTop + height <= window.innerHeight - margin
+    const top = hasRoomBelow ? belowTop : Math.max(margin, aboveTop)
+    setMenuStyle({ left, top, maxHeight: Math.min(height, window.innerHeight - top - margin) })
+  }, [blankOpen, sorted.length])
+
+  useEffect(() => {
+    if (blankOpen) setTimeout(() => nameRef.current?.focus(), 0)
+  }, [blankOpen])
+  useEffect(() => {
+    if (open) updateMenuPosition()
+  }, [open, updateMenuPosition])
+  useEffect(() => {
+    if (open) return
+    setBlankOpen(false)
+    setBlankName('')
+    setError('')
+    setBusy(false)
+  }, [open])
+
+  const submitBlankProject = async () => {
+    const name = blankName.trim()
+    if (!name || busy) return
+    setBusy(true)
+    setError('')
+    try {
+      await onCreateBlankProject(name)
+      setBlankName('')
+      setBlankOpen(false)
+    } catch {
+      setError('创建失败，请换个名称再试')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
-    <div className="relative px-3 pb-1.5">
-      <button
-        onClick={() => setOpen(!open)}
-        className="no-drag flex items-center gap-1.5 h-7 px-2 rounded-lg hover:bg-black/[0.05] transition text-left max-w-full"
-      >
-        <span className="text-sm leading-none flex-shrink-0">{isNoProject ? '⊘' : (active?.icon ?? '📁')}</span>
-        <span className={`text-xs truncate max-w-[140px] ${isNoProject ? 'text-[var(--ink-soft)]/60' : 'text-[var(--ink-soft)]'}`}>
-          {isNoProject ? '无项目' : (active?.name ?? '选择项目')}
-        </span>
-        <ChevronDown size={12} className="text-[var(--ink-soft)] flex-shrink-0" />
-      </button>
+    <div className="relative z-[1] mx-auto w-[calc(100%-28px)] rounded-t-[24px] border border-b-0 border-black/[0.04] bg-[#eceef2] px-5 pb-1.5 pt-2">
+      <div className="flex min-w-0 items-center overflow-hidden">
+        <button
+          ref={buttonRef}
+          onClick={() => {
+            if (!open) updateMenuPosition()
+            setOpen(!open)
+          }}
+          className="no-drag flex h-7 min-w-0 max-w-full items-center gap-2 rounded-xl px-2.5 text-left text-[var(--ink)] transition hover:bg-black/[0.05]"
+        >
+          {isNoProject ? (
+            <X size={16} className="flex-shrink-0 text-[var(--ink-soft)]" />
+          ) : (
+            <Folder size={16} className="flex-shrink-0 text-[var(--ink-soft)]" />
+          )}
+          <span className="min-w-0 truncate text-sm font-medium">
+            {isNoProject ? '不加载任何项目' : (active?.name ?? '选择项目')}
+          </span>
+          <ChevronDown size={14} className="flex-shrink-0 text-[var(--ink-soft)]" />
+        </button>
+      </div>
 
       {open && (
-        <>
+        createPortal(
+          <>
           <div className="fixed inset-0 z-40" onClick={close} />
-          <div ref={ref} className="absolute left-3 top-9 z-50 w-56 floating-surface rounded-lg py-1 max-h-72 overflow-y-auto">
-            <button
-              onClick={() => onClearProject()}
-              className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-black/[0.05] transition rounded-md ${
-                isNoProject ? 'text-[var(--ink)]' : 'text-[var(--ink-soft)]'
-              }`}
-            >
-              <span className="text-sm leading-none flex-shrink-0">⊘</span>
-              <span className="flex-1 text-xs truncate">无项目</span>
-              {isNoProject && <Check size={12} className="text-[#0071e3] flex-shrink-0" />}
-            </button>
-            <div className="border-t border-black/[0.08] mt-1 pt-1">
-              {sorted.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => onPick(p.id)}
-                  className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-black/[0.05] transition rounded-md ${
-                    p.id === activeProjectId ? 'text-[var(--ink)]' : 'text-[var(--ink-soft)]'
-                  }`}
-                >
-                  <span className="text-sm leading-none flex-shrink-0">{p.icon}</span>
-                  <span className="flex-1 text-xs truncate">{p.name}</span>
-                  {p.id === activeProjectId && <Check size={12} className="text-[#0071e3] flex-shrink-0" />}
-                </button>
-              ))}
+          <div
+            ref={ref}
+            className="fixed z-50 w-80 max-w-[calc(100vw-24px)] floating-surface rounded-2xl p-2 overflow-hidden flex flex-col"
+            style={menuStyle ? { left: menuStyle.left, top: menuStyle.top, maxHeight: menuStyle.maxHeight } : undefined}
+          >
+            <div className="px-2.5 pt-2 pb-1.5">
+              <div className="text-sm font-semibold text-[var(--ink)]">请选择或新建一个项目</div>
             </div>
-            <div className="border-t border-black/[0.08] mt-1 pt-1">
-              <button
-                onClick={() => { onCreateProject(); close() }}
-                className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-[var(--ink-soft)] hover:text-[var(--ink)] transition"
+            {sorted.length > 0 && (
+              <div
+                className="mt-1 min-h-0 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                style={{ maxHeight: Math.max(72, Math.min(160, (menuStyle?.maxHeight ?? 420) - (blankOpen ? 240 : 166))) }}
               >
-                <FolderPlus size={13} /> 新建项目
+                {sorted.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => onPick(p.id)}
+                    className={`w-full h-8 min-w-0 flex items-center gap-2.5 px-2.5 rounded-xl text-left hover:bg-black/[0.05] transition ${
+                      p.id === activeProjectId ? 'text-[var(--ink)]' : 'text-[var(--ink-soft)]'
+                    }`}
+                  >
+                    <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+                      <Folder size={15} className="text-[var(--ink-soft)]" />
+                    </span>
+                    <span className="flex-1 min-w-0 text-sm truncate">{p.name}</span>
+                    {p.id === activeProjectId && <Check size={12} className="text-[#0071e3] flex-shrink-0" />}
+                  </button>
+                ))}
+              </div>
+            )}
+            {sorted.length === 0 && (
+              <div className="mx-2 mt-2 rounded-xl bg-black/[0.03] px-3 py-4 text-center text-xs text-[var(--ink-soft)]">
+                左侧还没有加载项目
+              </div>
+            )}
+            <div className="border-t border-black/[0.08] mt-2 pt-2">
+              <button
+                onClick={() => { setError(''); void onLoadExistingProject() }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-sm text-[var(--ink-soft)] hover:bg-black/[0.05] hover:text-[var(--ink)] transition"
+              >
+                <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+                  <FolderOpen size={15} className="text-[var(--ink-soft)]" />
+                </span>
+                加载已有项目
+              </button>
+              <button
+                onClick={() => { setBlankOpen((v) => !v); setError('') }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-sm text-[var(--ink-soft)] hover:bg-black/[0.05] hover:text-[var(--ink)] transition"
+              >
+                <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+                  <FolderPlus size={15} className="text-[var(--ink-soft)]" />
+                </span>
+                新建空白项目
+              </button>
+              {blankOpen && (
+                <div className="mx-2 mb-1 rounded-xl bg-black/[0.03] p-2">
+                  <input
+                    ref={nameRef}
+                    value={blankName}
+                    onChange={(e) => setBlankName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') void submitBlankProject(); if (e.key === 'Escape') setBlankOpen(false) }}
+                    placeholder="输入项目名称"
+                    className="w-full h-8 px-2.5 rounded-lg bg-white/80 border border-black/10 outline-none text-sm focus:border-[#0071e3]"
+                  />
+                  <div className="flex items-center justify-between gap-2 mt-2">
+                    <span className="min-w-0 text-[11px] text-red-500 truncate">{error}</span>
+                    <button
+                      onClick={() => void submitBlankProject()}
+                      disabled={!blankName.trim() || busy}
+                      className="h-7 px-3 rounded-lg bg-[var(--ink)] text-white text-xs disabled:opacity-40 transition"
+                    >
+                      {busy ? '创建中' : '创建'}
+                    </button>
+                  </div>
+                </div>
+              )}
+              <button
+                onClick={() => onClearProject()}
+                className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-sm transition ${
+                  isNoProject ? 'text-[var(--ink)] bg-black/[0.04]' : 'text-[var(--ink-soft)] hover:bg-black/[0.05] hover:text-[var(--ink)]'
+                }`}
+              >
+                <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+                  <X size={15} className="text-[var(--ink-soft)]" />
+                </span>
+                <span className="flex-1 text-left">不加载任何项目</span>
+                {isNoProject && <Check size={12} className="text-[#0071e3] flex-shrink-0" />}
               </button>
             </div>
           </div>
-        </>
+          </>,
+          document.body
+        )
       )}
     </div>
   )

@@ -1,7 +1,7 @@
 import { useSettingsStore } from '../settingsStore'
 
 export function AgentSection() {
-  const { maxIterations, showThinking, autoApproveLow, saveGeneral } = useSettingsStore()
+  const { maxIterations, showThinking, approvalMode, saveGeneral } = useSettingsStore()
 
   return (
     <section>
@@ -22,7 +22,7 @@ export function AgentSection() {
               min={1}
               max={30}
               value={maxIterations}
-              onChange={(e) => saveGeneral({ maxIterations: Number(e.target.value), autoApproveLow, showThinking })}
+              onChange={(e) => saveGeneral({ maxIterations: Number(e.target.value), approvalMode, showThinking })}
               className="flex-1 accent-[#0071e3]"
             />
             <span className="w-10 text-center text-sm font-medium text-[var(--ink)]">{maxIterations}</span>
@@ -40,7 +40,7 @@ export function AgentSection() {
             </div>
           </div>
           <button
-            onClick={() => saveGeneral({ maxIterations, autoApproveLow, showThinking: !showThinking })}
+            onClick={() => saveGeneral({ maxIterations, approvalMode, showThinking: !showThinking })}
             className={`relative w-10 h-6 rounded-full transition flex-shrink-0 ${
               showThinking ? 'bg-[#0071e3]' : 'bg-black/15'
             }`}

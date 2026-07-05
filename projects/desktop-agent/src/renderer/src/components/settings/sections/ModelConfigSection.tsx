@@ -22,7 +22,7 @@ export function ModelConfigSection() {
   return (
     <section>
       <header className="mb-5">
-        <h3 className="text-lg font-semibold text-[var(--ink)]">模型配置</h3>
+        <h3 className="text-lg font-semibold text-[var(--ink)]">模型</h3>
         <p className="text-sm text-[var(--ink-soft)] mt-1">选择供应商并填写 API Key，配置后即可在输入框中使用</p>
       </header>
 

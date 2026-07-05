@@ -12,6 +12,7 @@ import {
   Trash2,
   FolderPlus,
   Folder,
+  Puzzle,
   ChevronDown,
   ChevronRight,
   ChevronUp,
@@ -32,6 +33,10 @@ import { WhaleTooltip } from './WhaleTooltip'
  * ============================================================ */
 
 const COLLAPSED_KEY = 'xld.collapsed.v1'
+const PINNED_SESSIONS_COLLAPSE_ID = '__pinned_sessions__'
+const PINNED_PROJECTS_COLLAPSE_ID = '__pinned_projects__'
+const PROJECTS_COLLAPSE_ID = '__projects__'
+const UNASSIGNED_SESSIONS_COLLAPSE_ID = '__unassigned_sessions__'
 
 function loadCollapsed(): Record<string, boolean> {
   try {
@@ -54,7 +59,6 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
   const store = useTaskStore()
   const { mode, setMode, message, startTask, reset, projects, sessions, activeProjectId, activeSessionId } = store
   const { openSettings } = useSettingsStore()
-  const [activeTab, setActiveTab] = useState<'new' | 'scheduled' | 'plugins'>('new')
   const [newProjectOpen, setNewProjectOpen] = useState(false)
   const [renamingProject, setRenamingProject] = useState<string | null>(null)
   const [newProjectName, setNewProjectName] = useState('')
@@ -86,7 +90,12 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
 
   const pinnedProjects = sortedProjects.filter((p) => p.pinned)
   const otherProjects = sortedProjects.filter((p) => !p.pinned)
+  const pinnedSessions = pinnedSessionsAll(sessions)
   const unassignedSessions = sessions.filter((s) => s.projectId === DEFAULT_PROJECT_ID)
+  const pinnedSessionsCollapsed = Boolean(projectCollapsed[PINNED_SESSIONS_COLLAPSE_ID])
+  const pinnedProjectsCollapsed = Boolean(projectCollapsed[PINNED_PROJECTS_COLLAPSE_ID])
+  const projectsCollapsed = Boolean(projectCollapsed[PROJECTS_COLLAPSE_ID])
+  const unassignedSessionsCollapsed = Boolean(projectCollapsed[UNASSIGNED_SESSIONS_COLLAPSE_ID])
 
   const isExpanded = (p: Project) => {
     if (Object.prototype.hasOwnProperty.call(projectCollapsed, p.id)) return !projectCollapsed[p.id]
@@ -136,13 +145,12 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
     setDragSessionId(null); setDragOverId(null)
   }
 
-  const renderProjectBlock = (p: Project, sectionLabel?: string) => {
+  const renderProjectBlock = (p: Project) => {
     const expanded = isExpanded(p)
     const list = sessionsOf(p.id)
     const isDefault = p.id === DEFAULT_PROJECT_ID
     return (
       <div key={p.id} className="space-y-0.5">
-        {sectionLabel && <SectionLabel label={sectionLabel} />}
         <ProjectRow
           project={p}
           expanded={expanded}
@@ -196,37 +204,42 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
         collapsed ? 'w-0 border-r-0' : 'w-60'
       }`}
     >
-      <div className="drag h-9 flex-shrink-0" />
+      <div className="drag h-12 flex-shrink-0" />
       {/* 顶部快捷入口：新对话 / 自动化 / 技能 */}
       <div className="px-3 pb-2">
         <div className="space-y-0.5">
-          <NavPill icon={<MessageSquarePlus size={15} />} label="新对话" active={activeTab === 'new'}
-            onClick={() => { setActiveTab('new'); reset(); }} />
-          <NavPill icon={<Clock size={15} />} label="自动化" active={activeTab === 'scheduled'}
-            onClick={() => { setActiveTab('scheduled'); notifyComingSoon('自动化') }} />
-          <NavPill icon={<Settings size={15} />} label="技能" active={activeTab === 'plugins'}
-            onClick={() => { setActiveTab('plugins'); notifyComingSoon('技能') }} />
+          <NavPill icon={<MessageSquarePlus size={15} />} label="新对话" onClick={() => reset()} />
+          <NavPill icon={<Clock size={15} />} label="自动化" onClick={() => notifyComingSoon('自动化')} />
+          <NavPill icon={<Puzzle size={15} />} label="技能" onClick={() => notifyComingSoon('技能')} />
         </div>
       </div>
 
       {/* 置顶对话区（可拖入自动置顶） */}
-      <PinnedDropZone sessions={pinnedSessionsAll(sessions)} activeId={activeSessionId}
+      <PinnedDropZone sessions={pinnedSessions} activeId={activeSessionId}
         onClick={(id) => void store.continueSession(id)} onDrop={handleDropToPinned}
         onDragOver={(e) => { e.preventDefault(); setDragOverId('__pinned__') }}
         isDragOver={dragOverId === '__pinned__'}
+        collapsed={pinnedSessionsCollapsed}
+        onToggle={() => toggleCollapse(PINNED_SESSIONS_COLLAPSE_ID)}
         onRename={(id, title) => setRenamingSession({ id, title })} />
 
       {/* 主体列表：按项目分组，项目下对话按时间倒序（最新在前） */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 pb-2 space-y-1">
         {pinnedProjects.length > 0 && (
           <div className="space-y-0.5">
-            <SectionLabel label="置顶" />
-            {pinnedProjects.map((p) => renderProjectBlock(p, '置顶项目'))}
+            <SectionLabel
+              label="置顶项目"
+              collapsed={pinnedProjectsCollapsed}
+              onToggle={() => toggleCollapse(PINNED_PROJECTS_COLLAPSE_ID)}
+            />
+            {!pinnedProjectsCollapsed && pinnedProjects.map((p) => renderProjectBlock(p))}
           </div>
         )}
         <div className="space-y-0.5">
           <SectionLabel
             label="项目"
+            collapsed={projectsCollapsed}
+            onToggle={() => toggleCollapse(PROJECTS_COLLAPSE_ID)}
             action={(
               <WhaleTooltip label="新建项目">
                 <button onClick={() => setNewProjectOpen(true)}
@@ -236,12 +249,16 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
               </WhaleTooltip>
             )}
           />
-          {otherProjects.map((p) => renderProjectBlock(p))}
+          {!projectsCollapsed && otherProjects.map((p) => renderProjectBlock(p))}
         </div>
         {unassignedSessions.length > 0 && (
           <div className="space-y-0.5">
-            <SectionLabel label="无项目对话" />
-            {(() => {
+            <SectionLabel
+              label="无项目对话"
+              collapsed={unassignedSessionsCollapsed}
+              onToggle={() => toggleCollapse(UNASSIGNED_SESSIONS_COLLAPSE_ID)}
+            />
+            {!unassignedSessionsCollapsed && (() => {
               const list = sessionsOf(DEFAULT_PROJECT_ID)
               if (list.length === 0) {
                 return <p className="pl-2.5 py-1 text-[11px] text-[var(--ink-soft)]/60">暂无对话</p>
@@ -329,12 +346,10 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
 }
 
 /* ---- 顶部导航 Pill ---- */
-function NavPill({ icon, label, active, badge, onClick }: { icon: React.ReactNode; label: string; active?: boolean; badge?: number; onClick: () => void }) {
+function NavPill({ icon, label, badge, onClick }: { icon: React.ReactNode; label: string; badge?: number; onClick: () => void }) {
   return (
     <button onClick={onClick}
-      className={`no-drag w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition ${
-        active ? 'bg-white/60 text-[var(--ink)] shadow-sm' : 'text-[var(--ink-soft)] hover:bg-black/[0.04] hover:text-[var(--ink)]'
-      }`}>
+      className="no-drag w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[13px] font-medium transition text-[var(--ink-soft)] hover:bg-black/[0.04] hover:text-[var(--ink)]">
       <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">{icon}</span>
       <span className="flex-1 text-left">{label}</span>
       {badge !== undefined && badge > 0 && (
@@ -345,21 +360,24 @@ function NavPill({ icon, label, active, badge, onClick }: { icon: React.ReactNod
 }
 
 /* ---- 置顶拖放区 ---- */
-function PinnedDropZone({ sessions, activeId, onClick, onDrop, onDragOver, isDragOver, onRename }: {
+function PinnedDropZone({ sessions, activeId, onClick, onDrop, onDragOver, isDragOver, collapsed, onToggle, onRename }: {
   sessions: Session[]; activeId: string | null; onClick: (id: string) => void
   onDrop: (e: React.DragEvent) => void; onDragOver: (e: React.DragEvent) => void; isDragOver: boolean
+  collapsed: boolean; onToggle: () => void
   onRename?: (id: string, title: string) => void
 }) {
   if (sessions.length === 0) return null
   return (
     <div className={`px-3 pb-1 ${isDragOver ? 'bg-amber-50/50 rounded-lg' : ''}`}
       onDragOver={onDragOver} onDrop={onDrop}>
-      <SectionLabel label="置顶对话" />
-      <div className="space-y-0.5">
-        {sessions.map((s) => (
-          <SessionRow key={s.id} session={s} active={s.id === activeId} onClick={() => onClick(s.id)} compact onRename={() => onRename?.(s.id, s.title)} />
-        ))}
-      </div>
+      <SectionLabel label="置顶对话" collapsed={collapsed} onToggle={onToggle} />
+      {!collapsed && (
+        <div className="space-y-0.5">
+          {sessions.map((s) => (
+            <SessionRow key={s.id} session={s} active={s.id === activeId} onClick={() => onClick(s.id)} compact onRename={() => onRename?.(s.id, s.title)} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -372,10 +390,21 @@ function pinnedSessionsAll(sessions: Session[]): Session[] {
 }
 
 /* ---- 分类标题 ---- */
-function SectionLabel({ label, action }: { label: string; action?: React.ReactNode }) {
+function SectionLabel({ label, action, collapsed, onToggle }: { label: string; action?: React.ReactNode; collapsed?: boolean; onToggle?: () => void }) {
   return (
     <div className="flex items-center justify-between px-1 pt-1.5 pb-0.5">
-      <span className="text-[13px] font-semibold text-[var(--ink-soft)] tracking-wide">{label}</span>
+      {onToggle ? (
+        <button
+          type="button"
+          onClick={onToggle}
+          className="group flex min-w-0 flex-1 items-center gap-1.5 text-left text-[13px] font-semibold text-[var(--ink-soft)] tracking-wide hover:text-[var(--ink)] transition"
+        >
+          <span className="truncate">{label}</span>
+          {collapsed ? <ChevronRight size={13} className="flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" /> : <ChevronDown size={13} className="flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" />}
+        </button>
+      ) : (
+        <span className="text-[13px] font-semibold text-[var(--ink-soft)] tracking-wide">{label}</span>
+      )}
       {action}
     </div>
   )
@@ -400,7 +429,7 @@ function ProjectRow({ project, expanded, onToggle, onActivate, onRename, onDelet
         </span>
         <span className="flex-1 text-[12px] font-medium text-[var(--ink)] truncate">{project.name}</span>
         {project.pinned && <Pin size={10} className="text-amber-400 flex-shrink-0" />}
-        {expanded ? <ChevronDown size={13} className="text-[var(--ink-soft)] flex-shrink-0" /> : <ChevronRight size={13} className="text-[var(--ink-soft)] flex-shrink-0" />}
+        {expanded ? <ChevronDown size={13} className="text-[var(--ink-soft)] flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100" /> : <ChevronRight size={13} className="text-[var(--ink-soft)] flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />}
       </button>
       {menuOpen && (
         <>

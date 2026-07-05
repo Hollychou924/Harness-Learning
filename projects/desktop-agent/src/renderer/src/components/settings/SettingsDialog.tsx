@@ -3,42 +3,16 @@ import { X } from 'lucide-react'
 import { useSettingsStore, type SettingsTab } from './settingsStore'
 import { ModelConfigSection } from './sections/ModelConfigSection'
 import { GeneralSection } from './sections/GeneralSection'
-import { MifySection } from './sections/MifySection'
-import { PermissionsSection } from './sections/PermissionsSection'
-import { AgentSection } from './sections/AgentSection'
 import { AboutSection } from './sections/AboutSection'
 import { DiagnosticsSection } from './sections/DiagnosticsSection'
 import { ArchivedSection } from './sections/ArchivedSection'
 
-interface NavGroup {
-  group: string
-  items: { id: SettingsTab; label: string }[]
-}
-
-const NAV_GROUPS: NavGroup[] = [
-  {
-    group: '核心',
-    items: [
-      { id: 'model', label: '模型配置' },
-      { id: 'general', label: '通用设置' }
-    ]
-  },
-  {
-    group: '高级',
-    items: [
-      { id: 'mify', label: 'Mify 网关' },
-      { id: 'permissions', label: '权限与审批' },
-      { id: 'agent', label: 'Agent 行为' }
-    ]
-  },
-  {
-    group: '其他',
-    items: [
-      { id: 'archived', label: '已归档' },
-      { id: 'diagnostics', label: '诊断日志' },
-      { id: 'about', label: '关于' }
-    ]
-  }
+const NAV_ITEMS: { id: SettingsTab; label: string }[] = [
+  { id: 'general', label: '通用' },
+  { id: 'model', label: '模型' },
+  { id: 'archived', label: '已归档' },
+  { id: 'diagnostics', label: '日志' },
+  { id: 'about', label: '关于' }
 ]
 
 export function SettingsDialog() {
@@ -69,7 +43,6 @@ export function SettingsDialog() {
         <div className="flex items-center justify-between px-6 py-4 border-b border-black/[0.08] flex-shrink-0">
           <div>
             <h2 className="text-base font-semibold text-[var(--ink)]">设置</h2>
-            <p className="text-xs text-[var(--ink-soft)] mt-0.5">管理模型、权限和高级选项</p>
           </div>
           <button
             onClick={closeSettings}
@@ -82,38 +55,28 @@ export function SettingsDialog() {
         {/* 左导航 + 右内容 */}
         <div className="flex flex-1 min-h-0">
           {/* 左侧导航 */}
-          <nav className="w-48 flex-shrink-0 border-r border-black/[0.08] overflow-y-auto py-3 px-2 space-y-4">
-            {NAV_GROUPS.map((g) => (
-              <div key={g.group}>
-                <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--ink-soft)]/60">
-                  {g.group}
-                </div>
-                <div className="space-y-0.5">
-                  {g.items.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => setActiveTab(item.id)}
-                      className={`w-full text-left px-2.5 py-1.5 rounded-lg text-sm transition ${
-                        activeTab === item.id
-                          ? 'bg-[#0071e3] text-white font-medium'
-                          : 'text-[var(--ink-soft)] hover:bg-black/[0.04] hover:text-[var(--ink)]'
-                      }`}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
+          <nav className="w-44 flex-shrink-0 border-r border-black/[0.08] overflow-y-auto py-3 px-2">
+            <div className="space-y-1">
+              {NAV_ITEMS.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`w-full text-left px-3 py-2 rounded-xl text-sm transition ${
+                    activeTab === item.id
+                      ? 'bg-[#0071e3] text-white font-medium shadow-sm shadow-blue-500/20'
+                      : 'text-[var(--ink-soft)] hover:bg-black/[0.04] hover:text-[var(--ink)]'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
           </nav>
 
           {/* 右侧内容区 */}
           <div className="flex-1 min-w-0 overflow-y-auto px-8 py-6">
             {activeTab === 'model' && <ModelConfigSection />}
             {activeTab === 'general' && <GeneralSection />}
-            {activeTab === 'mify' && <MifySection />}
-            {activeTab === 'permissions' && <PermissionsSection />}
-            {activeTab === 'agent' && <AgentSection />}
             {activeTab === 'about' && <AboutSection />}
             {activeTab === 'archived' && <ArchivedSection />}
             {activeTab === 'diagnostics' && <DiagnosticsSection />}

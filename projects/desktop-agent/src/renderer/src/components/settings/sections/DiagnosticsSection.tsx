@@ -66,7 +66,7 @@ export function DiagnosticsSection() {
     <section>
       <header className="mb-5">
         <div className="flex items-center justify-between gap-3">
-          <h3 className="text-lg font-semibold text-[var(--ink)]">诊断日志</h3>
+          <h3 className="text-lg font-semibold text-[var(--ink)]">日志</h3>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setFeedbackOpen(true)}
