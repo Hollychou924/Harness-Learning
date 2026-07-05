@@ -48,6 +48,46 @@ export async function runReact(
   attachments?: MessageAttachment[],
   consumeAppendedInput?: () => string[]
 ): Promise<ReactResult> {
+  const configIssue = validateModelAccess(config.apiKey)
+  if (configIssue) {
+    const turnId = `turn-${randomUUID()}`
+    const userMessageItemId = `userMessage-${randomUUID()}`
+    const agentMessageItemId = `agentMessage-${randomUUID()}`
+    const failureText = `模型调用失败：${configIssue}`
+    onEvent({ type: 'turn_started', turn_id: turnId })
+    onEvent({
+      type: 'item_started',
+      turn_id: turnId,
+      item: {
+        type: 'userMessage',
+        id: userMessageItemId,
+        content: userMessage ? [{ type: 'text', text: userMessage }] : []
+      }
+    })
+    onEvent({
+      type: 'item_completed',
+      turn_id: turnId,
+      item: {
+        type: 'userMessage',
+        id: userMessageItemId,
+        content: userMessage ? [{ type: 'text', text: userMessage }] : []
+      }
+    })
+    onEvent({
+      type: 'item_started',
+      turn_id: turnId,
+      item: { type: 'agentMessage', id: agentMessageItemId, text: failureText, phase: 'final_answer' }
+    })
+    onEvent({
+      type: 'item_completed',
+      turn_id: turnId,
+      item: { type: 'agentMessage', id: agentMessageItemId, text: failureText, phase: 'final_answer' }
+    })
+    onEvent({ type: 'turn_completed', turn_id: turnId, status: 'failed' })
+    onEvent({ type: 'error', message: failureText })
+    return { messages: [], finalText: failureText }
+  }
+
   const provider: LlmProvider = config.apiFormat === 'openai'
     ? new OpenAIProvider(config)
     : new AnthropicProvider(config)
@@ -91,8 +131,15 @@ export async function runReact(
     type: 'userMessage',
     id: userMessageItemId,
     content: [
-      { type: 'text', text: userMessage },
-      ...imageAttachments.map((a) => ({ type: 'image' as const, url: a.dataUrl || '' }))
+      ...(userMessage ? [{ type: 'text' as const, text: userMessage }] : []),
+      ...(attachments || []).map((a) => ({
+        type: a.type === 'image' ? 'image' as const : 'file' as const,
+        name: a.name,
+        mime: a.mime,
+        size: a.size,
+        url: a.type === 'image' ? a.dataUrl || '' : undefined,
+        textContent: a.type !== 'image' ? a.textContent : undefined
+      }))
     ]
   }
   onEvent({ type: 'item_started', turn_id: turnId, item: userMessageItem })
@@ -246,6 +293,20 @@ export async function runReact(
         onEvent({ type: 'completed', task_id: taskId || '', summary: finalText })
         return { messages, finalText }
       }
+      const failureText = `模型调用失败：${msg}`
+      const failureItemId = agentMessageItemId || `agentMessage-${randomUUID()}`
+      if (!agentMessageItemId) {
+        onEvent({
+          type: 'item_started',
+          turn_id: turnId,
+          item: { type: 'agentMessage', id: failureItemId, text: failureText, phase: 'final_answer' }
+        })
+      }
+      onEvent({
+        type: 'item_completed',
+        turn_id: turnId,
+        item: { type: 'agentMessage', id: failureItemId, text: failureText, phase: 'final_answer' }
+      })
       onEvent({ type: 'turn_completed', turn_id: turnId, status: 'failed' })
       throw e
     }
@@ -539,6 +600,13 @@ export async function runReact(
   clearPendingPlanRequestId()
   onEvent({ type: 'turn_completed', turn_id: turnId, status: 'completed' })
   return { messages, finalText }
+}
+
+function validateModelAccess(value: string): string | null {
+  if (!value.trim()) return '未检测到模型访问配置，请在模型设置里重新选择或配置模型'
+  if (/[\u0100-\uFFFF]/.test(value)) return '模型访问配置里包含中文或特殊字符，请重新配置模型'
+  if (/[\r\n\t]/.test(value)) return '模型访问配置里包含换行，请重新配置模型'
+  return null
 }
 
 // 判断错误是否因为模型不支持图片输入

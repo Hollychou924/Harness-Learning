@@ -7,9 +7,13 @@
 export type ItemStatus = 'pending' | 'running' | 'completed' | 'failed' | 'stopped' | 'canceled'
 
 export interface UserMessageContent {
-  type: 'text' | 'image'
+  type: 'text' | 'image' | 'file'
   text?: string
   url?: string
+  name?: string
+  mime?: string
+  size?: number
+  textContent?: string
 }
 
 export interface UserMessageItem {

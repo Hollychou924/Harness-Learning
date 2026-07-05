@@ -2,13 +2,28 @@ import type { AgentMessage } from '../../../agent/src/protocol'
 
 function plainMessageOf(message: AgentMessage): AgentMessage | null {
   if (message.role !== 'user' && message.role !== 'assistant') return null
-  const content = typeof message.content === 'string' ? message.content : ''
-  if (!content.trim()) return null
-  return { role: message.role, content }
+  const baseContent = typeof message.content === 'string' ? message.content : ''
+  const attachments = message.role === 'user' ? message.attachments || [] : []
+  const textAttachmentContent = attachments
+    .filter((attachment) => attachment.type !== 'image' && attachment.textContent)
+    .map((attachment) => `\n\n--- 附件：${attachment.name} ---\n${attachment.textContent}`)
+    .join('')
+  const content = `${baseContent}${textAttachmentContent}`
+  const imageAttachments = attachments.filter((attachment) => attachment.type === 'image')
+  if (!content.trim() && attachments.length === 0) return null
+  return {
+    role: message.role,
+    content,
+    ...(imageAttachments.length > 0 ? { attachments: imageAttachments } : {})
+  }
 }
 
 function sameMessage(a: AgentMessage, b: AgentMessage): boolean {
-  return a.role === b.role && a.content === b.content
+  return (
+    a.role === b.role &&
+    a.content === b.content &&
+    JSON.stringify(a.attachments || []) === JSON.stringify(b.attachments || [])
+  )
 }
 
 function sameRange(messages: AgentMessage[], leftStart: number, rightStart: number, length: number): boolean {

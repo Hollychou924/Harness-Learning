@@ -5,7 +5,7 @@ import { ComposerQuestionPanel } from './ComposerQuestionPanel'
 import { ProgressPill } from './ProgressPill'
 
 export function Composer() {
-  const { status, message, setMessage, startTask, appendInput, cancelTask, taskId, messages, currentTurn, approvalPending, pendingQuestion, respondQuestion, todos } = useTaskStore()
+  const { status, message, attachments, setMessage, startTask, appendInput, cancelTask, taskId, messages, currentTurn, approvalPending, pendingQuestion, respondQuestion, todos } = useTaskStore()
   const [pending, setPending] = useState(false)
 
   // idle 状态不渲染底部 Composer（输入框在 HomeView 中间）
@@ -16,7 +16,7 @@ export function Composer() {
   const isFinished = status === 'completed' || status === 'failed'
 
   const handleSend = async () => {
-    if (!message.trim()) return
+    if (!message.trim() && attachments.length === 0) return
     if (isExecuting && taskId) {
       setPending(true)
       try {

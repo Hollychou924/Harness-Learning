@@ -1,9 +1,8 @@
 // Turn/Item 状态机：把 agent 吐出的 turn_started/item_started/item_delta/item_completed/turn_completed
 // 事件序列，转成渲染层可用的 Turn[] 数据，并派生出给 LLM 用的精简对话历史(AgentMessage[])
 // 依据 2026-07-02 复刻并超越 Codex 展示逻辑方案 · 阶段1
-import type { StdoutMessage } from '../../../agent/src/protocol'
-import type { AgentMessage } from '../../../agent/src/protocol'
-import type { Item, ReasoningItem, AgentMessageItem, ToolCallItem, Turn } from '../../../agent/src/items'
+import type { StdoutMessage, AgentMessage, MessageAttachment } from '../../../agent/src/protocol'
+import type { Item, ReasoningItem, AgentMessageItem, ToolCallItem, Turn, UserMessageItem } from '../../../agent/src/items'
 
 /** 把一条 item_delta 应用到条目上，按 target.field 精确拼接到对应字段/分段 */
 export function applyItemDelta(item: Item, target: { field: string; index?: number }, delta: string): Item {
@@ -91,6 +90,29 @@ export function getFinalAnswerOfTurn(turn: Turn | null): string {
   return ''
 }
 
+function userContentToMessage(item: UserMessageItem): AgentMessage {
+  const text = item.content
+    .filter((c) => c.type === 'text')
+    .map((c) => c.text || '')
+    .join('')
+  const attachments: MessageAttachment[] = item.content
+    .filter((c) => c.type === 'image' || c.type === 'file')
+    .map((c, index) => ({
+      type: c.type === 'image' ? 'image' : 'text',
+      name: c.name || (c.type === 'image' ? `图片${index + 1}` : `文档${index + 1}`),
+      mime: c.mime || (c.type === 'image' ? 'image/png' : 'text/plain'),
+      size: c.size || 0,
+      dataUrl: c.type === 'image' ? c.url : undefined,
+      textContent: c.type === 'file' ? c.textContent : undefined
+    }))
+
+  return {
+    role: 'user',
+    content: text,
+    ...(attachments.length > 0 ? { attachments } : {})
+  }
+}
+
 /** 从完整的 turns 序列派生出给 LLM 用的精简对话历史，不含思考/审批等展示专用条目 */
 export function deriveAgentMessages(turns: Turn[]): AgentMessage[] {
   const messages: AgentMessage[] = []
@@ -100,8 +122,7 @@ export function deriveAgentMessages(turns: Turn[]): AgentMessage[] {
     const toolResults: Array<{ id: string; content: string }> = []
     for (const item of turn.items) {
       if (item.type === 'userMessage') {
-        const text = item.content.filter((c) => c.type === 'text').map((c) => c.text || '').join('')
-        messages.push({ role: 'user', content: text })
+        messages.push(userContentToMessage(item))
       } else if (item.type === 'agentMessage' && item.phase === 'final_answer') {
         assistantText = item.text
       } else if (item.type === 'toolCall') {

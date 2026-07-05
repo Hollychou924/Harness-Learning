@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { api } from '../api'
 import { useSettingsStore } from '../components/settings/settingsStore'
-import type { StdoutMessage, AgentMessage } from '../../../agent/src/protocol'
+import type { StdoutMessage, AgentMessage, MessageAttachment } from '../../../agent/src/protocol'
 import type { Turn } from '../../../agent/src/items'
 import { reduceTurnsEvent, getFinalAnswerOfTurn, deriveAgentMessages, type TurnsReducerState } from './turns'
 import { buildCompletedSessionMessages, sanitizeContinuationMessages } from './sessionHistory'
@@ -194,6 +194,13 @@ export interface SubtaskEntry {
   error?: string
 }
 
+export interface StartTaskDraft {
+  message?: string
+  attachments?: Attachment[]
+  baseTurns?: Turn[]
+  baseMessages?: AgentMessage[]
+}
+
 /** 单任务运行时状态（隔离存储，切走不清除，切回来恢复） */
 export interface TaskRuntime {
   status: TaskStatus
@@ -246,17 +253,18 @@ export interface TaskState {
   todos: TodoItem[]
   subtasks: SubtaskEntry[]
   attachments: Attachment[]
-  compactNotice: CompactNotice | null
   requestManualCompact: () => void
   clearCompactNotice: () => void
   setAttachments: (a: Attachment[]) => void
   setMode: (m: 'work' | 'code') => void
   setMessage: (s: string) => void
   setGoal: (s: string) => void
-  startTask: () => Promise<void>
+  startTask: (draft?: StartTaskDraft) => Promise<void>
   continueSession: (sessionId: string) => Promise<void>
   cancelTask: () => Promise<void>
   appendInput: (text: string) => Promise<void>
+  regenerateLatestTurn: () => Promise<void>
+  forkFromTurn: (turnId: string) => Promise<void>
   respondApproval: (approved: boolean, scope?: 'once' | 'task' | 'always') => Promise<void>
   respondQuestion: (selectedOptionIds?: string[], customAnswer?: string, skipped?: boolean, skipAll?: boolean) => Promise<void>
   respondPlan: (decision: 'approve' | 'reject_stop' | 'reject_revise', feedback?: string) => Promise<void>
@@ -445,6 +453,59 @@ function compactMessagesForContext(messages: AgentMessage[]): { messages: AgentM
 
 function compactNotice(state: CompactNotice['state'], label: string): CompactNotice {
   return { id: `compact-${Date.now()}`, state, label, createdAt: Date.now() }
+}
+
+function describeAttachments(attachments: Attachment[] | MessageAttachment[]): string {
+  if (attachments.length === 0) return ''
+  return attachments
+    .map((a, index) => `【${a.type === 'image' ? '图片' : '文档'} ${a.name || index + 1}】`)
+    .join(' ')
+}
+
+function messageAttachmentsOf(attachments: Attachment[]): MessageAttachment[] {
+  return attachments.map((a) => ({
+    type: a.type,
+    name: a.name,
+    mime: a.mime,
+    size: a.size,
+    dataUrl: a.dataUrl,
+    textContent: a.textContent
+  }))
+}
+
+function draftFromTurn(turn: Turn | null): { message: string; attachments: Attachment[] } | null {
+  const userItem = turn?.items.find((item) => item.type === 'userMessage')
+  if (!userItem || userItem.type !== 'userMessage') return null
+  const message = userItem.content
+    .filter((c) => c.type === 'text')
+    .map((c) => c.text || '')
+    .join('')
+  const attachments: Attachment[] = userItem.content
+    .filter((c) => c.type === 'image' || c.type === 'file')
+    .map((c, index) => ({
+      id: `edit-${Date.now()}-${index}`,
+      name: c.name || (c.type === 'image' ? `图片${index + 1}.png` : `文档${index + 1}`),
+      type: c.type === 'image' ? 'image' : 'text',
+      size: c.size || 0,
+      dataUrl: c.type === 'image' ? c.url : undefined,
+      textContent: c.type === 'file' ? c.textContent : undefined,
+      mime: c.mime || (c.type === 'image' ? 'image/png' : 'text/plain')
+    }))
+  return { message, attachments }
+}
+
+function userContentFromDraft(message: string, attachments: Attachment[]) {
+  return [
+    ...(message ? [{ type: 'text' as const, text: message }] : []),
+    ...attachments.map((a) => ({
+      type: a.type === 'image' ? 'image' as const : 'file' as const,
+      name: a.name,
+      mime: a.mime,
+      size: a.size,
+      url: a.type === 'image' ? a.dataUrl : undefined,
+      textContent: a.type !== 'image' ? a.textContent : undefined
+    }))
+  ]
 }
 
 export const useTaskStore = create<TaskState>((set, get) => ({
@@ -794,7 +855,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         const assistantText = getFinalAnswerOfTurn(cur2.currentTurn) || msg.summary || ''
         const derivedTail = deriveAgentMessages(cur2.turns)
         const nextMessages = buildCompletedSessionMessages(cur2.messages, msg.messages, derivedTail)
-        set({ status: 'completed', summary: msg.summary, finishedAt: Date.now(), messages: nextMessages })
+        const finalStatus: TaskStatus = cur2.status === 'failed' ? 'failed' : 'completed'
+        set({ status: finalStatus, summary: msg.summary, finishedAt: Date.now(), messages: nextMessages })
         pushHistory(set, get)
         if (evTaskId) {
           void api.saveSessionMessages(evTaskId, nextMessages)
@@ -836,51 +898,15 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     }
   },
 
-  startTask: async () => {
-    const { mode, message, goal, activeSessionId, messages, attachments } = get()
-    if (!message.trim()) return
-    // 继续已有对话：用原 sessionId + 全量历史；新建对话：无 sessionId 无 history
-    const isContinue = Boolean(activeSessionId && messages.length > 0)
-    const sessionId = isContinue ? (activeSessionId as string) : undefined
-    // 续聊只带用户/助手正文，过程回放里的工具细节不再反推给模型
-    const rawHistory = isContinue ? sanitizeContinuationMessages(messages.filter((m) => m.role !== 'system')) : undefined
-    let history = rawHistory
-    if (rawHistory) {
-      const compacted = compactMessagesForContext(rawHistory)
-      if (compacted.changed) {
-        set({ compactNotice: compactNotice('running', '正在自动整理旧上下文') })
-        history = compacted.messages
-        set({ compactNotice: compactNotice('done', '上下文已自动整理，当前任务会继续使用最近对话') })
-      }
-    }
-    // 把本轮用户消息加入消息流
-    const userMsg: AgentMessage = { role: 'user', content: message }
-    set({
-      status: 'executing',
-      turns: isContinue ? get().turns : [],
-      currentTurn: null,
-      summary: '',
-      artifacts: [],
-      error: null,
-      approvalPending: null,
-      pendingPlan: null,
-      pendingQuestion: null,
-      compactNotice: null,
-      todos: [],
-      subtasks: [],
-      attachments: [],
-      usage: { inputTokens: 0, outputTokens: 0 },
-      startedAt: Date.now(),
-      finishedAt: null,
-      goal: goal || message,
-      message: '',
-      messages: [...messages, userMsg]
-    })
-    // 注册到隔离存储，切走后事件继续写入对应任务
-    set((st) => ({ runningTasks: { ...st.runningTasks, [get().taskId as string]: { status: 'executing', turns: get().turns, currentTurn: null, summary: '', artifacts: [], usage: { inputTokens: 0, outputTokens: 0 }, error: null, startedAt: Date.now(), finishedAt: null, approvalPending: null, pendingPlan: null, pendingQuestion: null, compactNotice: null, todos: [], subtasks: [] } } }))
+  startTask: async (draft) => {
+    const state = get()
+    const mode = state.mode
+    const message = draft?.message ?? state.message
+    const draftAttachments = draft?.attachments ?? state.attachments
+    if (!message.trim() && draftAttachments.length === 0) return
+
     const settingsState = useSettingsStore.getState()
-    // 发送前把 objectUrl 图片转成 dataUrl(agent 子进程需要 base64)
-    const sendAttachments = await Promise.all(attachments.map(async (a) => {
+    const sendAttachments = await Promise.all(draftAttachments.map(async (a) => {
       if (a.objectUrl && !a.dataUrl && a.type === 'image') {
         try {
           const resp = await fetch(a.objectUrl)
@@ -897,22 +923,166 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       return a
     }))
 
+    const baseTurns = draft?.baseTurns ?? state.turns
+    const baseMessages = draft?.baseMessages ?? state.messages
+    // 继续已有对话：用原 sessionId + 全量历史；新建对话：无 sessionId 无 history
+    const isContinue = Boolean(state.activeSessionId && (baseMessages.length > 0 || baseTurns.length > 0))
+    const sessionId = isContinue ? (state.activeSessionId as string) : undefined
+    // 续聊只带用户/助手正文，过程回放里的工具细节不再反推给模型
+    const rawHistory = isContinue ? sanitizeContinuationMessages(baseMessages.filter((m) => m.role !== 'system')) : undefined
+    let history = rawHistory
+    if (rawHistory) {
+      const compacted = compactMessagesForContext(rawHistory)
+      if (compacted.changed) {
+        set({ compactNotice: compactNotice('running', '正在自动整理旧上下文') })
+        history = compacted.messages
+        set({ compactNotice: compactNotice('done', '上下文已自动整理，当前任务会继续使用最近对话') })
+      }
+    }
+
+    const messageAttachments = messageAttachmentsOf(sendAttachments)
+    const visibleTitle = message.trim() || describeAttachments(sendAttachments) || '新任务'
+    const userMsg: AgentMessage = {
+      role: 'user',
+      content: message,
+      ...(messageAttachments.length > 0 ? { attachments: messageAttachments } : {})
+    }
+
+    set({
+      status: 'executing',
+      turns: isContinue ? baseTurns : [],
+      currentTurn: null,
+      summary: '',
+      artifacts: [],
+      error: null,
+      approvalPending: null,
+      pendingPlan: null,
+      pendingQuestion: null,
+      compactNotice: null,
+      todos: [],
+      subtasks: [],
+      attachments: [],
+      usage: { inputTokens: 0, outputTokens: 0 },
+      startedAt: Date.now(),
+      finishedAt: null,
+      goal: state.goal || visibleTitle,
+      message: '',
+      messages: [...baseMessages, userMsg]
+    })
+    // 注册到隔离存储，切走后事件继续写入对应任务
+    set((st) => ({ runningTasks: { ...st.runningTasks, [get().taskId as string]: { status: 'executing', turns: get().turns, currentTurn: null, summary: '', artifacts: [], usage: { inputTokens: 0, outputTokens: 0 }, error: null, startedAt: Date.now(), finishedAt: null, approvalPending: null, pendingPlan: null, pendingQuestion: null, compactNotice: null, todos: [], subtasks: [] } } }))
+
     // 释放附件 Object URL
-    for (const a of attachments) { if (a.objectUrl) URL.revokeObjectURL(a.objectUrl) }
+    for (const a of draftAttachments) { if (a.objectUrl) URL.revokeObjectURL(a.objectUrl) }
 
     // 取当前项目绑定的文件夹作为工作区目录；无绑定则走主进程默认产出目录
     const curProject = get().projects.find((p) => p.id === get().activeProjectId)
     const workspaceDir = curProject?.folderPath || undefined
-    const res = await api.startTask({ mode, message, workspaceDir, maxIterations: settingsState.maxIterations, autoApproveLow: settingsState.autoApproveLow, sessionId, history, attachments: sendAttachments })
+    const res = await api.startTask({ mode, message, workspaceDir, maxIterations: settingsState.maxIterations, autoApproveLow: settingsState.autoApproveLow, sessionId, history, attachments: messageAttachments })
     if (res.error) {
-      set({ status: 'failed', error: res.error })
+      const now = Date.now()
+      const failureText = `模型调用失败：${res.error}`
+      const failureSessionId = res.taskId || sessionId
+      const failedTurn: Turn = {
+        id: uid('turn'),
+        status: 'failed',
+        startedAt: now,
+        finishedAt: now,
+        items: [
+          { type: 'userMessage', id: uid('userMessage'), content: userContentFromDraft(message, sendAttachments) },
+          { type: 'agentMessage', id: uid('agentMessage'), text: failureText, phase: 'final_answer' }
+        ]
+      }
+      const nextTurns = [...baseTurns, failedTurn]
+      const nextMessages: AgentMessage[] = [...baseMessages, userMsg, { role: 'assistant', content: failureText }]
+      set({
+        status: 'failed',
+        error: failureText,
+        finishedAt: now,
+        taskId: failureSessionId || get().taskId,
+        activeSessionId: failureSessionId || get().activeSessionId,
+        turns: nextTurns,
+        currentTurn: null,
+        messages: nextMessages
+      })
+      if (failureSessionId) {
+        pushHistory(set, get)
+        void api.saveSessionMessages(failureSessionId, nextMessages)
+        void api.saveSessionTurns(failureSessionId, nextTurns)
+      }
     } else {
       set({ taskId: res.taskId, activeSessionId: res.taskId })
       // 新对话立刻落盘用户消息，防止丢失
       if (!isContinue) {
-        void api.saveSessionMessages(res.taskId, [{ role: 'user', content: message }])
+        void api.saveSessionMessages(res.taskId, [userMsg])
       }
     }
+  },
+  regenerateLatestTurn: async () => {
+    const cur = get()
+    if (cur.status === 'executing') return
+    const latest = cur.turns[cur.turns.length - 1]
+    const draft = draftFromTurn(latest)
+    if (!latest || !draft) return
+    const baseTurns = cur.turns.slice(0, -1)
+    await get().startTask({
+      message: draft.message,
+      attachments: draft.attachments,
+      baseTurns,
+      baseMessages: deriveAgentMessages(baseTurns)
+    })
+  },
+  forkFromTurn: async (turnId) => {
+    const cur = get()
+    if (cur.status === 'executing') return
+    const index = cur.turns.findIndex((turn) => turn.id === turnId)
+    if (index < 0) return
+    const forkTurns = cur.turns.slice(0, index + 1)
+    const forkMessages = deriveAgentMessages(forkTurns)
+    const source = forkTurns[index]
+    const draft = draftFromTurn(source)
+    const titleBase = draft?.message.trim() || describeAttachments(draft?.attachments || []) || '新路线'
+    const now = Date.now()
+    const session: Session = {
+      id: uid('sess'),
+      title: `分叉：${titleBase.slice(0, 32)}`,
+      mode: cur.mode,
+      status: 'completed',
+      projectId: cur.activeProjectId,
+      createdAt: now,
+      updatedAt: now,
+      stepCount: forkTurns.length,
+      tokens: cur.usage.inputTokens + cur.usage.outputTokens,
+      pinned: false,
+      archived: false,
+      order: 0,
+      startedAt: forkTurns[0]?.startedAt,
+      finishedAt: source.finishedAt || now,
+      durationMs: forkTurns[0]?.startedAt ? (source.finishedAt || now) - forkTurns[0].startedAt : undefined
+    }
+    const nextSessions = [session, ...cur.sessions.map((s, i) => ({ ...s, order: i + 1 }))]
+    saveSessionsToStorage(nextSessions)
+    await api.saveSessionMessages(session.id, forkMessages)
+    await api.saveSessionTurns(session.id, forkTurns)
+    set({
+      ...initial,
+      status: 'completed',
+      mode: cur.mode,
+      messages: forkMessages,
+      turns: forkTurns,
+      activeSessionId: session.id,
+      activeProjectId: cur.activeProjectId,
+      taskId: session.id,
+      goal: session.title,
+      usage: cur.usage,
+      startedAt: session.startedAt ?? null,
+      finishedAt: session.finishedAt ?? null,
+      artifacts: deriveArtifactsFromTurns(forkTurns),
+      runningTasks: cur.runningTasks,
+      projects: cur.projects,
+      sessions: nextSessions,
+      history: cur.history
+    })
   },
   continueSession: async (sessionId) => {
     const cur = get()
