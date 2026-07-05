@@ -88,6 +88,26 @@ export interface DiagnosticsOverview {
   versions: Array<{ name: string; total: number; failed: number }>
 }
 
+export interface ReplayStep {
+  ts: number
+  offsetMs: number
+  title: string
+  kind: 'user' | 'model' | 'tool' | 'approval' | 'plan' | 'question' | 'file' | 'system' | 'error'
+  status?: string
+  detail?: string
+}
+
+export interface ReplayBundle {
+  traceId: string
+  generatedAt: string
+  privacy: {
+    includeConversation: boolean
+    includeFileSummary: boolean
+  }
+  meta: TraceMeta | null
+  steps: ReplayStep[]
+}
+
 type Api = {
   startTask: (args: { mode: 'work' | 'code'; message: string; workspaceDir?: string; maxIterations?: number; autoApproveLow?: boolean; sessionId?: string; history?: unknown[]; attachments?: unknown[] }) =>
     Promise<{ taskId: string; traceId?: string; error?: string }>
@@ -124,6 +144,8 @@ type Api = {
   feedbackCreate: (input: { traceId?: string; category: string; description: string; contact?: string; packageLevel?: DiagnosticPackageLevel; includeConversation?: boolean; includeFileSummary?: boolean; allowDiagnosticPackage?: boolean }) => Promise<{ success: boolean; feedback?: FeedbackTicket; packagePath?: string; error?: string }>
   feedbackList: (limit?: number) => Promise<FeedbackTicket[]>
   diagnosticsOverview: (limit?: number) => Promise<DiagnosticsOverview>
+  replayGet: (input: { traceId: string; includeConversation?: boolean; includeFileSummary?: boolean }) => Promise<ReplayBundle>
+  replayExport: (input: { traceId: string; includeConversation?: boolean; includeFileSummary?: boolean }) => Promise<{ success: boolean; path?: string; error?: string }>
 }
 
 const noop = () => {}
@@ -173,7 +195,15 @@ const empty: Api = {
     models: [],
     tools: [],
     versions: []
-  })
+  }),
+  replayGet: async (input) => ({
+    traceId: input.traceId,
+    generatedAt: new Date().toISOString(),
+    privacy: { includeConversation: false, includeFileSummary: false },
+    meta: null,
+    steps: []
+  }),
+  replayExport: async () => ({ success: false, error: 'preload 未就绪' })
 }
 
 export const api: Api = (globalThis as { api?: Api }).api ?? empty

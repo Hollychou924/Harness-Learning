@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ChevronLeft, ChevronRight, Download, Loader2, MessageSquareWarning } from 'lucide-react'
-import { api, type TraceMeta, type TraceEvent, type FeedbackTicket, type DiagnosticPackageLevel, type DiagnosticsOverview } from '../../../api'
+import { api, type TraceMeta, type TraceEvent, type FeedbackTicket, type DiagnosticPackageLevel, type DiagnosticsOverview, type ReplayBundle } from '../../../api'
 
 export function DiagnosticsSection() {
   const [traces, setTraces] = useState<TraceMeta[]>([])
@@ -9,6 +9,9 @@ export function DiagnosticsSection() {
   const [exporting, setExporting] = useState(false)
   const [notice, setNotice] = useState('')
   const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [replay, setReplay] = useState<ReplayBundle | null>(null)
+  const [includeReplayConversation, setIncludeReplayConversation] = useState(false)
+  const [includeReplayFileSummary, setIncludeReplayFileSummary] = useState(false)
   const [feedbackList, setFeedbackList] = useState<FeedbackTicket[]>([])
   const [overview, setOverview] = useState<DiagnosticsOverview | null>(null)
   const [query, setQuery] = useState('')
@@ -191,6 +194,8 @@ function TraceDetail({ traceId, onBack }: { traceId: string; onBack: () => void 
       setLoading(true)
       const d = (await api.traceGet(traceId)) as { meta: TraceMeta | null; events: TraceEvent[] }
       setDetail(d)
+      const r = await api.replayGet({ traceId, includeConversation: false, includeFileSummary: false })
+      setReplay(r)
       setLoading(false)
     })()
   }, [traceId])
@@ -219,6 +224,28 @@ function TraceDetail({ traceId, onBack }: { traceId: string; onBack: () => void 
       void api.openPath(result.path)
     } else {
       setNotice(result.error || '导出失败，请重试')
+    }
+  }
+
+  const refreshReplay = async (nextConversation = includeReplayConversation, nextFileSummary = includeReplayFileSummary) => {
+    const r = await api.replayGet({ traceId, includeConversation: nextConversation, includeFileSummary: nextFileSummary })
+    setReplay(r)
+  }
+
+  const exportReplay = async () => {
+    setExporting(true)
+    setNotice('')
+    const result = await api.replayExport({
+      traceId,
+      includeConversation: includeReplayConversation,
+      includeFileSummary: includeReplayFileSummary
+    })
+    setExporting(false)
+    if (result.success && result.path) {
+      setNotice(`回放包已生成：${result.path}`)
+      void api.openPath(result.path)
+    } else {
+      setNotice(result.error || '回放包生成失败，请重试')
     }
   }
 
@@ -280,6 +307,24 @@ function TraceDetail({ traceId, onBack }: { traceId: string; onBack: () => void 
           <div className="text-xs text-red-500 mt-2">⚠ {errors.length} 个异常</div>
         )}
       </div>
+
+      {replay && (
+        <ReplayPanel
+          replay={replay}
+          includeConversation={includeReplayConversation}
+          includeFileSummary={includeReplayFileSummary}
+          exporting={exporting}
+          onToggleConversation={(value) => {
+            setIncludeReplayConversation(value)
+            void refreshReplay(value, includeReplayFileSummary)
+          }}
+          onToggleFileSummary={(value) => {
+            setIncludeReplayFileSummary(value)
+            void refreshReplay(includeReplayConversation, value)
+          }}
+          onExport={exportReplay}
+        />
+      )}
 
       {/* 时间线 */}
       <div className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-soft)] mb-2">执行时间线</div>
@@ -608,6 +653,92 @@ function DiagnosticsOverviewPanel({ overview }: { overview: DiagnosticsOverview 
       )}
     </div>
   )
+}
+
+function ReplayPanel({
+  replay,
+  includeConversation,
+  includeFileSummary,
+  exporting,
+  onToggleConversation,
+  onToggleFileSummary,
+  onExport
+}: {
+  replay: ReplayBundle
+  includeConversation: boolean
+  includeFileSummary: boolean
+  exporting: boolean
+  onToggleConversation: (value: boolean) => void
+  onToggleFileSummary: (value: boolean) => void
+  onExport: () => void
+}) {
+  const visibleSteps = replay.steps.slice(0, 80)
+  return (
+    <div className="mb-4 rounded-xl glass-soft px-4 py-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="text-sm font-semibold text-[var(--ink)]">场景回放</div>
+          <div className="text-xs text-[var(--ink-soft)]">按时间还原用户输入、模型、工具、审批和异常</div>
+        </div>
+        <button
+          onClick={onExport}
+          disabled={exporting}
+          className="inline-flex items-center gap-1.5 rounded-lg glass px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:brightness-105 disabled:opacity-40 transition"
+        >
+          {exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+          生成回放包
+        </button>
+      </div>
+
+      <div className="mb-3 grid gap-2 text-xs text-[var(--ink-soft)] sm:grid-cols-2">
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={includeConversation} onChange={(e) => onToggleConversation(e.target.checked)} />
+          包含对话内容
+        </label>
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={includeFileSummary} onChange={(e) => onToggleFileSummary(e.target.checked)} />
+          包含文件摘要
+        </label>
+      </div>
+
+      {visibleSteps.length === 0 ? (
+        <div className="text-xs text-[var(--ink-soft)]">暂无可回放步骤</div>
+      ) : (
+        <div className="space-y-2">
+          {visibleSteps.map((step, index) => (
+            <div key={`${step.ts}-${index}`} className="flex gap-2 text-xs">
+              <span className="w-14 shrink-0 font-mono text-[var(--ink-soft)]">+{(step.offsetMs / 1000).toFixed(1)}s</span>
+              <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${replayKindColor(step.kind)}`} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-[var(--ink)]">{step.title}</span>
+                  {step.status && <span className="text-[10px] text-[var(--ink-soft)]">{step.status}</span>}
+                </div>
+                {step.detail && (
+                  <div className="mt-0.5 line-clamp-2 text-[var(--ink-soft)]">{step.detail}</div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function replayKindColor(kind: string): string {
+  const colors: Record<string, string> = {
+    user: 'bg-sky-400',
+    model: 'bg-blue-400',
+    tool: 'bg-amber-400',
+    approval: 'bg-orange-400',
+    plan: 'bg-indigo-400',
+    question: 'bg-fuchsia-400',
+    file: 'bg-teal-400',
+    error: 'bg-red-400',
+    system: 'bg-gray-400'
+  }
+  return colors[kind] || 'bg-gray-400'
 }
 
 function MetricCard({ label, value, tone }: { label: string; value: string; tone?: 'warn' }) {

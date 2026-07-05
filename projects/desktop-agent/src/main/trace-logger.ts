@@ -99,6 +99,32 @@ export interface DiagnosticsOverview {
   versions: Array<{ name: string; total: number; failed: number }>
 }
 
+export interface ReplayStep {
+  ts: number
+  offsetMs: number
+  title: string
+  kind: 'user' | 'model' | 'tool' | 'approval' | 'plan' | 'question' | 'file' | 'system' | 'error'
+  status?: string
+  detail?: string
+}
+
+export interface ReplayBundle {
+  traceId: string
+  generatedAt: string
+  privacy: {
+    includeConversation: boolean
+    includeFileSummary: boolean
+  }
+  meta: TraceMeta | null
+  steps: ReplayStep[]
+}
+
+export interface ReplayOptions {
+  traceId: string
+  includeConversation?: boolean
+  includeFileSummary?: boolean
+}
+
 const tracesDir = () => join(app.getPath('userData'), 'logs', 'traces')
 const indexFile = () => join(tracesDir(), 'index.json')
 const feedbackDir = () => join(app.getPath('userData'), 'logs', 'feedback')
@@ -592,6 +618,41 @@ export function getDiagnosticsOverview(limit = 200): DiagnosticsOverview {
   }
 }
 
+export function getReplayBundle(options: ReplayOptions): ReplayBundle {
+  const trace = getTrace(options.traceId)
+  const startedAt = trace.meta?.startedAt || trace.events[0]?.ts || Date.now()
+  return {
+    traceId: options.traceId,
+    generatedAt: new Date().toISOString(),
+    privacy: {
+      includeConversation: Boolean(options.includeConversation),
+      includeFileSummary: Boolean(options.includeFileSummary)
+    },
+    meta: trace.meta,
+    steps: trace.events
+      .map((event) => replayStepFromEvent(event, startedAt, options))
+      .filter((step): step is ReplayStep => Boolean(step))
+  }
+}
+
+export function exportReplayPackage(options: ReplayOptions): { success: boolean; path?: string; error?: string } {
+  try {
+    ensureDirs()
+    const bundle = getReplayBundle(options)
+    const filePath = join(app.getPath('downloads'), `xiaolanjing-replay-${options.traceId.slice(0, 8)}.json`)
+    writeFileSync(filePath, JSON.stringify(bundle, null, 2), 'utf-8')
+    if (options.traceId) {
+      logUserAction(options.traceId, 'replay_package_exported', {
+        includeConversation: Boolean(options.includeConversation),
+        includeFileSummary: Boolean(options.includeFileSummary)
+      })
+    }
+    return { success: true, path: filePath }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
 function classifyFailure(events: TraceEvent[]): string {
   const text = events
     .filter((event) => event.phase === 'error' || event.type === 'item_completed' || event.type === 'status')
@@ -610,6 +671,82 @@ function countBy(values: string[]): Array<[string, number]> {
   const map = new Map<string, number>()
   for (const value of values) map.set(value, (map.get(value) || 0) + 1)
   return Array.from(map.entries()).sort((a, b) => b[1] - a[1])
+}
+
+function replayStepFromEvent(event: TraceEvent, startedAt: number, options: ReplayOptions): ReplayStep | null {
+  const offsetMs = Math.max(0, event.ts - startedAt)
+  const data = trimEventForPackage(event, {
+    traceId: options.traceId,
+    feedbackId: '',
+    packageLevel: 'enhanced',
+    includeConversation: Boolean(options.includeConversation),
+    includeFileSummary: Boolean(options.includeFileSummary)
+  }).data
+
+  switch (event.type) {
+    case 'task_started':
+      return { ts: event.ts, offsetMs, kind: 'user', title: '用户发起任务', detail: String(data.message || '对话内容未包含') }
+    case 'turn_started':
+      return { ts: event.ts, offsetMs, kind: 'system', title: '开始一轮执行' }
+    case 'turn_completed':
+      return { ts: event.ts, offsetMs, kind: event.phase === 'error' ? 'error' : 'system', title: `一轮执行结束：${data.status || ''}`, status: String(data.status || '') }
+    case 'item_started':
+      return replayStepFromItem(event.ts, offsetMs, data.item as Record<string, unknown> | undefined, '开始')
+    case 'item_completed':
+      return replayStepFromItem(event.ts, offsetMs, data.item as Record<string, unknown> | undefined, '完成')
+    case 'approval_request':
+      return { ts: event.ts, offsetMs, kind: 'approval', title: `请求用户确认：${data.toolName || ''}`, detail: String(data.impact || '') }
+    case 'approval_response':
+      return { ts: event.ts, offsetMs, kind: 'approval', title: data.approved ? '用户批准继续' : '用户拒绝继续' }
+    case 'plan_proposed':
+      return { ts: event.ts, offsetMs, kind: 'plan', title: '小蓝鲸提出计划', detail: String(data.plan || '') }
+    case 'plan_response':
+      return { ts: event.ts, offsetMs, kind: 'plan', title: `用户处理计划：${data.decision || ''}`, detail: String(data.feedback || '') }
+    case 'question_proposed':
+      return { ts: event.ts, offsetMs, kind: 'question', title: '小蓝鲸请求补充信息', detail: String(data.question || '') }
+    case 'question_response':
+      return { ts: event.ts, offsetMs, kind: 'question', title: '用户补充信息', detail: String(data.customAnswer || '') }
+    case 'append_input':
+      return { ts: event.ts, offsetMs, kind: 'user', title: '用户追加输入', detail: String(data.message || '') }
+    case 'task_cancelled':
+      return { ts: event.ts, offsetMs, kind: 'user', title: '用户取消任务' }
+    case 'task_paused':
+      return { ts: event.ts, offsetMs, kind: 'user', title: '用户暂停任务' }
+    case 'task_resumed':
+      return { ts: event.ts, offsetMs, kind: 'user', title: '用户继续任务' }
+    case 'usage':
+      return { ts: event.ts, offsetMs, kind: 'model', title: '记录模型消耗', detail: `输入 ${data.inputTokens || 0} / 输出 ${data.outputTokens || 0}` }
+    case 'artifact':
+      return { ts: event.ts, offsetMs, kind: 'file', title: `生成产物：${data.artifactType || ''}`, detail: String(data.filePath || '') }
+    case 'error':
+      return { ts: event.ts, offsetMs, kind: 'error', title: '出现异常', detail: String(data.message || '') }
+    case 'completed':
+      return { ts: event.ts, offsetMs, kind: 'system', title: '任务完成', detail: String(data.summary || '') }
+    default:
+      return null
+  }
+}
+
+function replayStepFromItem(ts: number, offsetMs: number, item: Record<string, unknown> | undefined, phase: string): ReplayStep | null {
+  if (!item) return null
+  const type = String(item.type || '')
+  if (type === 'userMessage') return { ts, offsetMs, kind: 'user', title: `用户消息${phase}`, detail: String(item.content || '') }
+  if (type === 'agentMessage') return { ts, offsetMs, kind: 'model', title: phase === '完成' ? '小蓝鲸输出回复' : '小蓝鲸开始回复', detail: String(item.text || '') }
+  if (type === 'reasoning') return { ts, offsetMs, kind: 'model', title: `小蓝鲸思考${phase}` }
+  if (type === 'toolCall') {
+    return {
+      ts,
+      offsetMs,
+      kind: 'tool',
+      title: `工具${phase}：${item.toolName || item.toolKind || '未知工具'}`,
+      status: String(item.status || ''),
+      detail: String(item.resultSummary || item.error || '')
+    }
+  }
+  if (type === 'approval') return { ts, offsetMs, kind: 'approval', title: `审批${phase}`, status: String(item.status || '') }
+  if (type === 'plan') return { ts, offsetMs, kind: 'plan', title: `计划${phase}`, detail: String(item.plan || '') }
+  if (type === 'question') return { ts, offsetMs, kind: 'question', title: `反问${phase}`, detail: String(item.question || '') }
+  return { ts, offsetMs, kind: 'system', title: `${type}${phase}` }
 }
 
 function normalizeExportOptions(input?: string | DiagnosticExportOptions): Required<DiagnosticExportOptions> {

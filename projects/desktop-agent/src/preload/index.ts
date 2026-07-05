@@ -51,6 +51,10 @@ const api = {
     ipcRenderer.invoke('feedback:create', input) as Promise<{ success: boolean; feedback?: unknown; packagePath?: string; error?: string }>,
   feedbackList: (limit?: number) => ipcRenderer.invoke('feedback:list', limit) as Promise<unknown[]>,
   diagnosticsOverview: (limit?: number) => ipcRenderer.invoke('diagnostics:overview', limit) as Promise<unknown>,
+  replayGet: (input: { traceId: string; includeConversation?: boolean; includeFileSummary?: boolean }) =>
+    ipcRenderer.invoke('replay:get', input) as Promise<unknown>,
+  replayExport: (input: { traceId: string; includeConversation?: boolean; includeFileSummary?: boolean }) =>
+    ipcRenderer.invoke('replay:export', input) as Promise<{ success: boolean; path?: string; error?: string }>,
   openFiles: () => ipcRenderer.invoke('dialog:openFiles') as Promise<unknown[]>,
   pickFolder: () => ipcRenderer.invoke('project:select') as Promise<string | null>,
   createProjectFolder: (name: string) => ipcRenderer.invoke('project:create', name) as Promise<string | null>,
