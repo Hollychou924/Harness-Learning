@@ -62,7 +62,7 @@ export function TurnNavigator({ turns, onJump }: { turns: Turn[]; onJump: (turnI
             />
             {/* 悬停浮层：摘要信息 */}
             {isHovered && (
-              <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 z-10 w-52 rounded-lg glass shadow-lg p-2.5 space-y-1 pointer-events-none">
+              <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 z-10 w-52 rounded-lg floating-surface p-2.5 space-y-1 pointer-events-none">
                 <div className="text-[10px] text-[var(--ink-soft)]">第 {s.index + 1} 轮</div>
                 {s.userText && (
                   <div className="text-xs text-[var(--ink)] line-clamp-2">{s.userText}</div>

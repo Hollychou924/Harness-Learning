@@ -6,6 +6,7 @@ import { ToolActivityGroupView, groupToolItems } from './ToolActivityGroup'
 import { CollapsedTurnBar } from './CollapsedTurnBar'
 import { ProcessFold } from './ProcessFold'
 import { useDetailLevelStore } from './detailLevelStore'
+import { WhaleTooltip } from './WhaleTooltip'
 
 // 单轮内条目的纯展示：思考块 + 文件变更 + 工具活动组，历史轮次和当前实时轮次共用这一份渲染逻辑
 // 这样翻回历史对话，每一轮的思考/工具调用细节依然能展开看，不再是只剩一句"用了N个工具"
@@ -150,7 +151,9 @@ function FileChangeSection({ changes, collapsed }: { changes: FileChangeEntry[];
         <div className="px-3 pb-2 space-y-1.5">
           {changes.map((c, i) => (
             <div key={i} className="flex items-center gap-2 text-sm">
-              <span className="font-mono text-[var(--ink)] truncate flex-1" title={c.path}>{c.name}</span>
+              <WhaleTooltip label={c.path} className="min-w-0 flex-1">
+                <span className="font-mono text-[var(--ink)] truncate">{c.name}</span>
+              </WhaleTooltip>
               {c.writeCount > 1 && (
                 <span className="text-xs text-[var(--ink-soft)]">{c.writeCount} 次写入</span>
               )}

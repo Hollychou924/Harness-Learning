@@ -12,8 +12,8 @@ export function NameDialog({ title, initial, placeholder, confirmLabel, onCancel
   const ref = useRef<HTMLInputElement>(null)
   useEffect(() => { ref.current?.focus(); ref.current?.select() }, [])
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30" onClick={onCancel}>
-      <div className="w-72 glass rounded-2xl shadow-xl p-5" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center floating-screen" onClick={onCancel}>
+      <div className="w-72 floating-surface rounded-2xl p-5" onClick={(e) => e.stopPropagation()}>
         <h3 className="mb-3 text-sm font-semibold text-[var(--ink)]">{title}</h3>
         <input ref={ref} value={val} onChange={(e) => setVal(e.target.value)} placeholder={placeholder}
           onKeyDown={(e) => { if (e.key === 'Enter' && val.trim()) onConfirm(val); if (e.key === 'Escape') onCancel() }}
@@ -44,8 +44,8 @@ export function NewProjectDialog({ onCancel, onCreateNew, onLoadFolder }: {
 
 
   const content = (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/30" onClick={onCancel}>
-      <div className="w-[420px] glass rounded-2xl shadow-xl p-6" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center floating-screen" onClick={onCancel}>
+      <div className="w-[420px] floating-surface rounded-2xl p-6" onClick={(e) => e.stopPropagation()}>
         <h3 className="mb-1 text-base font-semibold text-[var(--ink)]">新建项目</h3>
         <p className="mb-4 text-xs text-[var(--ink-soft)]">选择已有项目文件夹加载，或从零新建一个项目</p>
 

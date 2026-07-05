@@ -3,6 +3,7 @@ import { ChevronDown, Check, Settings2, Trash2 } from 'lucide-react'
 import { api, type ModelConfig } from '../api'
 import { useSettingsStore } from './settings/settingsStore'
 import { PROVIDER_PRESETS } from './providerPresets'
+import { WhaleTooltip } from './WhaleTooltip'
 
 interface StoredModel extends ModelConfig {
   _id?: string
@@ -46,14 +47,16 @@ export function ModelSelector() {
         onClick={() => setOpen(!open)}
         className="flex items-center gap-1 text-xs text-[var(--ink-soft)] hover:text-[var(--ink)] transition px-2 py-1 rounded-lg hover:bg-black/[0.04]"
       >
-        <span className="truncate max-w-[160px]" title={displayLabel}>{displayLabel}</span>
+        <WhaleTooltip label={displayLabel} className="min-w-0 max-w-[160px]">
+          <span className="truncate">{displayLabel}</span>
+        </WhaleTooltip>
         <ChevronDown size={12} />
       </button>
 
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1 z-50 w-80 glass rounded-xl p-3 shadow-lg space-y-2">
+          <div className="absolute right-0 top-full mt-1 z-50 w-80 floating-surface rounded-xl p-3 space-y-2">
             {active && (
               <div className="text-xs text-[var(--ink-soft)] px-1 pb-1">
                 当前：{PROVIDER_PRESETS[active.providerId]?.label || active.providerId}
@@ -81,13 +84,14 @@ export function ModelSelector() {
                     </span>
                     {isActive && <Check size={13} className="text-sky-500 flex-shrink-0" />}
                     {!isActive && (
-                      <button
-                        onClick={(e) => handleDelete(e, c._id!)}
-                        className="opacity-0 group-hover:opacity-100 text-[var(--ink-soft)] hover:text-red-500 transition flex-shrink-0"
-                        title="删除此模型配置"
-                      >
-                        <Trash2 size={12} />
-                      </button>
+                      <WhaleTooltip label="删除此模型配置">
+                        <button
+                          onClick={(e) => handleDelete(e, c._id!)}
+                          className="opacity-0 group-hover:opacity-100 text-[var(--ink-soft)] hover:text-red-500 transition flex-shrink-0"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </WhaleTooltip>
                     )}
                   </div>
                 )

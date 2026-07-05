@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Archive, ArchiveRestore, Trash2, Search } from 'lucide-react'
 import { useTaskStore } from '../../../store/task'
 import type { Session, Project } from '../../../store/task'
+import { WhaleTooltip } from '../../WhaleTooltip'
 
 function timeAgo(ts: number): string {
   const diff = Date.now() - ts
@@ -70,22 +71,24 @@ export function ArchivedSection() {
                   </div>
                 </button>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                  <button
-                    title="恢复"
-                    onClick={() => unarchiveSession(s.id)}
-                    className="w-7 h-7 rounded flex items-center justify-center text-[var(--ink-soft)] hover:bg-black/[0.08] hover:text-[var(--ink)] transition"
-                  >
-                    <ArchiveRestore size={14} />
-                  </button>
-                  <button
-                    title="彻底删除"
-                    onClick={() => {
-                      if (confirm(`彻底删除「${s.title}」？此操作不可恢复`)) deleteSession(s.id)
-                    }}
-                    className="w-7 h-7 rounded flex items-center justify-center text-red-500 hover:bg-red-50 transition"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  <WhaleTooltip label="恢复">
+                    <button
+                      onClick={() => unarchiveSession(s.id)}
+                      className="w-7 h-7 rounded flex items-center justify-center text-[var(--ink-soft)] hover:bg-black/[0.08] hover:text-[var(--ink)] transition"
+                    >
+                      <ArchiveRestore size={14} />
+                    </button>
+                  </WhaleTooltip>
+                  <WhaleTooltip label="彻底删除">
+                    <button
+                      onClick={() => {
+                        if (confirm(`彻底删除「${s.title}」？此操作不可恢复`)) deleteSession(s.id)
+                      }}
+                      className="w-7 h-7 rounded flex items-center justify-center text-red-500 hover:bg-red-50 transition"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </WhaleTooltip>
                 </div>
               </div>
             )

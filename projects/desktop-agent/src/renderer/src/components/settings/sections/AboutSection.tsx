@@ -16,7 +16,7 @@ export function AboutSection() {
         <p className="text-xs text-[var(--ink-soft)]/60 mt-3">版本 0.1.0</p>
       </div>
 
-      <div className="glass-soft rounded-xl px-4 py-3 mt-4 space-y-1.5 text-xs text-[var(--ink-soft)]">
+      <div className="floating-subsurface rounded-xl px-4 py-3 mt-4 space-y-1.5 text-xs text-[var(--ink-soft)]">
         <div className="flex justify-between">
           <span>运行环境</span>
           <span className="text-[var(--ink)]">Electron + macOS</span>

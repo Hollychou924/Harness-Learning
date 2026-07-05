@@ -17,6 +17,7 @@ import { useTaskStore } from '../store/task'
 import { api } from '../api'
 import type { ArtifactEntry, SourceEntry } from '../store/task'
 import type { ToolCallItem, Turn } from '../../../agent/src/items'
+import { WhaleTooltip } from './WhaleTooltip'
 
 function deriveSourcesFromTurns(turns: Turn[], currentTurn: Turn | null): SourceEntry[] {
   const allTurns = currentTurn ? [...turns, currentTurn] : turns
@@ -209,9 +210,11 @@ function ArtifactItem({ art, onPreview }: { art: ArtifactEntry; onPreview: () =>
     <li>
       <button onClick={onPreview} className="w-full flex items-center gap-2 text-xs rounded-md px-1 py-1 hover:bg-black/[0.04] transition text-left">
       <span className="text-[var(--ink-soft)] flex-shrink-0">{meta.icon}</span>
-      <span className="truncate text-[var(--ink)]" title={art.filePath}>
-        {name}
-      </span>
+      <WhaleTooltip label={art.filePath} className="min-w-0">
+        <span className="truncate text-[var(--ink)]">
+          {name}
+        </span>
+      </WhaleTooltip>
       {art.added != null && (
         <span className="ml-auto text-green-600 font-mono">+{art.added}</span>
       )}
@@ -242,7 +245,9 @@ function ArtifactPreview({ art, content, dataUrl, kind, error, accepted, onAccep
         <Eye size={14} className="text-[var(--ink-soft)]" />
         <span className="text-xs font-semibold tracking-wide text-[var(--ink-soft)] uppercase">预览</span>
       </div>
-      <div className="text-xs font-mono text-[var(--ink)] truncate" title={art.filePath}>{name}</div>
+      <WhaleTooltip label={art.filePath} className="min-w-0">
+        <div className="text-xs font-mono text-[var(--ink)] truncate">{name}</div>
+      </WhaleTooltip>
       {dataUrl ? (
         <div className="rounded-lg bg-black/[0.03] p-2">
           <img src={dataUrl} alt={name} className="max-h-52 w-full object-contain rounded-md" />
@@ -278,7 +283,9 @@ function SourceItem({ source }: { source: SourceEntry }) {
   return (
     <li className="flex items-center gap-2 text-xs">
       <span className="text-[var(--ink-soft)] flex-shrink-0">{source.type === 'web' ? '🔗' : '📄'}</span>
-      <span className="truncate text-[var(--ink)]" title={source.path || source.url || source.label}>{source.label}</span>
+      <WhaleTooltip label={source.path || source.url || source.label} className="min-w-0 flex-1">
+        <span className="truncate text-[var(--ink)]">{source.label}</span>
+      </WhaleTooltip>
     </li>
   )
 }
@@ -396,14 +403,15 @@ function ContextCapacityIndicator({ usedTokens, running, onManualCompact }: { us
             {!isDanger && isWarning && <span className="text-amber-500">接近压缩阈值</span>}
           </div>
           <div>剩余 {formatTokens(Math.max(0, contextLimit - usedTokens))}</div>
-          <button
-            onClick={onManualCompact}
-            disabled={running}
-            className="h-7 px-2 rounded-lg glass text-xs text-[var(--ink)] hover:bg-black/[0.04] disabled:opacity-40 disabled:cursor-not-allowed"
-            title={running ? '任务进行中时，无法手动整理上下文' : '整理旧上下文'}
-          >
-            {running ? '运行中不可整理' : '手动整理上下文'}
-          </button>
+          <WhaleTooltip label={running ? '任务进行中时，无法手动整理上下文' : '整理旧上下文'}>
+            <button
+              onClick={onManualCompact}
+              disabled={running}
+              className="h-7 px-2 rounded-lg glass text-xs text-[var(--ink)] hover:bg-black/[0.04] disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {running ? '运行中不可整理' : '手动整理上下文'}
+            </button>
+          </WhaleTooltip>
         </div>
       )}
     </section>

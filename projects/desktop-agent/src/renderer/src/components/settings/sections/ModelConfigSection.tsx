@@ -44,7 +44,7 @@ export function ModelConfigSection() {
         <div className="space-y-1.5">
           {/* 当前配置 */}
           {modelConfig && (
-            <div className="glass-soft rounded-xl px-4 py-3 mb-3">
+            <div className="floating-subsurface rounded-xl px-4 py-3 mb-3">
               <div className="text-xs text-[var(--ink-soft)] mb-1">当前使用</div>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-[var(--ink)]">

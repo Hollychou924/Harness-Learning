@@ -58,15 +58,15 @@ export function SettingsDialog() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={closeSettings}>
       {/* 遮罩 */}
-      <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
+      <div className="absolute inset-0 floating-screen" />
 
       {/* 弹窗主体 */}
       <div
-        className="relative flex flex-col w-[min(960px,92vw)] h-[min(680px,82vh)] glass rounded-2xl overflow-hidden shadow-2xl"
+        className="relative flex flex-col w-[min(960px,92vw)] h-[min(680px,82vh)] floating-surface rounded-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 标题栏 */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/40 flex-shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-black/[0.08] flex-shrink-0">
           <div>
             <h2 className="text-base font-semibold text-[var(--ink)]">设置</h2>
             <p className="text-xs text-[var(--ink-soft)] mt-0.5">管理模型、权限和高级选项</p>
@@ -82,7 +82,7 @@ export function SettingsDialog() {
         {/* 左导航 + 右内容 */}
         <div className="flex flex-1 min-h-0">
           {/* 左侧导航 */}
-          <nav className="w-48 flex-shrink-0 border-r border-white/40 overflow-y-auto py-3 px-2 space-y-4">
+          <nav className="w-48 flex-shrink-0 border-r border-black/[0.08] overflow-y-auto py-3 px-2 space-y-4">
             {NAV_GROUPS.map((g) => (
               <div key={g.group}>
                 <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--ink-soft)]/60">

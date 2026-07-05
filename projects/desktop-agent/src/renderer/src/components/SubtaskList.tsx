@@ -1,5 +1,6 @@
 import { Check, X, Loader2 } from 'lucide-react'
 import { useTaskStore } from '../store/task'
+import { WhaleTooltip } from './WhaleTooltip'
 
 export function SubtaskList() {
   const { subtasks } = useTaskStore()
@@ -36,9 +37,11 @@ export function SubtaskList() {
               </span>
             )}
             {st.status === 'failed' && st.error && (
-              <span className="ml-auto text-xs text-red-400 flex-shrink-0 truncate max-w-[120px]" title={st.error}>
-                {st.error}
-              </span>
+              <WhaleTooltip label={st.error} className="ml-auto min-w-0 max-w-[120px]">
+                <span className="text-xs text-red-400 flex-shrink-0 truncate">
+                  {st.error}
+                </span>
+              </WhaleTooltip>
             )}
           </div>
         ))}

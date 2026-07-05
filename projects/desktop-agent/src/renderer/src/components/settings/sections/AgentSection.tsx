@@ -32,7 +32,7 @@ export function AgentSection() {
           </div>
         </div>
 
-        <div className="glass-soft rounded-xl px-4 py-3.5 flex items-start justify-between gap-4">
+        <div className="floating-subsurface rounded-xl px-4 py-3.5 flex items-start justify-between gap-4">
           <div>
             <div className="text-sm font-medium text-[var(--ink)]">显示思考过程</div>
             <div className="text-xs text-[var(--ink-soft)] mt-1">

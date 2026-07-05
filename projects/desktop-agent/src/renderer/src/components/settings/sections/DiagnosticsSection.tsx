@@ -70,7 +70,7 @@ export function DiagnosticsSection() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setFeedbackOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg glass px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:brightness-105 transition"
+              className="inline-flex items-center gap-1.5 rounded-lg floating-subsurface px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:brightness-105 transition"
             >
               <MessageSquareWarning size={13} />
               提交诊断
@@ -78,7 +78,7 @@ export function DiagnosticsSection() {
             <button
               onClick={exportRecent}
               disabled={exporting || traces.length === 0}
-              className="inline-flex items-center gap-1.5 rounded-lg glass px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:brightness-105 disabled:opacity-40 transition"
+              className="inline-flex items-center gap-1.5 rounded-lg floating-subsurface px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:brightness-105 disabled:opacity-40 transition"
             >
               {exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
               导出最近记录
@@ -102,7 +102,7 @@ export function DiagnosticsSection() {
         />
       )}
 
-      <div className="mb-4 rounded-xl glass-soft px-4 py-3">
+      <div className="mb-4 rounded-xl floating-subsurface px-4 py-3">
         <div className="mb-2 text-xs font-semibold text-[var(--ink-soft)]">按编号查询</div>
         <div className="flex gap-2">
           <input
@@ -121,7 +121,7 @@ export function DiagnosticsSection() {
       {overview && <DiagnosticsOverviewPanel overview={overview} />}
 
       {feedbackList.length > 0 && (
-        <div className="mb-4 rounded-xl glass-soft px-4 py-3">
+        <div className="mb-4 rounded-xl floating-subsurface px-4 py-3">
           <div className="mb-2 text-xs font-semibold text-[var(--ink-soft)]">最近反馈</div>
           <div className="space-y-1">
             {feedbackList.slice(0, 3).map((ticket) => (
@@ -152,7 +152,7 @@ export function DiagnosticsSection() {
             <button
               key={t.traceId}
               onClick={() => setSelectedId(t.traceId)}
-              className="w-full text-left glass-soft rounded-xl px-4 py-3 hover:brightness-105 transition"
+              className="w-full text-left floating-subsurface rounded-xl px-4 py-3 hover:brightness-105 transition"
             >
               <div className="flex items-center gap-2">
                 <StatusDot status={t.status} />
@@ -258,7 +258,7 @@ function TraceDetail({ traceId, onBack }: { traceId: string; onBack: () => void 
         <div className="flex items-center gap-2">
           <button
             onClick={() => setFeedbackOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg glass px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:brightness-105 transition"
+            className="inline-flex items-center gap-1.5 rounded-lg floating-subsurface px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:brightness-105 transition"
           >
             <MessageSquareWarning size={13} />
             反馈问题
@@ -266,7 +266,7 @@ function TraceDetail({ traceId, onBack }: { traceId: string; onBack: () => void 
           <button
             onClick={exportCurrent}
             disabled={exporting}
-            className="inline-flex items-center gap-1.5 rounded-lg glass px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:brightness-105 disabled:opacity-40 transition"
+            className="inline-flex items-center gap-1.5 rounded-lg floating-subsurface px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:brightness-105 disabled:opacity-40 transition"
           >
             {exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
             导出这次记录
@@ -287,7 +287,7 @@ function TraceDetail({ traceId, onBack }: { traceId: string; onBack: () => void 
       )}
 
       {/* 概览 */}
-      <div className="glass-soft rounded-xl px-4 py-3 mb-4 space-y-1.5">
+      <div className="floating-subsurface rounded-xl px-4 py-3 mb-4 space-y-1.5">
         <div className="flex items-center gap-2">
           <StatusDot status={detail.meta.status} />
           <span className="text-sm font-medium text-[var(--ink)]">{detail.meta.message || '(无消息)'}</span>
@@ -534,7 +534,7 @@ function FeedbackForm({
   }
 
   return (
-    <div className="mb-4 rounded-xl glass-soft px-4 py-3">
+    <div className="mb-4 rounded-xl floating-subsurface px-4 py-3">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
           <div className="text-sm font-semibold text-[var(--ink)]">提交诊断</div>
@@ -743,7 +743,7 @@ function replayKindColor(kind: string): string {
 
 function MetricCard({ label, value, tone }: { label: string; value: string; tone?: 'warn' }) {
   return (
-    <div className="rounded-xl glass-soft px-3 py-2">
+    <div className="rounded-xl floating-subsurface px-3 py-2">
       <div className="text-[11px] text-[var(--ink-soft)]">{label}</div>
       <div className={`mt-1 text-lg font-semibold ${tone === 'warn' ? 'text-red-500' : 'text-[var(--ink)]'}`}>{value}</div>
     </div>
@@ -752,7 +752,7 @@ function MetricCard({ label, value, tone }: { label: string; value: string; tone
 
 function RankPanel({ title, empty, items }: { title: string; empty: string; items: Array<{ label: string; value: string }> }) {
   return (
-    <div className="rounded-xl glass-soft px-4 py-3">
+    <div className="rounded-xl floating-subsurface px-4 py-3">
       <div className="mb-2 text-xs font-semibold text-[var(--ink-soft)]">{title}</div>
       {items.length === 0 ? (
         <div className="text-xs text-[var(--ink-soft)]">{empty}</div>

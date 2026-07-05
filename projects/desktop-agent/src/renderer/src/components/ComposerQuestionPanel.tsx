@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Check, ChevronLeft, ChevronRight, Edit3, X } from 'lucide-react'
 import type { QuestionRequest } from '../store/task'
+import { WhaleTooltip } from './WhaleTooltip'
 
 interface Props {
   question: QuestionRequest
@@ -99,8 +100,8 @@ export function ComposerQuestionPanel({ question, onAnswer }: Props) {
   }
 
   return (
-    <div className="mb-3 overflow-hidden rounded-2xl border border-black/[0.06] bg-white/95 shadow-sm">
-      <div className="flex items-center gap-3 border-b border-black/[0.06] bg-sky-50/70 px-4 py-3">
+    <div className="mb-3 overflow-hidden rounded-2xl floating-surface">
+      <div className="flex items-center gap-3 border-b border-black/[0.06] bg-sky-50 px-4 py-3">
         <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-sky-600 shadow-sm">
           <Edit3 size={14} />
         </div>
@@ -109,15 +110,16 @@ export function ComposerQuestionPanel({ question, onAnswer }: Props) {
           <div className="truncate text-xs text-[var(--ink-soft)]">选择后会继续执行，也可以输入其他想法</div>
         </div>
         <span className="rounded-full bg-white px-2 py-1 text-xs text-[var(--ink-soft)] shadow-sm">{index + 1} / {prompts.length}</span>
-        <button
-          type="button"
-          onClick={skipAll}
-          disabled={submitting}
-          className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--ink-soft)] transition hover:bg-white disabled:opacity-40"
-          title="跳过全部问题"
-        >
-          <X size={15} />
-        </button>
+        <WhaleTooltip label="跳过全部问题">
+          <button
+            type="button"
+            onClick={skipAll}
+            disabled={submitting}
+            className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--ink-soft)] transition hover:bg-white disabled:opacity-40"
+          >
+            <X size={15} />
+          </button>
+        </WhaleTooltip>
       </div>
 
       <div className="space-y-3 px-4 py-3">

@@ -2,6 +2,7 @@ import { AlertCircle, CheckCircle2 } from 'lucide-react'
 import type { Turn } from '../../../agent/src/items'
 import type { TodoItem } from '../store/task'
 import { countCompletedSteps, deriveFileChangeProgress, deriveProgressSteps } from './executionExperience'
+import { WhaleTooltip } from './WhaleTooltip'
 
 type Props = {
   status: string
@@ -45,7 +46,7 @@ export function ProgressPill({ status, currentTurn, todos, hasApprovalPending }:
           </>
         )}
       </div>
-      <div className="pointer-events-none absolute bottom-full left-1/2 z-40 mb-2 hidden w-72 -translate-x-1/2 rounded-2xl border border-white/60 bg-white/95 p-2 shadow-xl group-hover/progress:block">
+      <div className="pointer-events-none absolute bottom-full left-1/2 z-40 mb-2 hidden w-72 -translate-x-1/2 rounded-2xl floating-surface p-2 group-hover/progress:block">
         <div className="space-y-1">
           {steps.map((step, index) => (
             <div key={step.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs">
@@ -71,22 +72,24 @@ function ProgressRing({ percent }: { percent: number }) {
   const circumference = 2 * Math.PI * radius
   const dashOffset = circumference - (safePercent / 100) * circumference
   return (
-    <span className="relative flex h-4 w-4 items-center justify-center" title={`${safePercent}%`}>
-      <svg className="-rotate-90" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-        <circle cx="8" cy="8" r={radius} fill="none" stroke="rgba(0,113,227,0.18)" strokeWidth="2" />
-        <circle
-          cx="8"
-          cy="8"
-          r={radius}
-          fill="none"
-          stroke="var(--whale-blue)"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={dashOffset}
-        />
-      </svg>
-      <span className="absolute h-1.5 w-1.5 rounded-full bg-sky-500 animate-pulse" />
-    </span>
+    <WhaleTooltip label={`${safePercent}%`}>
+      <span className="relative flex h-4 w-4 items-center justify-center">
+        <svg className="-rotate-90" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+          <circle cx="8" cy="8" r={radius} fill="none" stroke="rgba(0,113,227,0.18)" strokeWidth="2" />
+          <circle
+            cx="8"
+            cy="8"
+            r={radius}
+            fill="none"
+            stroke="var(--whale-blue)"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={dashOffset}
+          />
+        </svg>
+        <span className="absolute h-1.5 w-1.5 rounded-full bg-sky-500 animate-pulse" />
+      </span>
+    </WhaleTooltip>
   )
 }

@@ -41,10 +41,9 @@ export function MessageActions({ align, time, actions }: MessageActionsProps) {
             : 'bg-sky-50 text-sky-600'
           : 'text-[var(--ink-soft)] hover:bg-black/[0.06] hover:text-[var(--ink)]'
       } ${action.disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
-      title={action.label}
     >
       {action.icon}
-      <span className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-black/75 px-2 py-1 text-[11px] text-white opacity-0 shadow-sm transition-opacity duration-150 group-hover/action:opacity-100 group-focus-visible/action:opacity-100">
+      <span className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md floating-tooltip px-2 py-1 text-[11px] font-medium text-white opacity-0 transition-opacity duration-150 group-hover/action:opacity-100 group-focus-visible/action:opacity-100">
         {action.label}
       </span>
     </button>

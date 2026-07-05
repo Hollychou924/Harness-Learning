@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { MouseEvent, ReactNode } from 'react'
 import { AlertTriangle, ChevronRight, Clipboard, ClipboardCheck, FileCode, FileText, FolderOpen, Loader2, Terminal } from 'lucide-react'
 import type { ToolCallItem } from '../../../agent/src/items'
+import { WhaleTooltip } from './WhaleTooltip'
 
 // 工具特化视图：让命令、读文件、列文件、写文件都变成用户能看懂的过程卡。
 
@@ -83,16 +84,17 @@ function CopyButton({ value, label }: { value: string; label: string }) {
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleCopy}
-      disabled={disabled}
-      className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-[var(--ink-soft)] hover:bg-black/[0.04] disabled:opacity-40"
-      title={label}
-    >
-      {copied ? <ClipboardCheck size={12} className="text-green-600" /> : <Clipboard size={12} />}
-      {copied ? '已复制' : label}
-    </button>
+    <WhaleTooltip label={label}>
+      <button
+        type="button"
+        onClick={handleCopy}
+        disabled={disabled}
+        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-[var(--ink-soft)] hover:bg-black/[0.04] disabled:opacity-40"
+      >
+        {copied ? <ClipboardCheck size={12} className="text-green-600" /> : <Clipboard size={12} />}
+        {copied ? '已复制' : label}
+      </button>
+    </WhaleTooltip>
   )
 }
 
@@ -131,7 +133,9 @@ export function WriteFileDiffView({ item }: { item: ToolCallItem }) {
         className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-black/[0.02] transition"
       >
         <FileCode size={14} className={hasError ? 'text-red-500 flex-shrink-0' : 'text-sky-600 flex-shrink-0'} />
-        <span className="text-[var(--ink)] font-mono truncate" title={filePath}>{fileName}</span>
+        <WhaleTooltip label={filePath} className="min-w-0">
+          <span className="text-[var(--ink)] font-mono truncate">{fileName}</span>
+        </WhaleTooltip>
         <span className="text-xs text-green-600 flex-shrink-0">写入 {lines} 行</span>
         {hasError && <span className="text-xs text-red-500 flex-shrink-0">写入失败</span>}
         <ChevronRight size={14} className={`text-[var(--ink-soft)] transition-transform ml-auto ${open ? 'rotate-90' : ''}`} />
@@ -139,7 +143,9 @@ export function WriteFileDiffView({ item }: { item: ToolCallItem }) {
       {open && (
         <div className="border-t border-black/[0.04]">
           <div className="flex items-center justify-between gap-2 px-3 py-1.5 text-xs text-[var(--ink-soft)] bg-black/[0.015]">
-            <span className="truncate" title={filePath}>{filePath || '未提供路径'}</span>
+            <WhaleTooltip label={filePath || '未提供路径'} className="min-w-0 flex-1">
+              <span className="truncate">{filePath || '未提供路径'}</span>
+            </WhaleTooltip>
             <CopyButton value={content} label="复制内容" />
           </div>
           {hasError ? (
@@ -179,7 +185,9 @@ export function ShellOutputView({ item }: { item: ToolCallItem }) {
         className={`w-full flex items-center gap-2 px-3 py-1.5 hover:bg-black/[0.02] transition ${isRunning ? 'whale-shimmer bg-sky-50/40' : ''}`}
       >
         {isRunning ? <Loader2 size={14} className="text-sky-500 animate-spin flex-shrink-0" /> : <Terminal size={14} className="text-[var(--ink-soft)] flex-shrink-0" />}
-        <span className="text-[var(--ink)] font-mono truncate flex-1 text-left" title={command}>$ {shortCommand || '命令'}</span>
+        <WhaleTooltip label={command || '命令'} className="min-w-0 flex-1">
+          <span className="text-[var(--ink)] font-mono truncate text-left">$ {shortCommand || '命令'}</span>
+        </WhaleTooltip>
         {hasDeletionRisk && <span className="inline-flex items-center gap-1 text-xs text-amber-600 flex-shrink-0"><AlertTriangle size={12} />删除动作</span>}
         {isRunning && <span className="text-xs text-sky-600 flex-shrink-0">运行中</span>}
         {elapsed && <span className="text-xs text-[var(--ink-soft)] flex-shrink-0">{elapsed}</span>}
@@ -191,7 +199,9 @@ export function ShellOutputView({ item }: { item: ToolCallItem }) {
       {open && (
         <div className="border-t border-black/[0.04]">
           <div className="flex items-center justify-between gap-2 px-3 py-1.5 text-xs text-[var(--ink-soft)] bg-black/[0.015]">
-            <span className="truncate" title={command}>完整命令：{command || '未提供命令'}</span>
+            <WhaleTooltip label={command || '未提供命令'} className="min-w-0 flex-1">
+              <span className="truncate">完整命令：{command || '未提供命令'}</span>
+            </WhaleTooltip>
             <div className="flex items-center gap-1 flex-shrink-0">
               <CopyButton value={command} label="复制命令" />
               <CopyButton value={output} label="复制输出" />
@@ -239,7 +249,9 @@ export function ReadFileView({ item }: { item: ToolCallItem }) {
     <div className={`rounded-lg overflow-hidden text-sm border ${hasError ? 'border-red-200 bg-red-50/25' : 'border-black/[0.06]'}`}>
       <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-black/[0.02] transition">
         <FileText size={14} className={hasError ? 'text-red-500 flex-shrink-0' : 'text-[var(--ink-soft)] flex-shrink-0'} />
-        <span className="text-[var(--ink)] font-mono truncate" title={filePath}>{fileNameOf(filePath, '文件')}</span>
+        <WhaleTooltip label={filePath || '文件'} className="min-w-0">
+          <span className="text-[var(--ink)] font-mono truncate">{fileNameOf(filePath, '文件')}</span>
+        </WhaleTooltip>
         {!hasError && lines > 0 && <span className="text-xs text-[var(--ink-soft)] flex-shrink-0">{lines} 行</span>}
         {!hasError && size && <span className="text-xs text-[var(--ink-soft)] flex-shrink-0">{size}</span>}
         {hasError && <span className="text-xs text-red-500 flex-shrink-0">读取失败</span>}
@@ -248,7 +260,9 @@ export function ReadFileView({ item }: { item: ToolCallItem }) {
       {open && (
         <div className="border-t border-black/[0.04]">
           <div className="flex items-center justify-between gap-2 px-3 py-1.5 text-xs text-[var(--ink-soft)] bg-black/[0.015]">
-            <span className="truncate" title={filePath}>{filePath || '未提供路径'}</span>
+            <WhaleTooltip label={filePath || '未提供路径'} className="min-w-0 flex-1">
+              <span className="truncate">{filePath || '未提供路径'}</span>
+            </WhaleTooltip>
             <CopyButton value={content} label="复制内容" />
           </div>
           {hasError ? <DetailPre tone="danger">{String(parsed?.error || item.error || '读取失败')}</DetailPre> : <DetailPre>{content.slice(0, 2400)}{content.length > 2400 ? `\n...（共 ${content.length} 字，仅显示前 2400 字）` : ''}</DetailPre>}
@@ -271,7 +285,9 @@ export function ListFilesView({ item }: { item: ToolCallItem }) {
     <div className={`rounded-lg overflow-hidden text-sm border ${hasError ? 'border-red-200 bg-red-50/25' : 'border-black/[0.06]'}`}>
       <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-black/[0.02] transition">
         <FolderOpen size={14} className={hasError ? 'text-red-500 flex-shrink-0' : 'text-[var(--ink-soft)] flex-shrink-0'} />
-        <span className="text-[var(--ink)] font-mono truncate" title={dir}>列出 {dir}</span>
+        <WhaleTooltip label={dir} className="min-w-0">
+          <span className="text-[var(--ink)] font-mono truncate">列出 {dir}</span>
+        </WhaleTooltip>
         {!hasError && <span className="text-xs text-[var(--ink-soft)] flex-shrink-0">{fileCount} 个文件 · {dirCount} 个文件夹</span>}
         {hasError && <span className="text-xs text-red-500 flex-shrink-0">检索失败</span>}
         <ChevronRight size={14} className={`text-[var(--ink-soft)] transition-transform ml-auto ${open ? 'rotate-90' : ''}`} />
@@ -291,7 +307,9 @@ export function ListFilesView({ item }: { item: ToolCallItem }) {
                 return (
                   <div key={`${path}-${index}`} className="flex items-center gap-2 px-3 py-1.5 text-xs">
                     <span className="text-[var(--ink-soft)] w-10 flex-shrink-0">{type}</span>
-                    <span className="font-mono text-[var(--ink)] truncate" title={path}>{name}</span>
+                    <WhaleTooltip label={path} className="min-w-0">
+                      <span className="font-mono text-[var(--ink)] truncate">{name}</span>
+                    </WhaleTooltip>
                     <span className="ml-auto text-[var(--ink-soft)] flex-shrink-0">{formatBytes(entry.size) || ''}</span>
                   </div>
                 )
