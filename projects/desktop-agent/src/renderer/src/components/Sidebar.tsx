@@ -4,7 +4,6 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  Search,
   Pin,
   PinOff,
   Archive,
@@ -16,16 +15,16 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronUp,
-  X
 } from 'lucide-react'
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useTaskStore, type Session, type Project, DEFAULT_PROJECT_ID } from '../store/task'
 import { useSettingsStore } from './settings/settingsStore'
 import { NameDialog, NewProjectDialog } from './Dialogs'
+import { WhaleTooltip } from './WhaleTooltip'
 
 /* ============================================================
  * 左侧导航（对标 Codex 桌面客户端）
- * - 顶部常驻入口：新对话 / 搜索 / 已安排 / 插件
+ * - 顶部常驻入口：新对话 / 自动化 / 技能
  * - 中部按区块：置顶对话 / 项目 / 普通对话
  * - 项目可展开，项目下对话按时间倒序，默认折叠超出的旧对话
  * - 对话右侧显示相对时间；运行中显示小蓝点
@@ -55,8 +54,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
   const store = useTaskStore()
   const { mode, setMode, message, startTask, reset, projects, sessions, activeProjectId, activeSessionId } = store
   const { openSettings } = useSettingsStore()
-  const [activeTab, setActiveTab] = useState<'new' | 'search' | 'scheduled' | 'plugins'>('new')
-  const [search, setSearch] = useState('')
+  const [activeTab, setActiveTab] = useState<'new' | 'scheduled' | 'plugins'>('new')
   const [newProjectOpen, setNewProjectOpen] = useState(false)
   const [renamingProject, setRenamingProject] = useState<string | null>(null)
   const [newProjectName, setNewProjectName] = useState('')
@@ -67,7 +65,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
   // 项目内默认只显示前 N 条；点「展开显示」后切到全量
   const [expandedAll, setExpandedAll] = useState<Record<string, boolean>>({})
   const SESSION_VISIBLE_DEFAULT = 5
-  // 轻量提示：一期给「已安排 / 插件」等未实现入口使用
+  // 轻量提示：一期给「自动化 / 技能」等未实现入口使用
   const [toast, setToast] = useState<string | null>(null)
   const toastTimer = useRef<number | null>(null)
   const notifyComingSoon = (label: string) => {
@@ -80,12 +78,6 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
 
   const toggleCollapse = (id: string) => setProjectCollapsed((m) => ({ ...m, [id]: !m[id] }))
 
-  const searchMatch = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    if (!q) return null
-    return new Set(sessions.filter((s) => s.title.toLowerCase().includes(q)).map((s) => s.id))
-  }, [sessions, search])
-
   const sortedProjects = useMemo(() => {
     return [...projects].sort(
       (a, b) => Number(b.pinned) - Number(a.pinned) || (b.pinnedAt ?? 0) - (a.pinnedAt ?? 0) || a.order - b.order
@@ -97,15 +89,13 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
   const unassignedSessions = sessions.filter((s) => s.projectId === DEFAULT_PROJECT_ID)
 
   const isExpanded = (p: Project) => {
-    if (search) return true
     if (Object.prototype.hasOwnProperty.call(projectCollapsed, p.id)) return !projectCollapsed[p.id]
     if (p.id === activeProjectId) return true
     return !projectCollapsed[p.id]
   }
 
   const sessionsOf = (pid: string) => {
-    let list = sessions.filter((s) => s.projectId === pid && !s.archived)
-    if (searchMatch) list = list.filter((s) => searchMatch.has(s.id))
+    const list = sessions.filter((s) => s.projectId === pid && !s.archived)
     return [...list].sort((a, b) => Number(b.pinned) - Number(a.pinned) || (b.pinnedAt ?? 0) - (a.pinnedAt ?? 0) || b.order - a.order || b.updatedAt - a.updatedAt)
   }
 
@@ -165,7 +155,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
         />
         {expanded && (
           <>
-            {list.length === 0 && !search && (
+            {list.length === 0 && (
               <p className="pl-7 py-1 text-[11px] text-[var(--ink-soft)]/60">暂无对话</p>
             )}
             {(expandedAll[p.id] ? list : list.slice(0, SESSION_VISIBLE_DEFAULT)).map((s) => (
@@ -207,39 +197,27 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
       }`}
     >
       <div className="drag h-9 flex-shrink-0" />
-      {/* 顶部快捷入口：新对话 / 搜索 / 已安排 / 插件 */}
+      {/* 顶部快捷入口：新对话 / 自动化 / 技能 */}
       <div className="px-3 pb-2">
         <div className="space-y-0.5">
           <NavPill icon={<MessageSquarePlus size={15} />} label="新对话" active={activeTab === 'new'}
             onClick={() => { setActiveTab('new'); reset(); }} />
-          <NavPill icon={<Search size={15} />} label="搜索" active={activeTab === 'search'}
-            onClick={() => setActiveTab('search')} />
-          <NavPill icon={<Clock size={15} />} label="已安排" active={activeTab === 'scheduled'}
-            onClick={() => { setActiveTab('scheduled'); notifyComingSoon('已安排') }} />
-          <NavPill icon={<Settings size={15} />} label="插件" active={activeTab === 'plugins'}
-            onClick={() => { setActiveTab('plugins'); notifyComingSoon('插件') }} />
-        </div>
-      </div>
-
-      {/* 搜索框 */}
-      <div className="px-3 pb-2">
-        <div className="relative">
-          <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--ink-soft)]" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索对话"
-            className="no-drag w-full h-7 pl-6 pr-5 text-xs rounded-md bg-black/[0.04] outline-none focus:bg-black/[0.06] transition placeholder:text-[var(--ink-soft)]/60" />
-          {search && <button onClick={() => setSearch('')} className="absolute right-1 top-1/2 -translate-y-1/2 text-[var(--ink-soft)] hover:text-[var(--ink)]"><X size={11} /></button>}
+          <NavPill icon={<Clock size={15} />} label="自动化" active={activeTab === 'scheduled'}
+            onClick={() => { setActiveTab('scheduled'); notifyComingSoon('自动化') }} />
+          <NavPill icon={<Settings size={15} />} label="技能" active={activeTab === 'plugins'}
+            onClick={() => { setActiveTab('plugins'); notifyComingSoon('技能') }} />
         </div>
       </div>
 
       {/* 置顶对话区（可拖入自动置顶） */}
-      <PinnedDropZone sessions={pinnedSessionsAll(sessions, searchMatch)} activeId={activeSessionId}
+      <PinnedDropZone sessions={pinnedSessionsAll(sessions)} activeId={activeSessionId}
         onClick={(id) => void store.continueSession(id)} onDrop={handleDropToPinned}
         onDragOver={(e) => { e.preventDefault(); setDragOverId('__pinned__') }}
         isDragOver={dragOverId === '__pinned__'}
         onRename={(id, title) => setRenamingSession({ id, title })} />
 
       {/* 主体列表：按项目分组，项目下对话按时间倒序（最新在前） */}
-      <div className="flex-1 overflow-y-auto px-3 pb-2 space-y-1">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 pb-2 space-y-1">
         {pinnedProjects.length > 0 && (
           <div className="space-y-0.5">
             <SectionLabel label="置顶" />
@@ -250,10 +228,12 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
           <SectionLabel
             label="项目"
             action={(
-              <button onClick={() => setNewProjectOpen(true)} title="新建项目"
-                className="no-drag w-6 h-6 rounded-md hover:bg-black/[0.06] flex items-center justify-center text-[var(--ink-soft)] hover:text-[var(--ink)] transition">
-                <FolderPlus size={13} />
-              </button>
+              <WhaleTooltip label="新建项目">
+                <button onClick={() => setNewProjectOpen(true)}
+                  className="no-drag w-6 h-6 rounded-md hover:bg-black/[0.06] flex items-center justify-center text-[var(--ink-soft)] hover:text-[var(--ink)] transition">
+                  <FolderPlus size={13} />
+                </button>
+              </WhaleTooltip>
             )}
           />
           {otherProjects.map((p) => renderProjectBlock(p))}
@@ -263,7 +243,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
             <SectionLabel label="无项目对话" />
             {(() => {
               const list = sessionsOf(DEFAULT_PROJECT_ID)
-              if (list.length === 0 && !search) {
+              if (list.length === 0) {
                 return <p className="pl-2.5 py-1 text-[11px] text-[var(--ink-soft)]/60">暂无对话</p>
               }
               const visible = expandedAll[DEFAULT_PROJECT_ID] ? list : list.slice(0, SESSION_VISIBLE_DEFAULT)
@@ -313,10 +293,12 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
             <div className="w-6 h-6 rounded-full bg-gradient-to-br from-amber-300 to-pink-400 flex-shrink-0" />
             <span className="text-xs text-[var(--ink-soft)] truncate">周浩</span>
           </div>
-          <button onClick={() => openSettings()} title="设置"
-            className="no-drag w-8 h-8 rounded-lg flex items-center justify-center text-[var(--ink-soft)] hover:bg-black/[0.06] hover:text-[var(--ink)] transition flex-shrink-0">
-            <Settings size={16} />
-          </button>
+          <WhaleTooltip label="设置">
+            <button onClick={() => openSettings()}
+              className="no-drag w-8 h-8 rounded-lg flex items-center justify-center text-[var(--ink-soft)] hover:bg-black/[0.06] hover:text-[var(--ink)] transition flex-shrink-0">
+              <Settings size={16} />
+            </button>
+          </WhaleTooltip>
         </div>
       </div>
 
@@ -338,7 +320,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
           onConfirm={(name) => { store.renameSession(renamingSession.id, name); setRenamingSession(null) }} />
       )}
       {toast && (
-        <div className="absolute left-1/2 bottom-6 -translate-x-1/2 z-[120] px-3 py-1.5 rounded-full bg-[var(--ink)]/85 text-white text-[12px] shadow-lg backdrop-blur">
+        <div className="absolute left-1/2 bottom-6 -translate-x-1/2 z-[120] px-3 py-1.5 rounded-full floating-toast text-white text-[12px]">
           {toast}
         </div>
       )}
@@ -383,10 +365,10 @@ function PinnedDropZone({ sessions, activeId, onClick, onDrop, onDragOver, isDra
 }
 
 /* ---- 已归档折叠区 ---- */
-function pinnedSessionsAll(sessions: Session[], searchMatch: Set<string> | null): Session[] {
-  let list = sessions.filter((s) => s.pinned && !s.archived)
-  if (searchMatch) list = list.filter((s) => searchMatch.has(s.id))
-  return [...list].sort((a, b) => (b.pinnedAt ?? 0) - (a.pinnedAt ?? 0))
+function pinnedSessionsAll(sessions: Session[]): Session[] {
+  return sessions
+    .filter((s) => s.pinned && !s.archived)
+    .sort((a, b) => (b.pinnedAt ?? 0) - (a.pinnedAt ?? 0))
 }
 
 /* ---- 分类标题 ---- */
@@ -423,7 +405,7 @@ function ProjectRow({ project, expanded, onToggle, onActivate, onRename, onDelet
       {menuOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-          <div className="absolute right-0 top-7 z-50 w-36 glass rounded-lg shadow-lg py-1">
+          <div className="absolute right-0 top-7 z-50 w-36 floating-surface rounded-lg py-1">
             {onTogglePin && (
               <button onClick={(e) => { e.stopPropagation(); onTogglePin(); setMenuOpen(false) }} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-black/[0.05] transition">
                 {project.pinned ? <PinOff size={12} /> : <Pin size={12} />} {project.pinned ? '取消置顶' : '置顶'}
@@ -502,18 +484,22 @@ function SessionRow({ session, active, onClick, onDragStart, onDragOver, onDrop,
       <div className="ml-auto flex items-center gap-1 flex-shrink-0">
         {showProject && <span className="text-[11px] text-[var(--ink-soft)]/60 bg-black/[0.04] px-1 rounded max-w-[48px] truncate">{showProject}</span>}
         {session.status === 'executing' ? (
-          <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse flex-shrink-0" title="进行中" />
+          <WhaleTooltip label="进行中">
+            <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse flex-shrink-0" />
+          </WhaleTooltip>
         ) : (
-          <span className="text-[11px] tabular-nums text-[var(--ink-soft)]/55" title={new Date(session.updatedAt).toLocaleString('zh-CN')}>
-            {timeAgo(session.updatedAt)}
-          </span>
+          <WhaleTooltip label={new Date(session.updatedAt).toLocaleString('zh-CN')}>
+            <span className="text-[11px] tabular-nums text-[var(--ink-soft)]/55">
+              {timeAgo(session.updatedAt)}
+            </span>
+          </WhaleTooltip>
         )}
         {session.pinned && <Pin size={9} className="text-amber-400 flex-shrink-0" />}
       </div>
       {menuOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-          <div className="absolute right-0 top-0 z-50 w-28 glass rounded-lg shadow-lg py-1">
+          <div className="absolute right-0 top-0 z-50 w-28 floating-surface rounded-lg py-1">
             {actions.map((a) => (
               <button key={a.id} onClick={(e) => { e.stopPropagation(); a.onClick(); setMenuOpen(false) }}
                 className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-black/[0.05] transition ${a.danger ? 'text-red-500' : 'text-[var(--ink)]'}`}>
