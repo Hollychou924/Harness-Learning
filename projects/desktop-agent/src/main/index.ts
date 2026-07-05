@@ -164,7 +164,8 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: false,
+      scrollBounce: false
     }
   })
 
@@ -676,6 +677,54 @@ async function extractDocumentText(filePath: string, ext: string): Promise<strin
   return ''
 }
 
+async function buildAttachmentFile(filePath: string) {
+  const fileName = filePath.split('/').pop() || filePath
+  const ext = fileName.split('.').pop()?.toLowerCase() || ''
+  const isImage = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(ext)
+  const isText = ['txt', 'md', 'json', 'csv', 'log', 'ts', 'js', 'tsx', 'jsx', 'py', 'go', 'rs', 'java', 'html', 'css', 'xml', 'yaml', 'yml', 'sh', 'sql'].includes(ext)
+  const isDoc = ['docx', 'xlsx', 'pdf', 'doc', 'pptx'].includes(ext)
+  const mime = isImage
+    ? (ext === 'jpg' ? 'image/jpeg' : ext === 'svg' ? 'image/svg+xml' : `image/${ext}`)
+    : isText ? 'text/plain'
+    : isDoc ? (ext === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      : ext === 'xlsx' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      : ext === 'pdf' ? 'application/pdf'
+      : ext === 'pptx' ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      : 'application/msword')
+    : 'application/octet-stream'
+
+  let dataUrl: string | undefined
+  let textContent: string | undefined
+  let size = 0
+  let error: string | undefined
+
+  try {
+    const buf = readFileSync(filePath)
+    size = buf.length
+    if (isImage) {
+      dataUrl = `data:${mime};base64,${buf.toString('base64')}`
+    } else if (isText) {
+      textContent = buf.toString('utf-8')
+    } else if (isDoc) {
+      textContent = await extractDocumentText(filePath, ext)
+    }
+  } catch (e) {
+    error = e instanceof Error ? e.message : String(e)
+  }
+
+  const type = isImage ? 'image' : (isText || (isDoc && textContent)) ? 'text' : 'file'
+  return {
+    name: fileName,
+    type,
+    size,
+    mime,
+    dataUrl,
+    textContent,
+    sourcePath: filePath,
+    error
+  }
+}
+
 ipcMain.handle('dialog:openFiles', async () => {
   const result = await dialog.showOpenDialog({
     properties: ['openFile', 'multiSelections'],
@@ -685,54 +734,14 @@ ipcMain.handle('dialog:openFiles', async () => {
   })
   if (result.canceled || result.filePaths.length === 0) return []
 
-  const results = await Promise.all(result.filePaths.map(async (filePath) => {
-    const fileName = filePath.split('/').pop() || filePath
-    const ext = fileName.split('.').pop()?.toLowerCase() || ''
-    const isImage = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(ext)
-    const isText = ['txt', 'md', 'json', 'csv', 'log', 'ts', 'js', 'tsx', 'jsx', 'py', 'go', 'rs', 'java', 'html', 'css', 'xml', 'yaml', 'yml', 'sh', 'sql'].includes(ext)
-    const isDoc = ['docx', 'xlsx', 'pdf', 'doc', 'pptx'].includes(ext)
-    const mime = isImage
-      ? (ext === 'jpg' ? 'image/jpeg' : ext === 'svg' ? 'image/svg+xml' : `image/${ext}`)
-      : isText ? 'text/plain'
-      : isDoc ? (ext === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        : ext === 'xlsx' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        : ext === 'pdf' ? 'application/pdf'
-        : ext === 'pptx' ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-        : 'application/msword')
-      : 'application/octet-stream'
+  return Promise.all(result.filePaths.map((filePath) => buildAttachmentFile(filePath)))
+})
 
-    let dataUrl: string | undefined
-    let textContent: string | undefined
-    let size = 0
-
-    try {
-      const buf = readFileSync(filePath)
-      size = buf.length
-      if (isImage) {
-        dataUrl = `data:${mime};base64,${buf.toString('base64')}`
-      } else if (isText) {
-        textContent = buf.toString('utf-8')
-      } else if (isDoc) {
-        textContent = await extractDocumentText(filePath, ext)
-      }
-    } catch {
-      // 读取失败
-    }
-
-    // 文档类有提取到文本就归为 text，否则 file
-    const type = isImage ? 'image' : (isText || (isDoc && textContent)) ? 'text' : 'file'
-
-    return {
-      name: fileName,
-      type,
-      size,
-      mime,
-      dataUrl,
-      textContent
-    }
-  }))
-
-  return results
+ipcMain.handle('dialog:readAttachmentFile', async (_e, filePath: string) => {
+  if (typeof filePath !== 'string' || !filePath) {
+    return { name: '未知文件', type: 'file', size: 0, mime: 'application/octet-stream', error: '文件路径为空' }
+  }
+  return buildAttachmentFile(filePath)
 })
 
 // 选择已有文件夹作为项目根目录（参考 Codex pickLocalWorkspaceRoots）

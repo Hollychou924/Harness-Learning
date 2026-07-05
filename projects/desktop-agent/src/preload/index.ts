@@ -56,6 +56,7 @@ const api = {
   replayExport: (input: { traceId: string; includeConversation?: boolean; includeFileSummary?: boolean }) =>
     ipcRenderer.invoke('replay:export', input) as Promise<{ success: boolean; path?: string; error?: string }>,
   openFiles: () => ipcRenderer.invoke('dialog:openFiles') as Promise<unknown[]>,
+  readAttachmentFile: (filePath: string) => ipcRenderer.invoke('dialog:readAttachmentFile', filePath) as Promise<unknown>,
   pickFolder: () => ipcRenderer.invoke('project:select') as Promise<string | null>,
   createProjectFolder: (name: string) => ipcRenderer.invoke('project:create', name) as Promise<string | null>,
   workspaceListFiles: (workspaceDir?: string, subDir?: string) =>

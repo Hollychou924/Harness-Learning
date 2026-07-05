@@ -16,7 +16,10 @@ export function Composer() {
   const isFinished = status === 'completed' || status === 'failed'
 
   const handleSend = async () => {
-    if (!message.trim() && attachments.length === 0) return
+    const hasBlockedAttachment = attachments.some((a) => a.status === 'failed' || a.status === 'uploading')
+    const readyAttachments = attachments.filter((a) => a.status !== 'failed' && a.status !== 'uploading')
+    if (hasBlockedAttachment) return
+    if (!message.trim() && readyAttachments.length === 0) return
     if (isExecuting && taskId) {
       setPending(true)
       try {

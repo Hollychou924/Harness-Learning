@@ -7,6 +7,8 @@ export interface AttachmentFile {
   mime: string
   dataUrl?: string
   textContent?: string
+  sourcePath?: string
+  error?: string
 }
 
 export interface ModelConfig {
@@ -133,6 +135,7 @@ type Api = {
   openExternal: (url: string) => Promise<void>
   openPath: (filePath: string) => Promise<void>
   openFiles: () => Promise<AttachmentFile[]>
+  readAttachmentFile: (filePath: string) => Promise<AttachmentFile>
   pickFolder: () => Promise<string | null>
   createProjectFolder: (name: string) => Promise<string | null>
   workspaceListFiles: (workspaceDir?: string, subDir?: string) => Promise<{ items: Array<{ name: string; type: string; size: number; path: string }>; error?: string }>
@@ -173,6 +176,14 @@ const empty: Api = {
   openExternal: async () => {},
   openPath: async () => {},
   openFiles: async () => [],
+  readAttachmentFile: async (filePath: string) => ({
+    name: filePath.split('/').pop() || filePath,
+    type: 'file',
+    size: 0,
+    mime: 'application/octet-stream',
+    sourcePath: filePath,
+    error: 'preload 未就绪'
+  }),
   pickFolder: async () => null,
   createProjectFolder: async () => null,
   workspaceListFiles: async () => ({ items: [] }),

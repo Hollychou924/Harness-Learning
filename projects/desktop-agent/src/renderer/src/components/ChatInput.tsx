@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, ArrowUp, ChevronDown, Check, X, FileText, Image as ImageIcon, Eye, AlertCircle, FolderPlus, FolderOpen, History, AtSign, Target, StopCircle } from 'lucide-react'
+import { Plus, ArrowUp, ChevronDown, Check, X, FileText, Image as ImageIcon, Eye, AlertCircle, FolderPlus, FolderOpen, History, AtSign, Target, StopCircle, RefreshCw, Loader2 } from 'lucide-react'
 import { api, type ModelConfig, type AttachmentFile } from '../api'
 import { useSettingsStore } from './settings/settingsStore'
 import { NewProjectDialog } from './Dialogs'
 import { useTaskStore, type Attachment, type Project, DEFAULT_PROJECT_ID } from '../store/task'
 import { PROVIDER_PRESETS, BUILTIN_PROVIDER_ORDER, modelSupportsVision } from './providerPresets'
+import { WhaleTooltip } from './WhaleTooltip'
 
 interface Props {
   value: string
@@ -33,6 +34,83 @@ function normalizePastedText(text: string): string {
 
 function hasWeirdLineBreaks(text: string): boolean {
   return WEIRD_DETECT.test(text)
+}
+
+function errorMessageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error || '上传失败')
+}
+
+function attachmentStatusOf(attachment: Attachment): 'ready' | 'uploading' | 'failed' {
+  return attachment.status ?? 'ready'
+}
+
+function attachmentFromPickedFile(file: AttachmentFile, id: string): Attachment {
+  return {
+    id,
+    name: file.name,
+    type: file.type,
+    size: file.size,
+    dataUrl: file.dataUrl,
+    textContent: file.textContent,
+    mime: file.mime,
+    sourcePath: file.sourcePath,
+    status: file.error ? 'failed' : 'ready',
+    error: file.error
+  }
+}
+
+async function attachmentFromBrowserFile(file: File, id: string): Promise<Attachment> {
+  const isImage = file.type.startsWith('image/')
+  const isText = file.type.startsWith('text/') || /\.(txt|md|json|csv|log|ts|js|tsx|jsx|py|go|rs|java|html|css|xml|yaml|yml|sh|sql)$/i.test(file.name)
+
+  try {
+    if (isImage) {
+      const dataUrl = await readFileAsDataURL(file)
+      return {
+        id,
+        name: file.name,
+        type: 'image',
+        size: file.size,
+        dataUrl,
+        mime: file.type,
+        status: 'ready',
+        sourceFile: file
+      }
+    }
+    if (isText) {
+      const textContent = await readFileAsText(file)
+      return {
+        id,
+        name: file.name,
+        type: 'text',
+        size: file.size,
+        textContent,
+        mime: file.type || 'text/plain',
+        status: 'ready',
+        sourceFile: file
+      }
+    }
+    return {
+      id,
+      name: file.name,
+      type: 'file',
+      size: file.size,
+      mime: file.type || 'application/octet-stream',
+      status: 'ready',
+      sourceFile: file
+    }
+  } catch (error) {
+    return {
+      id,
+      name: file.name,
+      type: isImage ? 'image' : isText ? 'text' : 'file',
+      size: file.size,
+      mime: file.type || 'application/octet-stream',
+      status: 'failed',
+      error: errorMessageOf(error),
+      sourceFile: file
+    }
+  }
 }
 
 export function ChatInput({ value, onChange, onSend, onStop, isRunning = false, placeholder, showProjectPicker = false }: Props) {
@@ -88,8 +166,11 @@ export function ChatInput({ value, onChange, onSend, onStop, isRunning = false, 
     ta.style.height = Math.min(ta.scrollHeight, 160) + 'px'
   }, [value])
 
-  const hasContent = value.trim().length > 0 || attachments.length > 0
+  const hasBlockedAttachment = attachments.some((a) => attachmentStatusOf(a) !== 'ready')
+  const readyAttachmentCount = attachments.filter((a) => attachmentStatusOf(a) === 'ready').length
+  const hasContent = !hasBlockedAttachment && (value.trim().length > 0 || readyAttachmentCount > 0)
   const shouldStop = isRunning && !hasContent && Boolean(onStop)
+  const sendLabel = hasBlockedAttachment ? '请先删除或重试失败附件' : '发送'
   const modelLabel = config
     ? PROVIDER_PRESETS[config.providerId]?.label || config.providerId
     : '未配置'
@@ -189,20 +270,21 @@ export function ChatInput({ value, onChange, onSend, onStop, isRunning = false, 
     // 读取文件内容，作为文本附件注入
     if (item.type === 'file') {
       const result = await api.workspaceReadFile(item.path, activeWorkspaceDir)
-      if (result.content) {
-        const newAtt: Attachment = {
-          id: `mention-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          name: item.name,
-          type: 'text',
-          size: item.size,
-          textContent: result.content,
-          mime: 'text/plain'
-        }
-        addAttachments([newAtt])
+      const newAtt: Attachment = {
+        id: `mention-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        name: item.name,
+        type: 'text',
+        size: item.size,
+        textContent: result.content,
+        mime: 'text/plain',
+        sourcePath: activeWorkspaceDir ? `${activeWorkspaceDir}/${item.path}` : undefined,
+        status: result.content ? 'ready' : 'failed',
+        error: result.content ? undefined : (result.error || '文件读取失败')
       }
+      addAttachments([newAtt])
     }
     // 目录暂时不处理，仅关闭菜单
-  }, [value, onChange, mentionQuery, addAttachments])
+  }, [value, onChange, mentionQuery, addAttachments, activeWorkspaceDir])
 
   // ── 粘贴：图片转附件，大文本转附件，非标准换行规范化 ──
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
@@ -214,19 +296,8 @@ export function ChatInput({ value, onChange, onSend, onStop, isRunning = false, 
         const file = item.getAsFile()
         if (file) {
           e.preventDefault()
-          const reader = new FileReader()
-          reader.onload = () => {
-            const newAtt: Attachment = {
-              id: `paste-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-              name: `粘贴图片.png`,
-              type: 'image',
-              size: file.size,
-              dataUrl: reader.result as string,
-              mime: item.type
-            }
-            addAttachments([newAtt])
-          }
-          reader.readAsDataURL(file)
+          void attachmentFromBrowserFile(file, `paste-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`)
+            .then((newAtt) => addAttachments([{ ...newAtt, name: '粘贴图片.png' }]))
           return
         }
       }
@@ -273,15 +344,7 @@ export function ChatInput({ value, onChange, onSend, onStop, isRunning = false, 
   const handleFileSelect = async () => {
     const files = (await api.openFiles()) as AttachmentFile[]
     if (files.length === 0) return
-    const newAtts: Attachment[] = files.map((f, i) => ({
-      id: `file-${Date.now()}-${i}`,
-      name: f.name,
-      type: f.type,
-      size: f.size,
-      dataUrl: f.dataUrl,
-      textContent: f.textContent,
-      mime: f.mime
-    }))
+    const newAtts: Attachment[] = files.map((f, i) => attachmentFromPickedFile(f, `file-${Date.now()}-${i}`))
     addAttachments(newAtts)
   }
 
@@ -344,38 +407,7 @@ ${text}` : text
     const newAtts: Attachment[] = []
     for (let i = 0; i < droppedFiles.length; i++) {
       const file = droppedFiles[i]
-      const isImage = file.type.startsWith('image/')
-      const isText = file.type.startsWith('text/') || /\.(txt|md|json|csv|log|ts|js|tsx|jsx|py|go|rs|java|html|css|xml|yaml|yml|sh|sql)$/i.test(file.name)
-      if (isImage) {
-        // 大图用 Object URL 减少内存占用(不用 dataURL 永久驻留 base64)
-        const objectUrl = URL.createObjectURL(file)
-        newAtts.push({
-          id: `drop-${Date.now()}-${i}`,
-          name: file.name,
-          type: 'image',
-          size: file.size,
-          objectUrl,
-          mime: file.type
-        })
-      } else if (isText) {
-        const textContent = await readFileAsText(file)
-        newAtts.push({
-          id: `drop-${Date.now()}-${i}`,
-          name: file.name,
-          type: 'text',
-          size: file.size,
-          textContent,
-          mime: file.type || 'text/plain'
-        })
-      } else {
-        newAtts.push({
-          id: `drop-${Date.now()}-${i}`,
-          name: file.name,
-          type: 'file',
-          size: file.size,
-          mime: file.type || 'application/octet-stream'
-        })
-      }
+      newAtts.push(await attachmentFromBrowserFile(file, `drop-${Date.now()}-${i}`))
     }
     addAttachments(newAtts)
   }, [addAttachments])
@@ -383,7 +415,25 @@ ${text}` : text
   const removeAttachment = (id: string) => {
     const att = attachments.find((a) => a.id === id)
     if (att?.objectUrl) URL.revokeObjectURL(att.objectUrl)
+    if (previewAttachment?.id === id) setPreviewAttachment(null)
     setAttachments(attachments.filter((a) => a.id !== id))
+  }
+
+  const retryAttachment = async (attachment: Attachment) => {
+    if (attachment.objectUrl) URL.revokeObjectURL(attachment.objectUrl)
+    setAttachments(attachments.map((a) => a.id === attachment.id ? { ...a, status: 'uploading', error: undefined } : a))
+    try {
+      const next = attachment.sourceFile
+        ? await attachmentFromBrowserFile(attachment.sourceFile, attachment.id)
+        : attachment.sourcePath
+          ? attachmentFromPickedFile(await api.readAttachmentFile(attachment.sourcePath), attachment.id)
+          : { ...attachment, status: 'failed' as const, error: '找不到原文件，无法重试' }
+      const current = useTaskStore.getState().attachments
+      setAttachments(current.map((a) => a.id === attachment.id ? { ...next, name: attachment.name } : a))
+    } catch (error) {
+      const current = useTaskStore.getState().attachments
+      setAttachments(current.map((a) => a.id === attachment.id ? { ...a, status: 'failed', error: errorMessageOf(error) } : a))
+    }
   }
 
   return (
@@ -409,7 +459,7 @@ ${text}` : text
       >
         {/* 拖拽高亮遮罩 */}
         {isDragging && (
-          <div className="absolute inset-0 z-10 rounded-2xl border-2 border-dashed border-[#0071e3] bg-sky-50/60 flex items-center justify-center pointer-events-none">
+          <div className="absolute inset-0 z-10 rounded-2xl border-2 border-dashed border-[#0071e3] bg-sky-50 flex items-center justify-center pointer-events-none">
             <span className="text-sm font-medium text-[#0071e3]">松开以上传文件</span>
           </div>
         )}
@@ -431,6 +481,7 @@ ${text}` : text
                 attachment={att}
                 onRemove={() => removeAttachment(att.id)}
                 onPreview={() => setPreviewAttachment(att)}
+                onRetry={() => void retryAttachment(att)}
               />
             ))}
           </div>
@@ -458,17 +509,18 @@ ${text}` : text
         {/* 底部行：左下 + 号，右下 模型选择 + 发送 */}
         <div className="flex items-center justify-between px-2.5 pb-2 pt-1">
           <div className="relative">
-            <button
-              onClick={() => setAddMenuOpen((v) => !v)}
-              className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[var(--ink-soft)] hover:bg-black/[0.06] hover:text-[var(--ink)] transition"
-              title="添加上下文"
-            >
-              <Plus size={18} />
-            </button>
+            <WhaleTooltip label="添加上下文">
+              <button
+                onClick={() => setAddMenuOpen((v) => !v)}
+                className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[var(--ink-soft)] hover:bg-black/[0.06] hover:text-[var(--ink)] transition"
+              >
+                <Plus size={18} />
+              </button>
+            </WhaleTooltip>
             {addMenuOpen && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setAddMenuOpen(false)} />
-                <div className="absolute left-0 bottom-10 z-40 w-64 glass rounded-xl shadow-xl p-1.5 border border-white/50">
+                <div className="absolute left-0 bottom-10 z-40 w-64 floating-surface rounded-xl p-1.5">
                   <AddMenuItem icon={<FileText size={14} />} label="添加本地文件" desc="图片、文档、文本都可以" onClick={handleFileSelect} />
                   <AddMenuItem icon={<AtSign size={14} />} label="引用项目文件" desc="从当前项目里选择文件" onClick={openMentionPicker} />
                   <AddMenuItem icon={<FolderOpen size={14} />} label="添加本地文件夹" desc="作为新的项目上下文" onClick={handlePickFolderAsProject} />
@@ -500,13 +552,11 @@ ${text}` : text
                 <>
                   <div className="fixed inset-0 z-[9998]" onClick={() => setModelMenuOpen(false)} />
                   <div
-                    className="fixed z-[9999] w-72 rounded-xl p-2 shadow-xl border border-white/50"
+                    className="fixed z-[9999] w-72 rounded-xl p-2 floating-surface"
                     style={{
                       left: menuPos.left,
                       bottom: menuPos.bottom,
-                      background: 'rgba(255,255,255,0.92)',
-                      backdropFilter: 'blur(40px) saturate(180%)',
-                      WebkitBackdropFilter: 'blur(40px) saturate(180%)'
+                      background: 'var(--floating-bg)'
                     }}
                   >
                     <div className="max-h-80 overflow-y-auto space-y-0.5">
@@ -523,7 +573,9 @@ ${text}` : text
                           >
                             <span className="flex-1 text-left">{preset.label}</span>
                             {preset.supportsVision && (
-                              <span className="text-[10px] text-sky-500" title="支持图片输入">👁</span>
+                              <WhaleTooltip label="支持图片输入">
+                                <span className="text-[10px] text-sky-500">👁</span>
+                              </WhaleTooltip>
                             )}
                             {preset.builtinApiKey && <span className="text-[10px] text-green-500">内置</span>}
                             {isActive && <Check size={13} className="text-sky-500" />}
@@ -537,39 +589,34 @@ ${text}` : text
               )}
             </div>
 
-            <button
-              onClick={() => {
-                if (shouldStop) {
-                  onStop?.()
-                  return
-                }
-                if (hasContent) onSend()
-              }}
-              disabled={!hasContent && !shouldStop}
-              title={shouldStop ? '停止任务' : '发送'}
-              className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition ${
-                hasContent || shouldStop
-                  ? shouldStop
-                    ? 'bg-red-500 text-white hover:brightness-110'
-                    : 'bg-[#0071e3] text-white hover:brightness-110'
-                  : 'bg-black/[0.06] text-[var(--ink-soft)]/40 cursor-not-allowed'
-              }`}
-            >
-              {shouldStop ? <StopCircle size={18} /> : <ArrowUp size={16} />}
-            </button>
+            <WhaleTooltip label={shouldStop ? '停止任务' : sendLabel}>
+              <button
+                onClick={() => {
+                  if (shouldStop) {
+                    onStop?.()
+                    return
+                  }
+                  if (hasContent) onSend()
+                }}
+                disabled={!hasContent && !shouldStop}
+                className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition ${
+                  hasContent || shouldStop
+                    ? shouldStop
+                      ? 'bg-red-500 text-white hover:brightness-110'
+                      : 'bg-[#0071e3] text-white hover:brightness-110'
+                    : 'bg-black/[0.06] text-[var(--ink-soft)]/40 cursor-not-allowed'
+                }`}
+              >
+                {shouldStop ? <StopCircle size={18} /> : <ArrowUp size={16} />}
+              </button>
+            </WhaleTooltip>
           </div>
         </div>
       </div>
 
       {/* @文件引用菜单 */}
       {mentionOpen && (
-        <div className="absolute bottom-full left-3 mb-1 z-20 w-72 rounded-xl p-1.5 shadow-xl border border-white/50 max-h-64 overflow-y-auto"
-          style={{
-            background: 'rgba(255,255,255,0.95)',
-            backdropFilter: 'blur(40px) saturate(180%)',
-            WebkitBackdropFilter: 'blur(40px) saturate(180%)'
-          }}
-        >
+        <div className="absolute bottom-full left-3 mb-1 z-20 w-72 rounded-xl p-1.5 floating-surface max-h-64 overflow-y-auto">
           {mentionLoading ? (
             <div className="px-2 py-3 text-xs text-[var(--ink-soft)] text-center">加载中…</div>
           ) : mentionItems.length === 0 ? (
@@ -661,11 +708,13 @@ function readFileAsText(file: File): Promise<string> {
 }
 
 // ============ 附件缩略图 ============
-function AttachmentThumb({ attachment, onRemove, onPreview }: {
+function AttachmentThumb({ attachment, onRemove, onPreview, onRetry }: {
   attachment: Attachment
   onRemove: () => void
   onPreview: () => void
+  onRetry: () => void
 }) {
+  const status = attachmentStatusOf(attachment)
   const sizeLabel = attachment.size < 1024
     ? `${attachment.size}B`
     : attachment.size < 1024 * 1024
@@ -673,10 +722,20 @@ function AttachmentThumb({ attachment, onRemove, onPreview }: {
     : `${(attachment.size / 1024 / 1024).toFixed(1)}MB`
 
   return (
-    <div className="relative group w-20 h-20 rounded-lg overflow-hidden glass-soft border border-black/[0.08]">
-      <button onClick={onPreview} className="w-full h-full flex items-center justify-center">
+    <div className={`relative group w-20 h-20 rounded-lg overflow-hidden glass-soft border ${status === 'failed' ? 'border-red-300 bg-red-50/70' : 'border-black/[0.08]'}`}>
+      <button type="button" onClick={onPreview} className="w-full h-full flex items-center justify-center">
         {attachment.type === 'image' && (attachment.dataUrl || attachment.objectUrl) ? (
-          <img src={attachment.objectUrl || attachment.dataUrl} alt={attachment.name} className="w-full h-full object-cover" />
+          <img src={attachment.objectUrl || attachment.dataUrl} alt={attachment.name} className={`w-full h-full object-cover ${status !== 'ready' ? 'opacity-45' : ''}`} />
+        ) : status === 'failed' ? (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-1 p-1">
+            <AlertCircle size={20} className="text-red-500" />
+            <span className="text-[9px] text-red-500 truncate w-full text-center">{attachment.name}</span>
+          </div>
+        ) : status === 'uploading' ? (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-1 p-1">
+            <Loader2 size={20} className="text-[var(--whale-blue)] animate-spin" />
+            <span className="text-[9px] text-[var(--ink-soft)] truncate w-full text-center">{attachment.name}</span>
+          </div>
         ) : attachment.type === 'text' ? (
           <div className="w-full h-full flex flex-col items-center justify-center gap-1 p-1">
             <FileText size={20} className="text-[var(--ink-soft)]" />
@@ -690,25 +749,46 @@ function AttachmentThumb({ attachment, onRemove, onPreview }: {
         )}
       </button>
 
-      <button
-        onClick={onPreview}
-        className="absolute top-1 left-1 w-5 h-5 rounded bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
-        title="预览"
-      >
-        <Eye size={11} />
-      </button>
+      {status === 'ready' && (
+      <WhaleTooltip label="预览" className="absolute top-1 left-1 opacity-0 group-hover:opacity-100 transition">
+        <button
+          type="button"
+          onClick={onPreview}
+          className="w-5 h-5 rounded bg-[var(--whale-blue)]/90 text-white flex items-center justify-center"
+        >
+          <Eye size={11} />
+        </button>
+      </WhaleTooltip>
+      )}
 
-      <button
-        onClick={onRemove}
-        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition hover:bg-red-500"
-        title="移除"
-      >
-        <X size={11} />
-      </button>
+      <WhaleTooltip label="移除" className="absolute top-1 right-1">
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onRemove() }}
+          className="w-5 h-5 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-red-500"
+        >
+          <X size={11} />
+        </button>
+      </WhaleTooltip>
 
-      <div className="absolute bottom-0 left-0 right-0 bg-black/40 text-white text-[8px] text-center py-0.5 opacity-0 group-hover:opacity-100 transition">
-        {sizeLabel}
-      </div>
+      {status === 'failed' && (
+        <WhaleTooltip label={attachment.error || '上传失败'} className="absolute bottom-1 left-1 right-1">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onRetry() }}
+            className="w-full h-5 rounded bg-red-500 text-white text-[9px] flex items-center justify-center gap-1 hover:bg-red-600"
+          >
+            <RefreshCw size={10} />
+            重试
+          </button>
+        </WhaleTooltip>
+      )}
+
+      {status !== 'failed' && (
+        <div className={`absolute bottom-0 left-0 right-0 ${status === 'uploading' ? 'bg-[var(--whale-blue)]' : 'bg-[var(--whale-blue)]/90'} text-white text-[8px] text-center py-0.5 ${status === 'uploading' ? '' : 'opacity-0 group-hover:opacity-100'} transition`}>
+          {status === 'uploading' ? '上传中' : sizeLabel}
+        </div>
+      )}
     </div>
   )
 }
@@ -720,12 +800,12 @@ function AttachmentPreview({ attachment, onClose }: {
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <div className="absolute inset-0 floating-screen" />
       <div
-        className="relative glass rounded-2xl overflow-hidden shadow-2xl max-w-3xl max-h-[80vh] flex flex-col"
+        className="relative floating-surface rounded-2xl overflow-hidden max-w-3xl max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/40 flex-shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-black/[0.08] flex-shrink-0">
           <div className="min-w-0">
             <div className="text-sm font-medium text-[var(--ink)] truncate">{attachment.name}</div>
             <div className="text-xs text-[var(--ink-soft)]">{attachment.mime}</div>
@@ -739,7 +819,11 @@ function AttachmentPreview({ attachment, onClose }: {
         </div>
 
         <div className="flex-1 overflow-auto p-4">
-          {attachment.type === 'image' && (attachment.dataUrl || attachment.objectUrl) ? (
+          {attachmentStatusOf(attachment) === 'failed' ? (
+            <div className="text-center text-sm text-red-500 py-8">
+              上传失败：{attachment.error || '请重试上传'}
+            </div>
+          ) : attachment.type === 'image' && (attachment.dataUrl || attachment.objectUrl) ? (
             <img src={attachment.objectUrl || attachment.dataUrl} alt={attachment.name} className="max-w-full max-h-[60vh] mx-auto rounded-lg" />
           ) : attachment.textContent ? (
             <pre className="text-xs text-[var(--ink)] whitespace-pre-wrap break-all font-mono leading-relaxed">
@@ -794,7 +878,7 @@ function ProjectPicker({
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={close} />
-          <div ref={ref} className="absolute left-3 top-9 z-50 w-56 glass rounded-lg shadow-lg py-1 max-h-72 overflow-y-auto">
+          <div ref={ref} className="absolute left-3 top-9 z-50 w-56 floating-surface rounded-lg py-1 max-h-72 overflow-y-auto">
             <button
               onClick={() => onClearProject()}
               className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-black/[0.05] transition rounded-md ${
@@ -805,7 +889,7 @@ function ProjectPicker({
               <span className="flex-1 text-xs truncate">无项目</span>
               {isNoProject && <Check size={12} className="text-[#0071e3] flex-shrink-0" />}
             </button>
-            <div className="border-t border-white/40 mt-1 pt-1">
+            <div className="border-t border-black/[0.08] mt-1 pt-1">
               {sorted.map((p) => (
                 <button
                   key={p.id}
@@ -820,7 +904,7 @@ function ProjectPicker({
                 </button>
               ))}
             </div>
-            <div className="border-t border-white/40 mt-1 pt-1">
+            <div className="border-t border-black/[0.08] mt-1 pt-1">
               <button
                 onClick={() => { onCreateProject(); close() }}
                 className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-[var(--ink-soft)] hover:text-[var(--ink)] transition"

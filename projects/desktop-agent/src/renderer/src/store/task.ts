@@ -180,8 +180,13 @@ export interface Attachment {
   dataUrl?: string
   textContent?: string
   mime: string
+  status?: 'ready' | 'uploading' | 'failed'
+  error?: string
+  sourcePath?: string
   /** 大图用 Object URL 替代 dataURL，减少内存占用 */
   objectUrl?: string
+  /** 拖拽或粘贴来源，仅用于当前输入框内重试，不会发送给模型 */
+  sourceFile?: File
 }
 
 export interface SubtaskEntry {
@@ -463,7 +468,7 @@ function describeAttachments(attachments: Attachment[] | MessageAttachment[]): s
 }
 
 function messageAttachmentsOf(attachments: Attachment[]): MessageAttachment[] {
-  return attachments.map((a) => ({
+  return attachments.filter((a) => a.status !== 'failed' && a.status !== 'uploading').map((a) => ({
     type: a.type,
     name: a.name,
     mime: a.mime,
@@ -903,10 +908,12 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const mode = state.mode
     const message = draft?.message ?? state.message
     const draftAttachments = draft?.attachments ?? state.attachments
-    if (!message.trim() && draftAttachments.length === 0) return
+    if (draftAttachments.some((a) => a.status === 'failed' || a.status === 'uploading')) return
+    const readyDraftAttachments = draftAttachments.filter((a) => a.status !== 'failed' && a.status !== 'uploading')
+    if (!message.trim() && readyDraftAttachments.length === 0) return
 
     const settingsState = useSettingsStore.getState()
-    const sendAttachments = await Promise.all(draftAttachments.map(async (a) => {
+    const sendAttachments = await Promise.all(readyDraftAttachments.map(async (a) => {
       if (a.objectUrl && !a.dataUrl && a.type === 'image') {
         try {
           const resp = await fetch(a.objectUrl)
