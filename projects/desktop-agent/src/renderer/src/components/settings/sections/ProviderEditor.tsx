@@ -22,10 +22,12 @@ export function ProviderEditor({ providerId, current, onSave, onCancel }: Props)
   const currentForProvider = current?.providerId === providerId ? current : null
   const isMify = preset.isMify === true
   const hasBuiltinKey = Boolean(preset.builtinApiKey)
+  const hasSavedKey = Boolean(currentForProvider?.hasSavedApiKey)
   const inheritedConfigWasCleared = Boolean(
     current?.providerId === providerId &&
     current.apiKey === '' &&
-    current.model
+    current.model &&
+    !current.hasSavedApiKey
   )
   const [error, setError] = useState(
     inheritedConfigWasCleared ? '当前模型访问配置异常，已清空，请重新粘贴访问配置' : ''
@@ -39,26 +41,31 @@ export function ProviderEditor({ providerId, current, onSave, onCancel }: Props)
     currentForProvider?.model ||
     (isMify ? MIFY_GATEWAY_DEFAULT_MODEL_ID : preset.modelCandidates[0] || '')
   )
-  // mify 或内置 Key 厂商：不要求用户填 Key，用预置值
-  const [apiKey, setApiKey] = useState(currentForProvider?.apiKey || preset.builtinApiKey || '')
+  // 页面不持有已保存的访问钥匙；留空表示继续使用后台已保存的钥匙。
+  const [apiKey, setApiKey] = useState(currentForProvider?.apiKey || '')
   const [apiBaseUrl, setApiBaseUrl] = useState(currentForProvider?.apiBaseUrl || preset.baseUrl)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [useCustomKey, setUseCustomKey] = useState(false)
 
   const handleSave = () => {
-    // mify/内置Key：没填自定义 Key 时用预置值
-    const finalKey = (isMify || hasBuiltinKey) && !useCustomKey
-      ? (preset.builtinApiKey || '')
-      : apiKey.trim()
-    if (/[\u0100-\uFFFF]/.test(finalKey)) {
+    // 留空并且后台已有保存值时，交给后台沿用原来的访问钥匙；重新填写时以新输入为准。
+    const reuseSavedKey = hasSavedKey && !apiKey.trim()
+    const useBuiltInKey = (isMify || hasBuiltinKey) && !useCustomKey && !hasSavedKey
+    const finalKey = reuseSavedKey
+      ? ''
+      : useBuiltInKey
+        ? (preset.builtinApiKey || '')
+        : apiKey.trim()
+    if (!reuseSavedKey && /[\u0100-\uFFFF]/.test(finalKey)) {
       setError('模型访问配置里包含中文或特殊字符，请重新填写')
       return
     }
-    if (/[\r\n\t]/.test(finalKey)) {
+    if (!reuseSavedKey && /[\r\n\t]/.test(finalKey)) {
       setError('模型访问配置里包含换行，请重新填写')
       return
     }
-    if (!finalKey.trim() || !model.trim()) return
+    if (!model.trim()) return
+    if (!reuseSavedKey && !finalKey.trim()) return
     setError('')
     onSave({
       providerId,
@@ -106,7 +113,7 @@ export function ProviderEditor({ providerId, current, onSave, onCancel }: Props)
             <select
               value={customProviderId}
               onChange={(e) => handleMifyProviderChange(e.target.value)}
-              className="w-full h-9 px-2 rounded-lg glass-soft text-sm outline-none"
+              className="w-full h-9 px-2 rounded-lg floating-subsurface text-sm outline-none"
             >
               {MIFY_PROVIDER_ID_CHIPS.map((chip) => (
                 <option key={chip.id} value={chip.id}>{chip.label}</option>
@@ -120,7 +127,7 @@ export function ProviderEditor({ providerId, current, onSave, onCancel }: Props)
             <select
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              className="w-full h-9 px-2 rounded-lg glass-soft text-sm outline-none"
+              className="w-full h-9 px-2 rounded-lg floating-subsurface text-sm outline-none"
             >
               {(isMify ? mifyModels : preset.modelCandidates).map((m) => (
                 <option key={m} value={m}>{m}</option>
@@ -134,7 +141,7 @@ export function ProviderEditor({ providerId, current, onSave, onCancel }: Props)
               value={model}
               onChange={(e) => setModel(e.target.value)}
               placeholder="输入模型 ID"
-              className="w-full h-9 px-2 rounded-lg glass-soft text-sm outline-none"
+              className="w-full h-9 px-2 rounded-lg floating-subsurface text-sm outline-none"
             />
           )}
         </Field>
@@ -145,9 +152,12 @@ export function ProviderEditor({ providerId, current, onSave, onCancel }: Props)
               type="password"
               value={apiKey}
               onChange={(e) => { setApiKey(e.target.value); setError('') }}
-              placeholder={preset.keyPlaceholder}
-              className="w-full h-9 px-2 rounded-lg glass-soft text-sm outline-none"
+              placeholder={hasSavedKey ? '已保存，留空则继续使用' : preset.keyPlaceholder}
+              className="w-full h-9 px-2 rounded-lg floating-subsurface text-sm outline-none"
             />
+            {hasSavedKey && !apiKey.trim() && (
+              <p className="text-[11px] text-[var(--ink-soft)] mt-1">已保存访问钥匙；不重新填写就继续使用原值</p>
+            )}
           </Field>
         )}
 
@@ -178,7 +188,7 @@ export function ProviderEditor({ providerId, current, onSave, onCancel }: Props)
                   value={apiBaseUrl}
                   onChange={(e) => setApiBaseUrl(e.target.value)}
                   placeholder="API Base URL"
-                  className="w-full h-9 px-2 rounded-lg glass-soft text-sm outline-none"
+                  className="w-full h-9 px-2 rounded-lg floating-subsurface text-sm outline-none"
                 />
                 <p className="text-[11px] text-[var(--ink-soft)] mt-1">已自动预填，通常无需修改</p>
               </Field>
@@ -192,7 +202,7 @@ export function ProviderEditor({ providerId, current, onSave, onCancel }: Props)
         <div className="flex gap-2 pt-2">
           <button
             onClick={handleSave}
-            disabled={!model.trim() || (showKeyInput && !apiKey.trim())}
+            disabled={!model.trim() || (showKeyInput && !apiKey.trim() && !hasSavedKey)}
             className="h-9 px-5 rounded-lg bg-[#0071e3] text-white text-sm font-medium hover:brightness-110 transition disabled:opacity-40"
           >
             使用此模型
@@ -200,7 +210,7 @@ export function ProviderEditor({ providerId, current, onSave, onCancel }: Props)
           {error && <span className="self-center text-xs text-red-500">{error}</span>}
           <button
             onClick={onCancel}
-            className="h-9 px-4 rounded-lg glass text-sm font-medium hover:brightness-105 transition"
+            className="h-9 px-4 rounded-lg floating-subsurface text-sm font-medium hover:brightness-105 transition"
           >
             取消
           </button>
