@@ -18,10 +18,15 @@ export interface ModelConfig {
   contextLimit: number
   customProviderId?: string
   autoApproveLow?: boolean
+  hasSavedApiKey?: boolean
 }
 
 export interface TraceMeta {
   traceId: string
+  runId: string
+  taskId: string
+  sessionId: string
+  conversationId: string
   message: string
   mode: string
   model: string
@@ -34,8 +39,16 @@ export interface TraceMeta {
 
 export interface TraceEvent {
   ts: number
+  seq?: number
   phase: string
   type: string
+  traceId?: string
+  taskId?: string
+  sessionId?: string
+  conversationId?: string
+  runId?: string
+  stepId?: string
+  parentStepId?: string
   data: Record<string, unknown>
 }
 
@@ -46,7 +59,7 @@ export interface TraceDetail {
 
 type Api = {
   startTask: (args: { mode: 'work' | 'code'; message: string; workspaceDir?: string; maxIterations?: number; autoApproveLow?: boolean; sessionId?: string; history?: unknown[]; attachments?: unknown[] }) =>
-    Promise<{ taskId: string; error?: string }>
+    Promise<{ taskId: string; traceId?: string; error?: string }>
   saveSessionMessages: (sessionId: string, messages: unknown[]) => Promise<{ success: boolean; error?: string }>
   loadSessionMessages: (sessionId: string) => Promise<unknown[]>
   deleteSessionMessages: (sessionId: string) => Promise<{ success: boolean; error?: string }>
@@ -76,6 +89,7 @@ type Api = {
   workspacePreviewFile: (filePath: string, workspaceDir?: string) => Promise<{ kind?: string; content?: string; dataUrl?: string; truncated?: boolean; error?: string }>
   traceList: (limit?: number) => Promise<TraceMeta[]>
   traceGet: (traceId: string) => Promise<TraceDetail>
+  traceExport: (traceId?: string) => Promise<{ success: boolean; path?: string; error?: string }>
 }
 
 const noop = () => {}
@@ -109,7 +123,8 @@ const empty: Api = {
   workspaceReadFile: async () => ({}),
   workspacePreviewFile: async () => ({}),
   traceList: async () => [],
-  traceGet: async () => ({ meta: null, events: [] })
+  traceGet: async () => ({ meta: null, events: [] }),
+  traceExport: async () => ({ success: false, error: 'preload 未就绪' })
 }
 
 export const api: Api = (globalThis as { api?: Api }).api ?? empty

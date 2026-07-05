@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, Loader2 } from 'lucide-react'
 import { api, type TraceMeta, type TraceEvent } from '../../../api'
 
 export function DiagnosticsSection() {
   const [traces, setTraces] = useState<TraceMeta[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
+  const [notice, setNotice] = useState('')
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -16,6 +18,19 @@ export function DiagnosticsSection() {
 
   useEffect(() => { void refresh() }, [refresh])
 
+  const exportRecent = async () => {
+    setExporting(true)
+    setNotice('')
+    const result = await api.traceExport()
+    setExporting(false)
+    if (result.success && result.path) {
+      setNotice(`已导出到 ${result.path}`)
+      void api.openPath(result.path)
+    } else {
+      setNotice(result.error || '导出失败，请重试')
+    }
+  }
+
   if (selectedId) {
     return <TraceDetail traceId={selectedId} onBack={() => { setSelectedId(null); void refresh() }} />
   }
@@ -23,8 +38,19 @@ export function DiagnosticsSection() {
   return (
     <section>
       <header className="mb-5">
-        <h3 className="text-lg font-semibold text-[var(--ink)]">诊断日志</h3>
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-lg font-semibold text-[var(--ink)]">诊断日志</h3>
+          <button
+            onClick={exportRecent}
+            disabled={exporting || traces.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-lg glass px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:brightness-105 disabled:opacity-40 transition"
+          >
+            {exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+            导出最近记录
+          </button>
+        </div>
         <p className="text-sm text-[var(--ink-soft)] mt-1">每条请求的完整执行链路记录，包含模型调用、工具执行、权限审批、异常等</p>
+        {notice && <p className="text-xs text-[var(--ink-soft)] mt-2">{notice}</p>}
       </header>
 
       {loading ? (
@@ -49,6 +75,8 @@ export function DiagnosticsSection() {
               <div className="flex items-center gap-3 mt-1 text-[11px] text-[var(--ink-soft)]">
                 <span>{t.provider} / {t.model}</span>
                 <span>·</span>
+                <span>记录 {shortId(t.traceId)}</span>
+                <span>·</span>
                 <span>{new Date(t.startedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                 <span>·</span>
                 <span>{t.eventCount} 事件</span>
@@ -70,6 +98,8 @@ export function DiagnosticsSection() {
 function TraceDetail({ traceId, onBack }: { traceId: string; onBack: () => void }) {
   const [detail, setDetail] = useState<{ meta: TraceMeta | null; events: TraceEvent[] } | null>(null)
   const [loading, setLoading] = useState(true)
+  const [exporting, setExporting] = useState(false)
+  const [notice, setNotice] = useState('')
 
   useEffect(() => {
     void (async () => {
@@ -94,12 +124,35 @@ function TraceDetail({ traceId, onBack }: { traceId: string; onBack: () => void 
 
   const phases = new Set(detail.events.map((e) => e.phase))
   const errors = detail.events.filter((e) => e.phase === 'error')
+  const exportCurrent = async () => {
+    setExporting(true)
+    setNotice('')
+    const result = await api.traceExport(traceId)
+    setExporting(false)
+    if (result.success && result.path) {
+      setNotice(`已导出到 ${result.path}`)
+      void api.openPath(result.path)
+    } else {
+      setNotice(result.error || '导出失败，请重试')
+    }
+  }
 
   return (
     <section>
-      <button onClick={onBack} className="flex items-center gap-1 text-sm text-[var(--ink-soft)] hover:text-[var(--ink)] transition mb-4">
-        <ChevronLeft size={16} /> 返回列表
-      </button>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <button onClick={onBack} className="flex items-center gap-1 text-sm text-[var(--ink-soft)] hover:text-[var(--ink)] transition">
+          <ChevronLeft size={16} /> 返回列表
+        </button>
+        <button
+          onClick={exportCurrent}
+          disabled={exporting}
+          className="inline-flex items-center gap-1.5 rounded-lg glass px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:brightness-105 disabled:opacity-40 transition"
+        >
+          {exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+          导出这次记录
+        </button>
+      </div>
+      {notice && <p className="mb-3 text-xs text-[var(--ink-soft)]">{notice}</p>}
 
       {/* 概览 */}
       <div className="glass-soft rounded-xl px-4 py-3 mb-4 space-y-1.5">
@@ -108,6 +161,8 @@ function TraceDetail({ traceId, onBack }: { traceId: string; onBack: () => void 
           <span className="text-sm font-medium text-[var(--ink)]">{detail.meta.message || '(无消息)'}</span>
         </div>
         <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs mt-2">
+          <InfoRow label="记录编号" value={shortId(detail.meta.traceId)} />
+          <InfoRow label="对话编号" value={shortId(detail.meta.sessionId || detail.meta.taskId)} />
           <InfoRow label="模型" value={`${detail.meta.provider} / ${detail.meta.model}`} />
           <InfoRow label="模式" value={detail.meta.mode} />
           <InfoRow label="状态" value={detail.meta.status} />
@@ -143,6 +198,7 @@ function TimelineEvent({ event, startTime }: { event: TraceEvent; startTime: num
     tool: 'bg-amber-400',
     permission: 'bg-orange-400',
     plan: 'bg-indigo-400',
+    question: 'bg-fuchsia-400',
     todo: 'bg-purple-400',
     subtask: 'bg-pink-400',
     progress: 'bg-green-400',
@@ -167,9 +223,16 @@ function TimelineEvent({ event, startTime }: { event: TraceEvent; startTime: num
         >
           <div className="flex items-center gap-2">
             <span className="text-[10px] text-[var(--ink-soft)] font-mono w-12 flex-shrink-0">+{offset}s</span>
+            {event.seq && <span className="text-[10px] text-[var(--ink-soft)] w-8 flex-shrink-0">#{event.seq}</span>}
             <span className="text-xs font-medium text-[var(--ink)]">{summary.title}</span>
             {summary.badge && <span className="text-[10px] text-[var(--ink-soft)]">{summary.badge}</span>}
           </div>
+          {(event.stepId || event.parentStepId) && (
+            <div className="ml-20 mt-0.5 text-[10px] text-[var(--ink-soft)]">
+              {event.stepId && <span>步骤 {shortId(event.stepId)}</span>}
+              {event.parentStepId && <span className="ml-2">上级 {shortId(event.parentStepId)}</span>}
+            </div>
+          )}
         </button>
         {expanded && summary.detail && (
           <pre className="text-[11px] text-[var(--ink-soft)] bg-black/[0.04] rounded-lg p-2 mt-1 ml-14 overflow-x-auto max-h-48 whitespace-pre-wrap break-all">
@@ -204,6 +267,10 @@ function getEventSummary(event: TraceEvent): { title: string; badge?: string; de
       return { title: '计划提案', detail: String(d.plan || ''), expandable: true }
     case 'plan_response':
       return { title: `计划决策: ${d.decision}`, detail: String(d.feedback || ''), expandable: Boolean(d.feedback) }
+    case 'question_proposed':
+      return { title: '需要用户补充信息', detail: String(d.question || ''), expandable: true }
+    case 'question_response':
+      return { title: '用户已补充信息', detail: String(d.customAnswer || ''), expandable: Boolean(d.customAnswer) }
     case 'todo_update':
       return { title: 'Todo 更新', badge: `${(d.todos as unknown[])?.length || 0} 项`, detail: JSON.stringify(d.todos, null, 2), expandable: true }
     case 'subtask_started':
@@ -222,6 +289,12 @@ function getEventSummary(event: TraceEvent): { title: string; badge?: string; de
       return { title: '任务完成', detail: String(d.summary || ''), expandable: true }
     case 'task_cancelled':
       return { title: '用户取消任务', expandable: false }
+    case 'task_paused':
+      return { title: '用户暂停任务', expandable: false }
+    case 'task_resumed':
+      return { title: '用户继续任务', expandable: false }
+    case 'task_rollback':
+      return { title: '用户请求回滚', expandable: false }
     case 'append_input':
       return { title: '追加输入', detail: String(d.message || ''), expandable: true }
     default:
@@ -273,6 +346,12 @@ function StatusDot({ status }: { status: string }) {
     cancelled: 'bg-gray-400'
   }
   return <span className={`w-2 h-2 rounded-full ${colors[status] || 'bg-gray-300'} flex-shrink-0`} />
+}
+
+function shortId(value?: string): string {
+  if (!value) return ''
+  if (value.length <= 12) return value
+  return `${value.slice(0, 8)}…${value.slice(-4)}`
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {

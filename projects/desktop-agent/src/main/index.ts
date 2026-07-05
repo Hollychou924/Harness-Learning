@@ -6,22 +6,19 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
 import { readdir as readdirAsync, stat as statAsync } from 'node:fs/promises'
 import { agentBridge } from './agent-bridge.js'
-import { startTrace, logAgentEvent, logUserAction, listTraces, getTrace } from './trace-logger.js'
+import { startTrace, logAgentEvent, logUserAction, listTraces, getTrace, exportTracePackage } from './trace-logger.js'
 import type { StdoutMessage, AgentConfig, MessageAttachment } from '../agent/src/protocol.js'
 import { getModelThinkingConfig } from '../renderer/src/components/providerPresets.js'
+import {
+  resolveModelConfigForSave,
+  sanitizeModelConfigForRenderer,
+  sanitizeModelConfigStoreForRenderer,
+  validateModelConfig,
+  type ModelConfig,
+  type ModelConfigStore
+} from './model-config.js'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
-
-interface ModelConfig {
-  providerId: string
-  model: string
-  apiKey: string
-  apiBaseUrl: string
-  apiFormat: 'openai' | 'anthropic'
-  contextLimit: number
-  customProviderId?: string
-  autoApproveLow?: boolean
-}
 
 function getConfigPath(): string {
   return join(app.getPath('userData'), 'model-config.json')
@@ -57,11 +54,6 @@ function saveConfigFile(cfg: ModelConfig): void {
 
 // ── 多模型并存存储 ──────────────────────────────────────────────
 // 存储"已配置模型列表" + 当前激活 id，为输入框快速切换和会话级绑定留基础
-interface ModelConfigStore {
-  configs: ModelConfig[]
-  activeId: string | null
-}
-
 function getModelsStorePath(): string {
   return join(app.getPath('userData'), 'model-configs.json')
 }
@@ -106,20 +98,6 @@ function getActiveModelConfig(): ModelConfig | null {
   return active || store.configs[0] || null
 }
 
-function validateModelConfig(cfg: ModelConfig): string | null {
-  const key = cfg.apiKey || ''
-  if (!key.trim()) return '模型访问配置为空，请重新配置模型'
-  if (/[\u0100-\uFFFF]/.test(key)) return '模型访问配置里包含中文或特殊字符，请重新配置模型'
-  if (/[\r\n\t]/.test(key)) return '模型访问配置里包含换行或制表符，请重新配置模型'
-  return null
-}
-
-function sanitizeModelConfigForRenderer(cfg: ModelConfig | null): ModelConfig | null {
-  if (!cfg) return null
-  if (!validateModelConfig(cfg)) return cfg
-  return { ...cfg, apiKey: '' }
-}
-
 function buildAgentConfig(): AgentConfig {
   const saved = getActiveModelConfig() || loadConfig()
   if (saved && saved.apiKey && !validateModelConfig(saved)) {
@@ -160,7 +138,14 @@ function buildAgentConfig(): AgentConfig {
 }
 
 let mainWindow: BrowserWindow | null = null
+let activeTaskId: string | null = null
 let activeTraceId: string | null = null
+
+function activeTraceForTask(taskId?: string): string | null {
+  if (!activeTraceId) return null
+  if (!taskId) return activeTraceId
+  return activeTaskId === taskId ? activeTraceId : null
+}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -185,10 +170,12 @@ function createWindow(): void {
 
   // 把 Agent 子进程消息转发给渲染进程，并注入 taskId（流式事件本身不带，补上以便前端按任务隔离）
   agentBridge.onMessage((msg: StdoutMessage) => {
-    const taskId = activeTraceId
-    if (taskId) {
-      logAgentEvent(taskId, msg)
-      if (msg.type === 'completed' || msg.type === 'error') {
+    const taskId = activeTaskId
+    const traceId = activeTraceId
+    if (traceId) {
+      logAgentEvent(traceId, msg)
+      if (msg.type === 'completed' || msg.type === 'error' || (msg.type === 'turn_completed' && msg.status === 'cancelled')) {
+        activeTaskId = null
         activeTraceId = null
       }
     }
@@ -227,19 +214,25 @@ app.on('window-all-closed', () => {
 // IPC 通道（依据 docs/09 第二章）
 ipcMain.handle('agent:startTask', async (_e, args: { mode: 'work' | 'code'; message: string; workspaceDir?: string; maxIterations?: number; autoApproveLow?: boolean; sessionId?: string; history?: unknown[]; attachments?: unknown[] }) => {
   const sessionId = args.sessionId || randomUUID()
+  const traceId = randomUUID()
   const savedConfig = getActiveModelConfig() || loadConfig()
   const configError = savedConfig ? validateModelConfig(savedConfig) : null
   if (configError) {
-    return { taskId: sessionId, error: configError }
+    return { taskId: sessionId, traceId, error: configError }
   }
   const config = buildAgentConfig()
   if (!config.apiKey) {
-    return { taskId: sessionId, error: '未检测到模型访问配置，请在模型设置里重新选择或配置模型' }
+    return { taskId: sessionId, traceId, error: '未检测到模型访问配置，请在模型设置里重新选择或配置模型' }
   }
   if (args.maxIterations) config.maxIterations = args.maxIterations
   if (args.autoApproveLow !== undefined) config.autoApproveLow = args.autoApproveLow
-  activeTraceId = sessionId
-  startTrace(sessionId, {
+  activeTaskId = sessionId
+  activeTraceId = traceId
+  startTrace(traceId, {
+    taskId: sessionId,
+    sessionId,
+    conversationId: sessionId,
+    runId: traceId,
     message: args.message,
     mode: args.mode,
     model: config.model,
@@ -249,17 +242,19 @@ ipcMain.handle('agent:startTask', async (_e, args: { mode: 'work' | 'code'; mess
     apiKey: config.apiKey,
     apiBaseUrl: config.apiBaseUrl,
     providerId: config.providerId,
-    customProviderId: config.customProviderId
+    customProviderId: config.customProviderId,
+    attachmentCount: Array.isArray(args.attachments) ? args.attachments.length : 0,
+    historyCount: Array.isArray(args.history) ? args.history.length : 0
   })
   // 输出目录：优先用用户指定，否则用系统文档目录下的「小蓝鲸产出」
   const outputDir = args.workspaceDir || join(app.getPath('documents'), '小蓝鲸产出')
   if (!existsSync(outputDir)) mkdirSync(outputDir, { recursive: true })
   agentBridge.startTask(sessionId, args.message, config, outputDir, args.history, args.attachments as MessageAttachment[] | undefined)
-  return { taskId: sessionId }
+  return { taskId: sessionId, traceId }
 })
 
 ipcMain.handle('config:get', async (_e, key: string) => {
-  const cfg = loadConfig()
+  const cfg = getActiveModelConfig() || loadConfig()
   if (key === 'hasApiKey') {
     const active = getActiveModelConfig()
     return Boolean((active && !validateModelConfig(active)) || process.env.ANTHROPIC_API_KEY)
@@ -268,13 +263,15 @@ ipcMain.handle('config:get', async (_e, key: string) => {
   if (key === 'modelConfig') {
     const active = sanitizeModelConfigForRenderer(getActiveModelConfig())
     if (active) return active
-    if (cfg) return cfg
+    const legacy = sanitizeModelConfigForRenderer(loadConfig())
+    if (legacy) return legacy
     const envKey = process.env.ANTHROPIC_API_KEY
     if (envKey) {
       return {
         providerId: 'anthropic',
         model: process.env.XLJ_MODEL || 'claude-sonnet-4-5-20250929',
-        apiKey: envKey,
+        apiKey: '',
+        hasSavedApiKey: true,
         apiBaseUrl: process.env.ANTHROPIC_BASE_URL || '',
         apiFormat: 'anthropic',
         contextLimit: 200000,
@@ -291,15 +288,32 @@ ipcMain.handle('config:get', async (_e, key: string) => {
 })
 
 ipcMain.handle('config:saveModel', async (_e, cfg: ModelConfig) => {
-  const configError = validateModelConfig(cfg)
+  const store = loadModelsStore()
+  const legacyConfig = loadConfig()
+  const envConfig: ModelConfig | null = process.env.ANTHROPIC_API_KEY && cfg.providerId === 'anthropic'
+    ? {
+        providerId: 'anthropic',
+        model: process.env.XLJ_MODEL || cfg.model,
+        apiKey: process.env.ANTHROPIC_API_KEY,
+        apiBaseUrl: process.env.ANTHROPIC_BASE_URL || '',
+        apiFormat: 'anthropic',
+        contextLimit: 200000,
+        autoApproveLow: false
+      }
+    : null
+  const resolvedCfg = resolveModelConfigForSave(cfg, [
+    ...store.configs,
+    ...(legacyConfig ? [legacyConfig] : []),
+    ...(envConfig ? [envConfig] : [])
+  ])
+  const configError = validateModelConfig(resolvedCfg)
   if (configError) return { success: false, error: configError }
   // 同时写入旧单配置(兼容)和多模型存储
-  saveConfigFile(cfg)
-  const store = loadModelsStore()
-  const id = generateModelId(cfg)
-  const newEntry = { ...cfg, _id: id } as ModelConfig & { _id: string }
+  saveConfigFile(resolvedCfg)
+  const id = generateModelId(resolvedCfg)
+  const newEntry = { ...resolvedCfg, _id: id } as ModelConfig & { _id: string }
   // 同 providerId+model 视为同一条，覆盖更新
-  const idx = store.configs.findIndex((c) => c.providerId === cfg.providerId && c.model === cfg.model && c.customProviderId === cfg.customProviderId)
+  const idx = store.configs.findIndex((c) => c.providerId === resolvedCfg.providerId && c.model === resolvedCfg.model && c.customProviderId === resolvedCfg.customProviderId)
   if (idx >= 0) {
     newEntry._id = (store.configs[idx] as ModelConfig & { _id?: string })._id || id
     store.configs[idx] = newEntry
@@ -314,7 +328,7 @@ ipcMain.handle('config:saveModel', async (_e, cfg: ModelConfig) => {
 // 获取已配置模型列表
 ipcMain.handle('config:getModelList', async () => {
   const store = loadModelsStore()
-  return store
+  return sanitizeModelConfigStoreForRenderer(store)
 })
 
 // 切换激活模型（输入框快速切换，不进设置页）
@@ -355,46 +369,57 @@ ipcMain.handle('shell:openPath', async (_e, filePath: string) => {
 
 // 任务控制通道（依据 docs/09 第二章，转发为 stdin task_control）
 ipcMain.handle('agent:pause', async (_e, args: { taskId: string }) => {
+  const traceId = activeTraceForTask(args.taskId)
+  if (traceId) logUserAction(traceId, 'task_paused', { taskId: args.taskId })
   agentBridge.send({ type: 'task_control', task_id: args.taskId, action: 'pause' })
 })
 
 ipcMain.handle('agent:resume', async (_e, args: { taskId: string }) => {
+  const traceId = activeTraceForTask(args.taskId)
+  if (traceId) logUserAction(traceId, 'task_resumed', { taskId: args.taskId })
   agentBridge.send({ type: 'task_control', task_id: args.taskId, action: 'resume' })
 })
 
 ipcMain.handle('agent:cancel', async (_e, args: { taskId: string }) => {
-  if (activeTraceId) logUserAction(activeTraceId, 'task_cancelled', { taskId: args.taskId })
+  const traceId = activeTraceForTask(args.taskId)
+  if (traceId) logUserAction(traceId, 'task_cancelled', { taskId: args.taskId })
   // 先尝试优雅取消（发 task_control），再补发 stopped 状态让 UI 立即反映
   agentBridge.send({ type: 'task_control', task_id: args.taskId, action: 'cancel' })
   agentBridge.cancelAndNotify()
 })
 
 ipcMain.handle('agent:rollback', async (_e, args: { taskId: string }) => {
+  const traceId = activeTraceForTask(args.taskId)
+  if (traceId) logUserAction(traceId, 'task_rollback', { taskId: args.taskId })
   agentBridge.send({ type: 'task_control', task_id: args.taskId, action: 'rollback' })
   return { success: true }
 })
 
 // 权限审批通道（转发为 stdin approval_response）
 ipcMain.handle('agent:approval', async (_e, args: { requestId: string; approved: boolean; scope?: 'once' | 'task' | 'always' }) => {
-  if (activeTraceId) logUserAction(activeTraceId, 'approval_response', { requestId: args.requestId, approved: args.approved, scope: args.scope })
+  const traceId = activeTraceForTask()
+  if (traceId) logUserAction(traceId, 'approval_response', { requestId: args.requestId, approved: args.approved, scope: args.scope })
   agentBridge.send({ type: 'approval_response', request_id: args.requestId, approved: args.approved, scope: args.scope })
 })
 
 // 反问响应通道（转发为 stdin question_response）
 ipcMain.handle('agent:questionResponse', async (_e, args: { requestId: string; selectedOptionIds?: string[]; customAnswer?: string; skipped?: boolean }) => {
-  if (activeTraceId) logUserAction(activeTraceId, 'question_response', { requestId: args.requestId, selectedOptionIds: args.selectedOptionIds, customAnswer: args.customAnswer, skipped: args.skipped })
+  const traceId = activeTraceForTask()
+  if (traceId) logUserAction(traceId, 'question_response', { requestId: args.requestId, selectedOptionIds: args.selectedOptionIds, customAnswer: args.customAnswer, skipped: args.skipped })
   agentBridge.send({ type: 'question_response', request_id: args.requestId, selected_option_ids: args.selectedOptionIds, custom_answer: args.customAnswer, skipped: args.skipped })
 })
 
 // 计划响应通道（转发为 stdin plan_response）
 ipcMain.handle('agent:planResponse', async (_e, args: { requestId: string; decision: 'approve' | 'reject_stop' | 'reject_revise'; feedback?: string }) => {
-  if (activeTraceId) logUserAction(activeTraceId, 'plan_response', { requestId: args.requestId, decision: args.decision, feedback: args.feedback })
+  const traceId = activeTraceForTask()
+  if (traceId) logUserAction(traceId, 'plan_response', { requestId: args.requestId, decision: args.decision, feedback: args.feedback })
   agentBridge.send({ type: 'plan_response', request_id: args.requestId, decision: args.decision, feedback: args.feedback })
 })
 
 // 追加指令通道（转发为 stdin append_input）
 ipcMain.handle('agent:appendInput', async (_e, args: { taskId: string; message: string; mode?: 'inject' | 'queue' }) => {
-  if (activeTraceId) logUserAction(activeTraceId, 'append_input', { taskId: args.taskId, message: args.message, mode: args.mode })
+  const traceId = activeTraceForTask(args.taskId)
+  if (traceId) logUserAction(traceId, 'append_input', { taskId: args.taskId, message: args.message, mode: args.mode })
   agentBridge.send({ type: 'append_input', task_id: args.taskId, message: args.message, mode: args.mode })
 })
 
@@ -569,6 +594,10 @@ ipcMain.handle('trace:list', async (_e, limit?: number) => {
 
 ipcMain.handle('trace:get', async (_e, traceId: string) => {
   return getTrace(traceId)
+})
+
+ipcMain.handle('trace:export', async (_e, traceId?: string) => {
+  return exportTracePackage(traceId)
 })
 
 // 从 Office/PDF 文档中提取纯文本内容（供模型理解文档）

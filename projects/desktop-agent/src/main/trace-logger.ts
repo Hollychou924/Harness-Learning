@@ -1,22 +1,32 @@
 import { app } from 'electron'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { mkdirSync, appendFileSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
 import type { StdoutMessage } from '../agent/src/protocol.js'
 
-// 全链路 trace 日志：每条请求一个 traceId（复用 session_id），写入磁盘 JSONL
-// 集中在主进程收集，agent 子进程事件 + 用户操作全部记录
-// 2026-07-02 起随 Turn/Item 协议同步改造：记录的事件形状与 StdoutMessage 一致，
-// 供阶段4的时间轴回放面板直接复用，不用另起一套采集逻辑
+// 小蓝鲸本地诊断日志：每次任务单独生成一条排查记录，和长期对话分离。
+// 所有写入磁盘的数据先做遮挡，避免模型配置、文件内容、联系方式等敏感信息裸写入日志。
 
 export interface TraceEvent {
   ts: number
+  seq?: number
   phase: string
   type: string
+  traceId?: string
+  taskId?: string
+  sessionId?: string
+  conversationId?: string
+  runId?: string
+  stepId?: string
+  parentStepId?: string
   data: Record<string, unknown>
 }
 
-interface TraceMeta {
+export interface TraceMeta {
   traceId: string
+  runId: string
+  taskId: string
+  sessionId: string
+  conversationId: string
   message: string
   mode: string
   model: string
@@ -25,6 +35,14 @@ interface TraceMeta {
   startedAt: number
   finishedAt?: number
   eventCount: number
+}
+
+interface TraceIdentity {
+  traceId: string
+  runId: string
+  taskId: string
+  sessionId: string
+  conversationId: string
 }
 
 const tracesDir = () => join(app.getPath('userData'), 'logs', 'traces')
@@ -38,11 +56,15 @@ function ensureDirs(): void {
 
 function maskApiKey(key: string): string {
   if (!key) return ''
-  if (key.length <= 10) return key.slice(0, 4) + '***'
-  return key.slice(0, 6) + '***' + key.slice(-4)
+  if (key.length <= 10) return `${key.slice(0, 4)}***`
+  return `${key.slice(0, 6)}***${key.slice(-4)}`
 }
 
-// 内存索引，避免频繁读磁盘
+function safeTitle(value: string): string {
+  const text = sanitizeText(value).replace(/\s+/g, ' ').trim()
+  return text.slice(0, 120)
+}
+
 let indexCache: TraceMeta[] | null = null
 
 function loadIndex(): TraceMeta[] {
@@ -69,6 +91,10 @@ function traceFilePath(traceId: string): string {
 }
 
 export function startTrace(traceId: string, opts: {
+  taskId: string
+  sessionId: string
+  conversationId: string
+  runId?: string
   message: string
   mode: string
   model: string
@@ -79,11 +105,20 @@ export function startTrace(traceId: string, opts: {
   apiBaseUrl?: string
   providerId?: string
   customProviderId?: string
+  attachmentCount?: number
+  historyCount?: number
 }): void {
   ensureDirs()
-  const meta: TraceMeta = {
+  const identity: TraceIdentity = {
     traceId,
-    message: opts.message.slice(0, 200),
+    runId: opts.runId || traceId,
+    taskId: opts.taskId,
+    sessionId: opts.sessionId,
+    conversationId: opts.conversationId
+  }
+  const meta: TraceMeta = {
+    ...identity,
+    message: safeTitle(opts.message),
     mode: opts.mode,
     model: opts.model,
     provider: opts.provider,
@@ -95,14 +130,16 @@ export function startTrace(traceId: string, opts: {
   const list = loadIndex().filter((t) => t.traceId !== traceId)
   list.unshift(meta)
   saveIndex(list)
+  writeFileSync(traceFilePath(traceId), '', 'utf-8')
 
-  // 写入第一条事件：请求发起
   appendEvent(traceId, {
     ts: Date.now(),
     phase: 'request',
     type: 'task_started',
+    stepId: `task:${identity.taskId}`,
     data: {
       message: opts.message,
+      messageLength: opts.message.length,
       mode: opts.mode,
       model: opts.model,
       provider: opts.provider,
@@ -111,7 +148,9 @@ export function startTrace(traceId: string, opts: {
       apiBaseUrl: opts.apiBaseUrl,
       apiKeyMasked: maskApiKey(opts.apiKey),
       maxIterations: opts.maxIterations,
-      autoApproveLow: opts.autoApproveLow
+      autoApproveLow: opts.autoApproveLow,
+      attachmentCount: opts.attachmentCount || 0,
+      historyCount: opts.historyCount || 0
     }
   })
   updateMeta(traceId, (m) => { m.eventCount++ })
@@ -119,46 +158,81 @@ export function startTrace(traceId: string, opts: {
 
 export function appendEvent(traceId: string, event: TraceEvent): void {
   try {
-    appendFileSync(traceFilePath(traceId), JSON.stringify(event) + '\n', 'utf-8')
+    const normalized = normalizeEvent(traceId, event)
+    appendFileSync(traceFilePath(traceId), `${JSON.stringify(normalized)}\n`, 'utf-8')
   } catch {
     // 磁盘写入失败不影响主流程
   }
 }
 
-// 将 agent stdout 事件（Turn/Item 模型）映射为 trace 事件
+function normalizeEvent(traceId: string, event: TraceEvent): TraceEvent {
+  const meta = loadIndex().find((t) => t.traceId === traceId)
+  const identity = meta ? {
+    traceId: meta.traceId,
+    runId: meta.runId,
+    taskId: meta.taskId,
+    sessionId: meta.sessionId,
+    conversationId: meta.conversationId
+  } : { traceId }
+  return {
+    ...event,
+    ...identity,
+    seq: meta ? meta.eventCount + 1 : event.seq,
+    data: sanitizeTraceData(event.data)
+  }
+}
+
 export function logAgentEvent(traceId: string, msg: StdoutMessage): void {
   const ts = Date.now()
   let phase = 'execution'
   const type = msg.type
   let data: Record<string, unknown> = {}
+  let stepId: string | undefined
+  let parentStepId: string | undefined
 
   switch (msg.type) {
     case 'turn_started':
       phase = 'turn'
+      stepId = `turn:${msg.turn_id}`
       data = { turnId: msg.turn_id }
       break
     case 'turn_completed':
       phase = 'turn'
+      stepId = `turn:${msg.turn_id}`
       data = { turnId: msg.turn_id, status: msg.status }
+      updateMeta(traceId, (m) => {
+        if (msg.status === 'failed') m.status = 'failed'
+        if (msg.status === 'cancelled') m.status = 'cancelled'
+        m.finishedAt = ts
+      })
       break
     case 'item_started':
       phase = itemPhase(msg.item.type)
+      stepId = `item:${msg.item.id}`
+      parentStepId = `turn:${msg.turn_id}`
       data = { turnId: msg.turn_id, item: msg.item }
       break
     case 'item_delta':
       phase = 'stream'
+      stepId = `item:${msg.item_id}:delta`
+      parentStepId = `item:${msg.item_id}`
       data = { turnId: msg.turn_id, itemId: msg.item_id, target: msg.target, delta: msg.delta }
       break
     case 'item_completed':
       phase = itemPhase(msg.item.type)
+      stepId = `item:${msg.item.id}`
+      parentStepId = `turn:${msg.turn_id}`
       data = { turnId: msg.turn_id, item: msg.item }
       break
     case 'item_status_changed':
       phase = 'item'
+      stepId = `item:${msg.item_id}`
+      parentStepId = `turn:${msg.turn_id}`
       data = { turnId: msg.turn_id, itemId: msg.item_id, status: msg.status }
       break
     case 'approval_request':
       phase = 'permission'
+      stepId = `approval:${msg.request_id}`
       data = {
         requestId: msg.request_id,
         toolName: msg.tool_name,
@@ -170,7 +244,13 @@ export function logAgentEvent(traceId: string, msg: StdoutMessage): void {
       break
     case 'plan_proposed':
       phase = 'plan'
+      stepId = `plan:${msg.request_id}`
       data = { requestId: msg.request_id, plan: msg.plan, steps: msg.steps }
+      break
+    case 'question_proposed':
+      phase = 'question'
+      stepId = `question:${msg.request_id}`
+      data = { requestId: msg.request_id, question: msg.question, detail: msg.detail, options: msg.options, multiple: msg.multiple, allowCustom: msg.allow_custom, allowSkip: msg.allow_skip }
       break
     case 'todo_update':
       phase = 'todo'
@@ -178,14 +258,17 @@ export function logAgentEvent(traceId: string, msg: StdoutMessage): void {
       break
     case 'subtask_started':
       phase = 'subtask'
+      stepId = `subtask:${msg.subtask_id}`
       data = { subtaskId: msg.subtask_id, title: msg.title, agentId: msg.agent_id }
       break
     case 'subtask_completed':
       phase = 'subtask'
+      stepId = `subtask:${msg.subtask_id}`
       data = { subtaskId: msg.subtask_id, title: msg.title, durationMs: msg.duration_ms, toolCount: msg.tool_count, tokens: msg.tokens }
       break
     case 'subtask_failed':
       phase = 'subtask'
+      stepId = `subtask:${msg.subtask_id}`
       data = { subtaskId: msg.subtask_id, title: msg.title, error: msg.error }
       break
     case 'usage':
@@ -199,13 +282,13 @@ export function logAgentEvent(traceId: string, msg: StdoutMessage): void {
     case 'error':
       phase = 'error'
       data = { message: msg.message }
-      updateMeta(traceId, (m) => { m.status = 'failed' })
+      updateMeta(traceId, (m) => { m.status = 'failed'; m.finishedAt = ts })
       break
     case 'completed':
       phase = 'completion'
-      data = { summary: msg.summary }
+      data = { taskId: msg.task_id, summary: msg.summary, messageCount: msg.messages?.length || 0 }
       updateMeta(traceId, (m) => {
-        m.status = 'completed'
+        if (m.status !== 'failed' && m.status !== 'cancelled') m.status = 'completed'
         m.finishedAt = ts
       })
       break
@@ -218,7 +301,7 @@ export function logAgentEvent(traceId: string, msg: StdoutMessage): void {
       break
   }
 
-  appendEvent(traceId, { ts, phase, type, data })
+  appendEvent(traceId, { ts, phase, type, stepId, parentStepId, data })
   updateMeta(traceId, (m) => { m.eventCount++ })
 }
 
@@ -238,6 +321,7 @@ export function logUserAction(traceId: string, action: string, data: Record<stri
     ts: Date.now(),
     phase: 'user_action',
     type: action,
+    stepId: `user:${action}`,
     data
   })
   updateMeta(traceId, (m) => { m.eventCount++ })
@@ -270,4 +354,73 @@ export function getTrace(traceId: string): { meta: TraceMeta | null; events: Tra
     // 文件不存在
   }
   return { meta, events }
+}
+
+export function exportTracePackage(traceId?: string): { success: boolean; path?: string; error?: string } {
+  try {
+    ensureDirs()
+    const traces = traceId ? [getTrace(traceId)] : listTraces(20).map((item) => getTrace(item.traceId))
+    const exportedAt = new Date().toISOString()
+    const payload = {
+      exportedAt,
+      app: {
+        name: app.getName(),
+        version: app.getVersion(),
+        platform: process.platform,
+        arch: process.arch
+      },
+      traces
+    }
+    const name = traceId ? `xiaolanjing-diagnostic-${traceId.slice(0, 8)}.json` : `xiaolanjing-diagnostic-${Date.now()}.json`
+    const filePath = join(app.getPath('downloads'), name)
+    writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf-8')
+    return { success: true, path: filePath }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+function sanitizeTraceData(data: Record<string, unknown>): Record<string, unknown> {
+  return sanitizeValue(data, 0) as Record<string, unknown>
+}
+
+function sanitizeValue(value: unknown, depth: number, key = ''): unknown {
+  if (value == null) return value
+  if (depth > 8) return '[层级过深，已省略]'
+  if (typeof value === 'string') return sanitizeStringByKey(key, value)
+  if (typeof value === 'number' || typeof value === 'boolean') return value
+  if (Array.isArray(value)) return value.slice(0, 80).map((item) => sanitizeValue(item, depth + 1, key))
+  if (typeof value === 'object') {
+    const out: Record<string, unknown> = {}
+    for (const [childKey, childValue] of Object.entries(value as Record<string, unknown>)) {
+      out[childKey] = sanitizeValue(childValue, depth + 1, childKey)
+    }
+    return out
+  }
+  return String(value)
+}
+
+function sanitizeStringByKey(key: string, value: string): string {
+  const lower = key.toLowerCase()
+  if (/apikey|api_key|authorization|token|secret|password|cookie/.test(lower)) return '[敏感配置已隐藏]'
+  if (/dataurl|base64/.test(lower)) return '[文件内容已隐藏]'
+  if (/filepath|path$|workspace/.test(lower)) return maskPath(value)
+  return sanitizeText(value)
+}
+
+function sanitizeText(value: string): string {
+  let text = value
+    .replace(/Bearer\s+[A-Za-z0-9._\-]+/g, 'Bearer [已隐藏]')
+    .replace(/\b(?:sk|sk-ant|xai|AIza)[A-Za-z0-9_\-]{12,}\b/g, '[访问配置已隐藏]')
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[邮箱已隐藏]')
+    .replace(/\b1[3-9]\d{9}\b/g, '[手机号已隐藏]')
+    .replace(/\/Users\/[^\s'"`]+/g, (match) => maskPath(match))
+    .replace(/[A-Za-z]:\\[^\s'"`]+/g, (match) => maskPath(match))
+  if (text.length > 1500) text = `${text.slice(0, 1500)}…[已截断，共 ${value.length} 字]`
+  return text
+}
+
+function maskPath(value: string): string {
+  if (!value) return value
+  return `[路径已隐藏]/${basename(value)}`
 }
