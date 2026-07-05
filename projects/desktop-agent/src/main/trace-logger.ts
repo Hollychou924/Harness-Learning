@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import { basename, join } from 'node:path'
 import { mkdirSync, appendFileSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import type { StdoutMessage } from '../agent/src/protocol.js'
 
 // 小蓝鲸本地诊断日志：每次任务单独生成一条排查记录，和长期对话分离。
@@ -45,13 +46,54 @@ interface TraceIdentity {
   conversationId: string
 }
 
+export type DiagnosticPackageLevel = 'basic' | 'enhanced' | 'full'
+
+export interface DiagnosticExportOptions {
+  traceId?: string
+  feedbackId?: string
+  packageLevel?: DiagnosticPackageLevel
+  includeConversation?: boolean
+  includeFileSummary?: boolean
+}
+
+export interface FeedbackTicket {
+  feedbackId: string
+  traceId?: string
+  taskId?: string
+  category: string
+  description: string
+  contact?: string
+  packageLevel: DiagnosticPackageLevel
+  includeConversation: boolean
+  includeFileSummary: boolean
+  allowDiagnosticPackage: boolean
+  packagePath?: string
+  createdAt: number
+}
+
+export interface FeedbackInput {
+  traceId?: string
+  category: string
+  description: string
+  contact?: string
+  packageLevel?: DiagnosticPackageLevel
+  includeConversation?: boolean
+  includeFileSummary?: boolean
+  allowDiagnosticPackage?: boolean
+}
+
 const tracesDir = () => join(app.getPath('userData'), 'logs', 'traces')
 const indexFile = () => join(tracesDir(), 'index.json')
+const feedbackDir = () => join(app.getPath('userData'), 'logs', 'feedback')
+const feedbackIndexFile = () => join(feedbackDir(), 'index.json')
 
 function ensureDirs(): void {
   const dir = tracesDir()
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
   if (!existsSync(indexFile())) writeFileSync(indexFile(), '[]', 'utf-8')
+  const fbDir = feedbackDir()
+  if (!existsSync(fbDir)) mkdirSync(fbDir, { recursive: true })
+  if (!existsSync(feedbackIndexFile())) writeFileSync(feedbackIndexFile(), '[]', 'utf-8')
 }
 
 function maskApiKey(key: string): string {
@@ -66,6 +108,7 @@ function safeTitle(value: string): string {
 }
 
 let indexCache: TraceMeta[] | null = null
+let feedbackCache: FeedbackTicket[] | null = null
 
 function loadIndex(): TraceMeta[] {
   if (indexCache) return indexCache
@@ -84,6 +127,25 @@ function saveIndex(list: TraceMeta[]): void {
   indexCache = list
   ensureDirs()
   writeFileSync(indexFile(), JSON.stringify(list.slice(0, 200), null, 2), 'utf-8')
+}
+
+function loadFeedbackIndex(): FeedbackTicket[] {
+  if (feedbackCache) return feedbackCache
+  try {
+    ensureDirs()
+    const raw = readFileSync(feedbackIndexFile(), 'utf-8')
+    feedbackCache = JSON.parse(raw)
+    if (!Array.isArray(feedbackCache)) feedbackCache = []
+  } catch {
+    feedbackCache = []
+  }
+  return feedbackCache!
+}
+
+function saveFeedbackIndex(list: FeedbackTicket[]): void {
+  feedbackCache = list
+  ensureDirs()
+  writeFileSync(feedbackIndexFile(), JSON.stringify(list.slice(0, 200), null, 2), 'utf-8')
 }
 
 function traceFilePath(traceId: string): string {
@@ -356,28 +418,162 @@ export function getTrace(traceId: string): { meta: TraceMeta | null; events: Tra
   return { meta, events }
 }
 
-export function exportTracePackage(traceId?: string): { success: boolean; path?: string; error?: string } {
+export function exportTracePackage(input?: string | DiagnosticExportOptions): { success: boolean; path?: string; error?: string } {
   try {
     ensureDirs()
-    const traces = traceId ? [getTrace(traceId)] : listTraces(20).map((item) => getTrace(item.traceId))
+    const options = normalizeExportOptions(input)
+    const traces = options.traceId ? [getTrace(options.traceId)] : listTraces(20).map((item) => getTrace(item.traceId))
     const exportedAt = new Date().toISOString()
     const payload = {
       exportedAt,
+      feedbackId: options.feedbackId,
+      packageLevel: options.packageLevel,
+      includeConversation: options.includeConversation,
+      includeFileSummary: options.includeFileSummary,
       app: {
         name: app.getName(),
         version: app.getVersion(),
         platform: process.platform,
         arch: process.arch
       },
-      traces
+      traces: traces.map((trace) => shapeTraceForPackage(trace, options))
     }
-    const name = traceId ? `xiaolanjing-diagnostic-${traceId.slice(0, 8)}.json` : `xiaolanjing-diagnostic-${Date.now()}.json`
+    const nameBase = options.feedbackId || (options.traceId ? options.traceId.slice(0, 8) : String(Date.now()))
+    const name = `xiaolanjing-diagnostic-${nameBase}.json`
     const filePath = join(app.getPath('downloads'), name)
     writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf-8')
     return { success: true, path: filePath }
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : String(e) }
   }
+}
+
+export function createFeedbackTicket(input: FeedbackInput): { success: boolean; feedback?: FeedbackTicket; packagePath?: string; error?: string } {
+  try {
+    ensureDirs()
+    const trace = input.traceId ? getTrace(input.traceId) : { meta: listTraces(1)[0] || null, events: [] }
+    const traceId = input.traceId || trace.meta?.traceId
+    const feedbackId = `fb_${Date.now().toString(36)}_${randomUUID().slice(0, 8)}`
+    const packageLevel = input.packageLevel || 'basic'
+    const allowDiagnosticPackage = input.allowDiagnosticPackage !== false
+    const ticket: FeedbackTicket = {
+      feedbackId,
+      traceId,
+      taskId: trace.meta?.taskId,
+      category: sanitizeText(input.category || '其他'),
+      description: sanitizeText(input.description || ''),
+      contact: input.contact ? sanitizeText(input.contact) : undefined,
+      packageLevel,
+      includeConversation: Boolean(input.includeConversation),
+      includeFileSummary: Boolean(input.includeFileSummary),
+      allowDiagnosticPackage,
+      createdAt: Date.now()
+    }
+
+    if (allowDiagnosticPackage) {
+      const exported = exportTracePackage({
+        traceId,
+        feedbackId,
+        packageLevel,
+        includeConversation: ticket.includeConversation,
+        includeFileSummary: ticket.includeFileSummary
+      })
+      if (exported.success) ticket.packagePath = exported.path
+    }
+
+    const list = loadFeedbackIndex().filter((item) => item.feedbackId !== feedbackId)
+    list.unshift(ticket)
+    saveFeedbackIndex(list)
+    writeFileSync(join(feedbackDir(), `${feedbackId}.json`), JSON.stringify(ticket, null, 2), 'utf-8')
+
+    if (traceId) {
+      logUserAction(traceId, 'feedback_submitted', {
+        feedbackId,
+        category: ticket.category,
+        packageLevel,
+        includeConversation: ticket.includeConversation,
+        includeFileSummary: ticket.includeFileSummary,
+        allowDiagnosticPackage
+      })
+    }
+
+    return { success: true, feedback: ticket, packagePath: ticket.packagePath }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+export function listFeedbackTickets(limit = 50): FeedbackTicket[] {
+  return loadFeedbackIndex().slice(0, limit)
+}
+
+function normalizeExportOptions(input?: string | DiagnosticExportOptions): Required<DiagnosticExportOptions> {
+  const options = typeof input === 'string' ? { traceId: input } : (input || {})
+  return {
+    traceId: options.traceId || '',
+    feedbackId: options.feedbackId || '',
+    packageLevel: options.packageLevel || 'enhanced',
+    includeConversation: Boolean(options.includeConversation),
+    includeFileSummary: Boolean(options.includeFileSummary)
+  }
+}
+
+function shapeTraceForPackage(trace: { meta: TraceMeta | null; events: TraceEvent[] }, options: Required<DiagnosticExportOptions>): Record<string, unknown> {
+  if (options.packageLevel === 'basic') {
+    return {
+      meta: trace.meta,
+      summary: summarizeTrace(trace.events),
+      errors: trace.events.filter((event) => event.phase === 'error').map((event) => ({
+        ts: event.ts,
+        type: event.type,
+        message: event.data.message
+      }))
+    }
+  }
+  const events = trace.events
+    .filter((event) => shouldKeepEventForPackage(event, options))
+    .map((event) => trimEventForPackage(event, options))
+  return { meta: trace.meta, summary: summarizeTrace(trace.events), events }
+}
+
+function summarizeTrace(events: TraceEvent[]): Record<string, unknown> {
+  const toolEvents = events.filter((event) => event.phase === 'tool' && event.type === 'item_completed')
+  return {
+    eventCount: events.length,
+    phases: Array.from(new Set(events.map((event) => event.phase))),
+    errorCount: events.filter((event) => event.phase === 'error').length,
+    toolCount: toolEvents.length,
+    lastEvent: events[events.length - 1]?.type
+  }
+}
+
+function shouldKeepEventForPackage(event: TraceEvent, options: Required<DiagnosticExportOptions>): boolean {
+  if (options.packageLevel === 'full') return true
+  if (!options.includeConversation && (event.phase === 'stream' || event.phase === 'model_output')) return false
+  return true
+}
+
+function trimEventForPackage(event: TraceEvent, options: Required<DiagnosticExportOptions>): TraceEvent {
+  const data = { ...event.data }
+  if (!options.includeConversation) {
+    if ('delta' in data) data.delta = '[对话内容未包含]'
+    if ('message' in data) data.message = '[对话内容未包含]'
+    if ('summary' in data) data.summary = '[对话内容未包含]'
+    if (isItemLike(data.item)) {
+      data.item = { ...data.item, text: data.item.text ? '[对话内容未包含]' : data.item.text, content: '[对话内容未包含]' }
+    }
+  }
+  if (!options.includeFileSummary) {
+    if ('filePath' in data) data.filePath = '[文件路径未包含]'
+    if (isItemLike(data.item) && data.item.resultSummary) {
+      data.item = { ...data.item, resultSummary: '[文件摘要未包含]' }
+    }
+  }
+  return { ...event, data }
+}
+
+function isItemLike(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === 'object')
 }
 
 function sanitizeTraceData(data: Record<string, unknown>): Record<string, unknown> {

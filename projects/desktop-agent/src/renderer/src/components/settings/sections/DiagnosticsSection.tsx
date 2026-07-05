@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, Download, Loader2 } from 'lucide-react'
-import { api, type TraceMeta, type TraceEvent } from '../../../api'
+import { ChevronLeft, ChevronRight, Download, Loader2, MessageSquareWarning } from 'lucide-react'
+import { api, type TraceMeta, type TraceEvent, type FeedbackTicket, type DiagnosticPackageLevel } from '../../../api'
 
 export function DiagnosticsSection() {
   const [traces, setTraces] = useState<TraceMeta[]>([])
@@ -8,11 +8,15 @@ export function DiagnosticsSection() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
   const [notice, setNotice] = useState('')
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [feedbackList, setFeedbackList] = useState<FeedbackTicket[]>([])
 
   const refresh = useCallback(async () => {
     setLoading(true)
     const list = (await api.traceList(50)) as TraceMeta[]
+    const tickets = (await api.feedbackList(20)) as FeedbackTicket[]
     setTraces(list)
+    setFeedbackList(tickets)
     setLoading(false)
   }, [])
 
@@ -40,18 +44,60 @@ export function DiagnosticsSection() {
       <header className="mb-5">
         <div className="flex items-center justify-between gap-3">
           <h3 className="text-lg font-semibold text-[var(--ink)]">诊断日志</h3>
-          <button
-            onClick={exportRecent}
-            disabled={exporting || traces.length === 0}
-            className="inline-flex items-center gap-1.5 rounded-lg glass px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:brightness-105 disabled:opacity-40 transition"
-          >
-            {exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
-            导出最近记录
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setFeedbackOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg glass px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:brightness-105 transition"
+            >
+              <MessageSquareWarning size={13} />
+              提交诊断
+            </button>
+            <button
+              onClick={exportRecent}
+              disabled={exporting || traces.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-lg glass px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:brightness-105 disabled:opacity-40 transition"
+            >
+              {exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+              导出最近记录
+            </button>
+          </div>
         </div>
         <p className="text-sm text-[var(--ink-soft)] mt-1">每条请求的完整执行链路记录，包含模型调用、工具执行、权限审批、异常等</p>
         {notice && <p className="text-xs text-[var(--ink-soft)] mt-2">{notice}</p>}
       </header>
+
+
+
+      {feedbackOpen && (
+        <FeedbackForm
+          traceId={traces[0]?.traceId}
+          onClose={() => setFeedbackOpen(false)}
+          onCreated={(ticket) => {
+            setFeedbackList((items) => [ticket, ...items])
+            setNotice(`反馈已生成：${ticket.feedbackId}`)
+          }}
+        />
+      )}
+
+      {feedbackList.length > 0 && (
+        <div className="mb-4 rounded-xl glass-soft px-4 py-3">
+          <div className="mb-2 text-xs font-semibold text-[var(--ink-soft)]">最近反馈</div>
+          <div className="space-y-1">
+            {feedbackList.slice(0, 3).map((ticket) => (
+              <div key={ticket.feedbackId} className="flex items-center gap-2 text-xs text-[var(--ink-soft)]">
+                <span className="font-mono text-[var(--ink)]">{ticket.feedbackId}</span>
+                <span>{ticket.category}</span>
+                {ticket.traceId && <span>关联记录 {shortId(ticket.traceId)}</span>}
+                {ticket.packagePath && (
+                  <button onClick={() => void api.openPath(ticket.packagePath!)} className="ml-auto text-[var(--ink)] hover:underline">
+                    打开诊断文件
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-[var(--ink-soft)] py-8 justify-center">
@@ -100,6 +146,7 @@ function TraceDetail({ traceId, onBack }: { traceId: string; onBack: () => void 
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
   const [notice, setNotice] = useState('')
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
 
   useEffect(() => {
     void (async () => {
@@ -143,16 +190,36 @@ function TraceDetail({ traceId, onBack }: { traceId: string; onBack: () => void 
         <button onClick={onBack} className="flex items-center gap-1 text-sm text-[var(--ink-soft)] hover:text-[var(--ink)] transition">
           <ChevronLeft size={16} /> 返回列表
         </button>
-        <button
-          onClick={exportCurrent}
-          disabled={exporting}
-          className="inline-flex items-center gap-1.5 rounded-lg glass px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:brightness-105 disabled:opacity-40 transition"
-        >
-          {exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
-          导出这次记录
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setFeedbackOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg glass px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:brightness-105 transition"
+          >
+            <MessageSquareWarning size={13} />
+            反馈问题
+          </button>
+          <button
+            onClick={exportCurrent}
+            disabled={exporting}
+            className="inline-flex items-center gap-1.5 rounded-lg glass px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:brightness-105 disabled:opacity-40 transition"
+          >
+            {exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+            导出这次记录
+          </button>
+        </div>
       </div>
       {notice && <p className="mb-3 text-xs text-[var(--ink-soft)]">{notice}</p>}
+
+      {feedbackOpen && (
+        <FeedbackForm
+          traceId={traceId}
+          onClose={() => setFeedbackOpen(false)}
+          onCreated={(ticket) => {
+            setNotice(`反馈已生成：${ticket.feedbackId}`)
+            setFeedbackOpen(false)
+          }}
+        />
+      )}
 
       {/* 概览 */}
       <div className="glass-soft rounded-xl px-4 py-3 mb-4 space-y-1.5">
@@ -336,6 +403,137 @@ function itemSummary(item: ItemLike | undefined, phase: string): { title: string
     default:
       return { title: `${item.type}${phase}`, expandable: false }
   }
+}
+
+function FeedbackForm({
+  traceId,
+  onClose,
+  onCreated
+}: {
+  traceId?: string
+  onClose: () => void
+  onCreated: (ticket: FeedbackTicket) => void
+}) {
+  const [category, setCategory] = useState('任务失败')
+  const [description, setDescription] = useState('')
+  const [contact, setContact] = useState('')
+  const [packageLevel, setPackageLevel] = useState<DiagnosticPackageLevel>('basic')
+  const [allowDiagnosticPackage, setAllowDiagnosticPackage] = useState(true)
+  const [includeConversation, setIncludeConversation] = useState(false)
+  const [includeFileSummary, setIncludeFileSummary] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  const submit = async () => {
+    if (!description.trim()) {
+      setError('请简单描述遇到的问题')
+      return
+    }
+    setSubmitting(true)
+    setError('')
+    const result = await api.feedbackCreate({
+      traceId,
+      category,
+      description,
+      contact,
+      packageLevel,
+      allowDiagnosticPackage,
+      includeConversation,
+      includeFileSummary
+    })
+    setSubmitting(false)
+    if (result.success && result.feedback) {
+      onCreated(result.feedback)
+      if (result.packagePath) void api.openPath(result.packagePath)
+      return
+    }
+    setError(result.error || '反馈生成失败，请重试')
+  }
+
+  return (
+    <div className="mb-4 rounded-xl glass-soft px-4 py-3">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <div className="text-sm font-semibold text-[var(--ink)]">提交诊断</div>
+          <div className="text-xs text-[var(--ink-soft)]">
+            {traceId ? `将自动关联记录 ${shortId(traceId)}` : '将自动关联最近一次任务'}
+          </div>
+        </div>
+        <button onClick={onClose} className="text-xs text-[var(--ink-soft)] hover:text-[var(--ink)]">取消</button>
+      </div>
+
+      <div className="grid gap-3">
+        <label className="grid gap-1 text-xs text-[var(--ink-soft)]">
+          问题类型
+          <select value={category} onChange={(e) => setCategory(e.target.value)} className="h-9 rounded-lg bg-black/[0.04] px-3 text-sm text-[var(--ink)] outline-none">
+            {['结果不对', '任务失败', '卡住', '速度慢', '费用异常', '界面问题', '模型配置问题', '其他'].map((item) => (
+              <option key={item} value={item}>{item}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="grid gap-1 text-xs text-[var(--ink-soft)]">
+          问题描述
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="请描述你看到的问题、期望结果，以及大概什么时候发生"
+            className="min-h-[82px] rounded-lg bg-black/[0.04] px-3 py-2 text-sm text-[var(--ink)] outline-none resize-none"
+          />
+        </label>
+
+        <label className="grid gap-1 text-xs text-[var(--ink-soft)]">
+          联系方式（可选）
+          <input
+            value={contact}
+            onChange={(e) => setContact(e.target.value)}
+            placeholder="可填写邮箱或手机号，方便追问"
+            className="h-9 rounded-lg bg-black/[0.04] px-3 text-sm text-[var(--ink)] outline-none"
+          />
+        </label>
+
+        <div className="rounded-lg bg-black/[0.03] p-3">
+          <div className="mb-2 text-xs font-semibold text-[var(--ink)]">诊断包范围</div>
+          <div className="grid gap-2 text-xs text-[var(--ink-soft)]">
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={allowDiagnosticPackage} onChange={(e) => setAllowDiagnosticPackage(e.target.checked)} />
+              允许生成诊断包
+            </label>
+            <select
+              value={packageLevel}
+              disabled={!allowDiagnosticPackage}
+              onChange={(e) => setPackageLevel(e.target.value as DiagnosticPackageLevel)}
+              className="h-9 rounded-lg bg-white/60 px-3 text-sm text-[var(--ink)] outline-none disabled:opacity-50"
+            >
+              <option value="basic">基础：只包含任务摘要、错误和环境信息</option>
+              <option value="enhanced">增强：包含执行步骤和工具摘要</option>
+              <option value="full">完整：包含更完整的本地记录</option>
+            </select>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={includeConversation} disabled={!allowDiagnosticPackage} onChange={(e) => setIncludeConversation(e.target.checked)} />
+              允许包含对话内容
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={includeFileSummary} disabled={!allowDiagnosticPackage} onChange={(e) => setIncludeFileSummary(e.target.checked)} />
+              允许包含文件摘要
+            </label>
+          </div>
+        </div>
+
+        {error && <div className="text-xs text-red-500">{error}</div>}
+        <div className="flex justify-end">
+          <button
+            onClick={submit}
+            disabled={submitting}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--ink)] px-4 py-2 text-xs font-medium text-white hover:brightness-110 disabled:opacity-50 transition"
+          >
+            {submitting && <Loader2 size={13} className="animate-spin" />}
+            生成反馈编号
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function StatusDot({ status }: { status: string }) {

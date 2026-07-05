@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
 import { readdir as readdirAsync, stat as statAsync } from 'node:fs/promises'
 import { agentBridge } from './agent-bridge.js'
-import { startTrace, logAgentEvent, logUserAction, listTraces, getTrace, exportTracePackage } from './trace-logger.js'
+import { startTrace, logAgentEvent, logUserAction, listTraces, getTrace, exportTracePackage, createFeedbackTicket, listFeedbackTickets } from './trace-logger.js'
 import type { StdoutMessage, AgentConfig, MessageAttachment } from '../agent/src/protocol.js'
 import { getModelThinkingConfig } from '../renderer/src/components/providerPresets.js'
 import {
@@ -598,6 +598,23 @@ ipcMain.handle('trace:get', async (_e, traceId: string) => {
 
 ipcMain.handle('trace:export', async (_e, traceId?: string) => {
   return exportTracePackage(traceId)
+})
+
+ipcMain.handle('feedback:create', async (_e, input: {
+  traceId?: string
+  category: string
+  description: string
+  contact?: string
+  packageLevel?: 'basic' | 'enhanced' | 'full'
+  includeConversation?: boolean
+  includeFileSummary?: boolean
+  allowDiagnosticPackage?: boolean
+}) => {
+  return createFeedbackTicket(input)
+})
+
+ipcMain.handle('feedback:list', async (_e, limit?: number) => {
+  return listFeedbackTickets(limit ?? 50)
 })
 
 // 从 Office/PDF 文档中提取纯文本内容（供模型理解文档）

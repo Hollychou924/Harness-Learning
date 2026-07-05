@@ -47,6 +47,9 @@ const api = {
   traceList: (limit?: number) => ipcRenderer.invoke('trace:list', limit) as Promise<unknown[]>,
   traceGet: (traceId: string) => ipcRenderer.invoke('trace:get', traceId) as Promise<unknown>,
   traceExport: (traceId?: string) => ipcRenderer.invoke('trace:export', traceId) as Promise<{ success: boolean; path?: string; error?: string }>,
+  feedbackCreate: (input: { traceId?: string; category: string; description: string; contact?: string; packageLevel?: 'basic' | 'enhanced' | 'full'; includeConversation?: boolean; includeFileSummary?: boolean; allowDiagnosticPackage?: boolean }) =>
+    ipcRenderer.invoke('feedback:create', input) as Promise<{ success: boolean; feedback?: unknown; packagePath?: string; error?: string }>,
+  feedbackList: (limit?: number) => ipcRenderer.invoke('feedback:list', limit) as Promise<unknown[]>,
   openFiles: () => ipcRenderer.invoke('dialog:openFiles') as Promise<unknown[]>,
   pickFolder: () => ipcRenderer.invoke('project:select') as Promise<string | null>,
   createProjectFolder: (name: string) => ipcRenderer.invoke('project:create', name) as Promise<string | null>,

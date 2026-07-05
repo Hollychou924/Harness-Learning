@@ -57,6 +57,23 @@ export interface TraceDetail {
   events: TraceEvent[]
 }
 
+export type DiagnosticPackageLevel = 'basic' | 'enhanced' | 'full'
+
+export interface FeedbackTicket {
+  feedbackId: string
+  traceId?: string
+  taskId?: string
+  category: string
+  description: string
+  contact?: string
+  packageLevel: DiagnosticPackageLevel
+  includeConversation: boolean
+  includeFileSummary: boolean
+  allowDiagnosticPackage: boolean
+  packagePath?: string
+  createdAt: number
+}
+
 type Api = {
   startTask: (args: { mode: 'work' | 'code'; message: string; workspaceDir?: string; maxIterations?: number; autoApproveLow?: boolean; sessionId?: string; history?: unknown[]; attachments?: unknown[] }) =>
     Promise<{ taskId: string; traceId?: string; error?: string }>
@@ -90,6 +107,8 @@ type Api = {
   traceList: (limit?: number) => Promise<TraceMeta[]>
   traceGet: (traceId: string) => Promise<TraceDetail>
   traceExport: (traceId?: string) => Promise<{ success: boolean; path?: string; error?: string }>
+  feedbackCreate: (input: { traceId?: string; category: string; description: string; contact?: string; packageLevel?: DiagnosticPackageLevel; includeConversation?: boolean; includeFileSummary?: boolean; allowDiagnosticPackage?: boolean }) => Promise<{ success: boolean; feedback?: FeedbackTicket; packagePath?: string; error?: string }>
+  feedbackList: (limit?: number) => Promise<FeedbackTicket[]>
 }
 
 const noop = () => {}
@@ -124,7 +143,9 @@ const empty: Api = {
   workspacePreviewFile: async () => ({}),
   traceList: async () => [],
   traceGet: async () => ({ meta: null, events: [] }),
-  traceExport: async () => ({ success: false, error: 'preload 未就绪' })
+  traceExport: async () => ({ success: false, error: 'preload 未就绪' }),
+  feedbackCreate: async () => ({ success: false, error: 'preload 未就绪' }),
+  feedbackList: async () => []
 }
 
 export const api: Api = (globalThis as { api?: Api }).api ?? empty
