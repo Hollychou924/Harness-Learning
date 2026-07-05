@@ -172,7 +172,7 @@ export function deriveProgressSteps(turn: Turn | null, todos: TodoItem[]): Progr
     }))
   }
 
-  return getToolItems(turn).map((item) => ({
+  return getToolItems(turn).map((item): ProgressStepView => ({
     id: item.id,
     label: trimStepLabel(describeToolCall(item).replace(/^正在/, '').replace(/^已/, '')),
     status: item.status === 'running' || item.status === 'pending'
@@ -180,7 +180,7 @@ export function deriveProgressSteps(turn: Turn | null, todos: TodoItem[]): Progr
       : DONE_STATUSES.has(item.status)
         ? 'completed'
         : 'pending'
-  })).map((step, index, all) => {
+  })).map((step, index, all): ProgressStepView => {
     if (step.status === 'running') return step
     const hasRunning = all.some((item) => item.status === 'running')
     if (!hasRunning && step.status === 'pending' && index === 0) return { ...step, status: 'running' }

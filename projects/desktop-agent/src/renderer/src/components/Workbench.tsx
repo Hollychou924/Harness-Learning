@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react'
-import { useTaskStore } from '../store/task'
+import { useEffect, useRef, useState } from 'react'
+import { useTaskStore, type Attachment } from '../store/task'
 import { getFinalAnswerOfTurn } from '../store/turns'
 import { Composer } from './Composer'
 import { ResultView } from './ResultView'
@@ -7,16 +7,15 @@ import { ProcessFlow } from './ProcessFlow'
 import { TurnItemsView } from './TurnItemsView'
 import { TurnNavigator } from './TurnNavigator'
 import { ChatInput } from './ChatInput'
+import { MessageActions, actionIcons, useMessageFeedback } from './MessageActions'
 import { useSettingsStore } from './settings/settingsStore'
-import { useDetailLevelStore, type DetailLevel } from './detailLevelStore'
 import { useTimelineScroll } from './useTimelineScroll'
 import { useDeferredRender } from './useDeferredRender'
 import { ChevronUp } from 'lucide-react'
-import { Maximize2, Minimize2, Eye } from 'lucide-react'
-import type { Turn } from '../../../agent/src/items'
+import type { Turn, UserMessageContent } from '../../../agent/src/items'
 
 export function Workbench() {
-  const { status, mode, goal, message, summary, messages } = useTaskStore()
+  const { status, goal, message, summary, messages } = useTaskStore()
   const greeting = greetingText()
   const taskTitle = status !== 'idle' ? goal || message : ''
 
@@ -30,7 +29,6 @@ export function Workbench() {
               {taskTitle}
             </span>
           )}
-          {messages.length > 0 && <DetailLevelToggle />}
         </div>
       </div>
 
@@ -108,18 +106,24 @@ function HomeView({ greeting }: { greeting: string }) {
 }
 
 function RunningView({ summary, status }: { summary: string; status: string }) {
-  const { goal, message, currentTurn } = useTaskStore()
+  const { goal, message, currentTurn, startedAt } = useTaskStore()
   const chunks = getFinalAnswerOfTurn(currentTurn)
-  const userQuery = goal || message
+  const userDraft = userDraftFromTurn(currentTurn) || { text: goal || message, attachments: [] }
+  const [toast, setToast] = useState<string | null>(null)
+  const showToast = (text: string) => {
+    setToast(text)
+    window.setTimeout(() => setToast(null), 1800)
+  }
   return (
     <div className="max-w-4xl mx-auto px-6 py-6 space-y-4">
       {/* 用户消息：右侧气泡 */}
-      {userQuery && (
-        <div className="flex justify-end">
-          <div className="glass rounded-2xl rounded-tr-md px-4 py-2.5 max-w-[80%]">
-            <p className="text-sm leading-relaxed text-[var(--ink)] whitespace-pre-wrap">{userQuery}</p>
-          </div>
-        </div>
+      {hasUserDraft(userDraft) && (
+        <UserMessageBubble
+          draft={userDraft}
+          time={currentTurn?.startedAt || startedAt || undefined}
+          canEdit={false}
+          onCopy={() => copyDraft(userDraft, showToast)}
+        />
       )}
 
       {/* 执行过程 + 回复：左侧 */}
@@ -127,6 +131,7 @@ function RunningView({ summary, status }: { summary: string; status: string }) {
       {(chunks || status === 'completed') && (
         <ResultView content={chunks} />
       )}
+      {toast && <FloatingToast text={toast} />}
     </div>
   )
 }
@@ -137,14 +142,16 @@ function RunningView({ summary, status }: { summary: string; status: string }) {
  * 点击历史对话后，从这里"像没离开过一样"继续聊
  * ============================================================ */
 function ConversationView({ status }: { status: string }) {
-  const { turns, currentTurn, goal, message } = useTaskStore()
-  const liveUserText = currentTurn?.items
-    .filter((it) => it.type === 'userMessage')
-    .flatMap((it) => it.content.filter((c) => c.type === 'text').map((c) => c.text || ''))
-    .join('') || ''
+  const { turns, currentTurn, goal, message, startedAt } = useTaskStore()
+  const liveUserDraft = userDraftFromTurn(currentTurn) || { text: goal || message, attachments: [] }
   const { showThinking } = useSettingsStore()
   const chunks = getFinalAnswerOfTurn(currentTurn)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const [toast, setToast] = useState<string | null>(null)
+  const showToast = (text: string) => {
+    setToast(text)
+    window.setTimeout(() => setToast(null), 1800)
+  }
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -172,14 +179,15 @@ function ConversationView({ status }: { status: string }) {
       {/* 左侧跨轮导航条：超过 3 轮才出现 */}
       <TurnNavigator turns={turns} onJump={handleJump} />
       <div ref={scrollRef} className="flex-1 w-full max-w-4xl mx-auto px-6 py-6 space-y-4 overflow-y-auto h-full">
-        <TimelinePaged turns={turns} showThinking={showThinking} />
+        <TimelinePaged turns={turns} showThinking={showThinking} status={status} showToast={showToast} />
         {/* 本轮用户消息气泡 */}
-        {isLiveTurn && liveUserText && (
-          <div className="flex justify-end">
-            <div className="glass rounded-2xl rounded-tr-md px-4 py-2.5 max-w-[80%]">
-              <p className="text-sm leading-relaxed text-[var(--ink)] whitespace-pre-wrap">{liveUserText}</p>
-            </div>
-          </div>
+        {isLiveTurn && hasUserDraft(liveUserDraft) && (
+          <UserMessageBubble
+            draft={liveUserDraft}
+            time={currentTurn?.startedAt || startedAt || undefined}
+            canEdit={false}
+            onCopy={() => copyDraft(liveUserDraft, showToast)}
+          />
         )}
         {/* 本轮执行过程 + 实时回复 */}
         {isLiveTurn && <ProcessFlow />}
@@ -187,6 +195,7 @@ function ConversationView({ status }: { status: string }) {
         {status === 'idle' && (
           <p className="text-center text-xs text-[var(--ink-soft)] py-2">在下方输入继续对话，上下文已完整保留</p>
         )}
+        {toast && <FloatingToast text={toast} />}
       </div>
     </div>
   )
@@ -194,27 +203,46 @@ function ConversationView({ status }: { status: string }) {
 
 /** 一轮历史：用户消息气泡(右) + 思考/工具活动(左，可展开) + 最终回复(左)
  *  懒加载：不在视口内时只渲染用户消息占位，进入视口才渲染完整内容（来自 lobsterai LazyRenderTurn） */
-function HistoryTurnView({ turn, showThinking }: { turn: Turn; showThinking: boolean }) {
-  const userText = turn.items
-    .filter((it) => it.type === 'userMessage')
-    .flatMap((it) => it.content.filter((c) => c.type === 'text').map((c) => c.text || ''))
-    .join('')
+function HistoryTurnView({
+  turn,
+  showThinking,
+  isLatest,
+  status,
+  showToast
+}: {
+  turn: Turn
+  showThinking: boolean
+  isLatest: boolean
+  status: string
+  showToast: (text: string) => void
+}) {
+  const userDraft = userDraftFromTurn(turn)
   const finalAnswer = getFinalAnswerOfTurn(turn)
   const { ref, shouldRender } = useDeferredRender<HTMLDivElement>({ rootMargin: '300px' })
 
   return (
     <div ref={ref} data-turn-id={turn.id} className="space-y-3 turn-target">
-      {userText && (
-        <div className="flex justify-end">
-          <div className="glass rounded-2xl rounded-tr-md px-4 py-2.5 max-w-[80%]">
-            <p className="text-sm leading-relaxed text-[var(--ink)] whitespace-pre-wrap">{userText}</p>
-          </div>
-        </div>
+      {userDraft && hasUserDraft(userDraft) && (
+        <UserMessageBubble
+          draft={userDraft}
+          time={turn.startedAt}
+          canEdit={isLatest && status !== 'executing' && Boolean(finalAnswer)}
+          onCopy={() => copyDraft(userDraft, showToast)}
+          onEdit={() => editDraft(userDraft, showToast)}
+        />
       )}
       {shouldRender ? (
         <>
           <TurnItemsView turn={turn} showThinking={showThinking} />
-          {finalAnswer && <ResultView content={finalAnswer} />}
+          {finalAnswer && (
+            <AssistantMessageBlock
+              turn={turn}
+              content={finalAnswer}
+              isLatest={isLatest}
+              status={status}
+              showToast={showToast}
+            />
+          )}
         </>
       ) : (
         <div className="h-8" />
@@ -224,9 +252,20 @@ function HistoryTurnView({ turn, showThinking }: { turn: Turn; showThinking: boo
 }
 
 /** 虚拟分页的历史轮次渲染：超阈值自动折叠，可手动加载/折叠更早轮次（来自 Kun） */
-function TimelinePaged({ turns, showThinking }: { turns: Turn[]; showThinking: boolean }) {
+function TimelinePaged({
+  turns,
+  showThinking,
+  status,
+  showToast
+}: {
+  turns: Turn[]
+  showThinking: boolean
+  status: string
+  showToast: (text: string) => void
+}) {
   const { visibleTurnCount, hasHidden, shouldShowCollapseButton, loadEarlier, collapseEarlier } = useTimelineScroll(turns.length)
-  const visibleTurns = hasHidden ? turns.slice(hasHidden) : turns
+  const hiddenCount = Math.max(0, turns.length - visibleTurnCount)
+  const visibleTurns = hasHidden ? turns.slice(hiddenCount) : turns
 
   return (
     <>
@@ -237,7 +276,7 @@ function TimelinePaged({ turns, showThinking }: { turns: Turn[]; showThinking: b
             className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs text-[var(--ink-soft)] hover:bg-black/[0.04] transition"
           >
             <ChevronUp size={13} />
-            加载更早的 {hasHidden} 轮对话
+            加载更早的 {hiddenCount} 轮对话
           </button>
         </div>
       )}
@@ -253,36 +292,185 @@ function TimelinePaged({ turns, showThinking }: { turns: Turn[]; showThinking: b
         </div>
       )}
       {visibleTurns.map((t) => (
-        <HistoryTurnView key={t.id} turn={t} showThinking={showThinking} />
+        <HistoryTurnView
+          key={t.id}
+          turn={t}
+          showThinking={showThinking}
+          isLatest={turns[turns.length - 1]?.id === t.id}
+          status={status}
+          showToast={showToast}
+        />
       ))}
     </>
   )
 }
 
-function DetailLevelToggle() {
-  const { level, setLevel } = useDetailLevelStore()
-  const options: { value: DetailLevel; icon: React.ReactNode; label: string }[] = [
-    { value: 'conclusionOnly', icon: <Eye size={13} />, label: '只看结论' },
-    { value: 'normal', icon: <Minimize2 size={13} />, label: '默认' },
-    { value: 'expandAll', icon: <Maximize2 size={13} />, label: '全部展开' }
+interface UserDraft {
+  text: string
+  attachments: Attachment[]
+}
+
+function userDraftFromTurn(turn: Turn | null): UserDraft | null {
+  const item = turn?.items.find((it) => it.type === 'userMessage')
+  if (!item || item.type !== 'userMessage') return null
+  const text = item.content
+    .filter((c) => c.type === 'text')
+    .map((c) => c.text || '')
+    .join('')
+  return {
+    text,
+    attachments: attachmentsFromContent(item.content)
+  }
+}
+
+function attachmentsFromContent(content: UserMessageContent[]): Attachment[] {
+  return content
+    .filter((c) => c.type === 'image' || c.type === 'file')
+    .map((c, index) => ({
+      id: `draft-${Date.now()}-${index}`,
+      name: c.name || (c.type === 'image' ? `图片${index + 1}.png` : `文档${index + 1}`),
+      type: c.type === 'image' ? 'image' : 'text',
+      size: c.size || 0,
+      dataUrl: c.type === 'image' ? c.url : undefined,
+      textContent: c.type === 'file' ? c.textContent : undefined,
+      mime: c.mime || (c.type === 'image' ? 'image/png' : 'text/plain')
+    }))
+}
+
+function hasUserDraft(draft: UserDraft): boolean {
+  return Boolean(draft.text.trim() || draft.attachments.length > 0)
+}
+
+function copyTextOfDraft(draft: UserDraft): string {
+  const attachmentText = draft.attachments
+    .map((a) => `【${a.type === 'image' ? '图片' : '文档'} ${a.name}】`)
+    .join('\n')
+  return [draft.text.trim(), attachmentText].filter(Boolean).join('\n')
+}
+
+async function writeClipboard(text: string, showToast: (text: string) => void) {
+  try {
+    await navigator.clipboard.writeText(text)
+    showToast('已复制')
+  } catch {
+    showToast('复制失败，请重试')
+  }
+}
+
+function copyDraft(draft: UserDraft, showToast: (text: string) => void) {
+  void writeClipboard(copyTextOfDraft(draft), showToast)
+}
+
+function editDraft(draft: UserDraft, showToast: (text: string) => void) {
+  const { setMessage, setAttachments } = useTaskStore.getState()
+  setMessage(draft.text)
+  setAttachments(draft.attachments)
+  showToast('已带回输入框')
+}
+
+function UserMessageBubble({
+  draft,
+  time,
+  canEdit,
+  onCopy,
+  onEdit
+}: {
+  draft: UserDraft
+  time?: number
+  canEdit: boolean
+  onCopy: () => void
+  onEdit?: () => void
+}) {
+  const actions = [
+    { key: 'copy' as const, label: '复制', icon: actionIcons.copy(), onClick: onCopy },
+    ...(canEdit && onEdit ? [{ key: 'edit' as const, label: '编辑', icon: actionIcons.edit, onClick: onEdit }] : [])
   ]
+
   return (
-    <div className="flex items-center gap-0.5 rounded-lg bg-black/[0.04] p-0.5">
-      {options.map((opt) => (
-        <button
-          key={opt.value}
-          onClick={() => setLevel(opt.value)}
-          className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs transition ${
-            level === opt.value
-              ? 'bg-white shadow-sm text-[var(--ink)]'
-              : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
-          }`}
-          title={opt.label}
-        >
-          {opt.icon}
-          <span className="hidden sm:inline">{opt.label}</span>
-        </button>
-      ))}
+    <div className="group/message flex justify-end">
+      <div className="max-w-[80%]">
+        <div className="rounded-2xl rounded-tr-md bg-black/[0.035] px-4 py-2.5">
+          {draft.text.trim() && (
+            <p className="text-sm leading-relaxed text-[var(--ink)] whitespace-pre-wrap">{draft.text}</p>
+          )}
+          {draft.attachments.length > 0 && (
+            <div className={`flex flex-wrap gap-1.5 ${draft.text.trim() ? 'mt-2' : ''}`}>
+              {draft.attachments.map((attachment) => (
+                <AttachmentChip key={attachment.id} attachment={attachment} />
+              ))}
+            </div>
+          )}
+        </div>
+        <MessageActions align="user" time={time} actions={actions} />
+      </div>
+    </div>
+  )
+}
+
+function AttachmentChip({ attachment }: { attachment: Attachment }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-black/[0.05] px-2 py-1 text-xs text-[var(--ink-soft)]">
+      <span>{attachment.type === 'image' ? '图片' : '文档'}</span>
+      <span className="max-w-[180px] truncate">{attachment.name}</span>
+    </span>
+  )
+}
+
+function AssistantMessageBlock({
+  turn,
+  content,
+  isLatest,
+  status,
+  showToast
+}: {
+  turn: Turn
+  content: string
+  isLatest: boolean
+  status: string
+  showToast: (text: string) => void
+}) {
+  const { feedback, toggle } = useMessageFeedback()
+  const regenerateLatestTurn = useTaskStore((s) => s.regenerateLatestTurn)
+  const forkFromTurn = useTaskStore((s) => s.forkFromTurn)
+  const state = feedback[turn.id] || {}
+  const canRegenerate = isLatest && status !== 'executing'
+
+  const actions = [
+    { key: 'copy' as const, label: '复制', icon: actionIcons.copy(), onClick: () => void writeClipboard(content, showToast) },
+    { key: 'like' as const, label: '点赞', icon: actionIcons.like(state.like), active: state.like, onClick: () => toggle(turn.id, 'like') },
+    { key: 'dislike' as const, label: '点踩', icon: actionIcons.dislike(state.dislike), active: state.dislike, onClick: () => toggle(turn.id, 'dislike') },
+    ...(canRegenerate ? [{
+      key: 'regenerate' as const,
+      label: '重新生成',
+      icon: actionIcons.regenerate,
+      onClick: async () => {
+        showToast('正在重新生成')
+        await regenerateLatestTurn()
+      }
+    }] : []),
+    {
+      key: 'fork' as const,
+      label: '从此处新开对话',
+      icon: actionIcons.fork,
+      onClick: async () => {
+        await forkFromTurn(turn.id)
+        showToast('已创建新路线')
+      }
+    }
+  ]
+
+  return (
+    <div className="group/message">
+      <ResultView content={content} />
+      <MessageActions align="assistant" time={turn.finishedAt} actions={actions} />
+    </div>
+  )
+}
+
+function FloatingToast({ text }: { text: string }) {
+  return (
+    <div className="pointer-events-none fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full bg-black/75 px-3 py-1.5 text-xs text-white shadow-lg">
+      {text}
     </div>
   )
 }

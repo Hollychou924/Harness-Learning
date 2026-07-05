@@ -1,7 +1,7 @@
 // 代码高亮：Shiki 主线程异步高亮
 // 参考 kilocode markdown-stream-highlight.ts
 
-import { createHighlighter, type Highlighter, bundledLanguages, transformerNotationDiff } from 'shiki'
+import { createHighlighter, type Highlighter, bundledLanguages } from 'shiki'
 
 let highlighter: Highlighter | null = null
 const loadedLanguages = new Set<string>()

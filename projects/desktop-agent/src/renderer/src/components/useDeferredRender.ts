@@ -7,7 +7,7 @@ export function useDeferredRender<T extends HTMLElement>(options?: {
   enabled?: boolean
   rootMargin?: string
 }): {
-  ref: React.RefObject<T | null>
+  ref: React.RefObject<T>
   shouldRender: boolean
 } {
   const enabled = options?.enabled ?? true

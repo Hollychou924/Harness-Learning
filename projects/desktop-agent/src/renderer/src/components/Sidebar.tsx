@@ -1,7 +1,6 @@
 import {
   Settings,
   MessageSquarePlus,
-  Plus,
   CheckCircle2,
   XCircle,
   Clock,
@@ -17,7 +16,6 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronUp,
-  MoreHorizontal,
   X
 } from 'lucide-react'
 import { useState, useRef, useEffect, useMemo } from 'react'
@@ -100,6 +98,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
 
   const isExpanded = (p: Project) => {
     if (search) return true
+    if (Object.prototype.hasOwnProperty.call(projectCollapsed, p.id)) return !projectCollapsed[p.id]
     if (p.id === activeProjectId) return true
     return !projectCollapsed[p.id]
   }
@@ -222,18 +221,14 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
         </div>
       </div>
 
-      {/* 搜索框 + 新建项目 */}
-      <div className="px-3 pb-2 flex items-center gap-1.5">
-        <div className="relative flex-1">
+      {/* 搜索框 */}
+      <div className="px-3 pb-2">
+        <div className="relative">
           <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--ink-soft)]" />
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索对话"
             className="no-drag w-full h-7 pl-6 pr-5 text-xs rounded-md bg-black/[0.04] outline-none focus:bg-black/[0.06] transition placeholder:text-[var(--ink-soft)]/60" />
           {search && <button onClick={() => setSearch('')} className="absolute right-1 top-1/2 -translate-y-1/2 text-[var(--ink-soft)] hover:text-[var(--ink)]"><X size={11} /></button>}
         </div>
-        <button onClick={() => setNewProjectOpen(true)} title="新建项目"
-          className="no-drag w-7 h-7 rounded-md bg-black/[0.04] hover:bg-black/[0.08] flex items-center justify-center text-[var(--ink-soft)] hover:text-[var(--ink)] transition flex-shrink-0">
-          <FolderPlus size={14} />
-        </button>
       </div>
 
       {/* 置顶对话区（可拖入自动置顶） */}
@@ -252,7 +247,15 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
           </div>
         )}
         <div className="space-y-0.5">
-          {otherProjects.length > 0 && <SectionLabel label="项目" />}
+          <SectionLabel
+            label="项目"
+            action={(
+              <button onClick={() => setNewProjectOpen(true)} title="新建项目"
+                className="no-drag w-6 h-6 rounded-md hover:bg-black/[0.06] flex items-center justify-center text-[var(--ink-soft)] hover:text-[var(--ink)] transition">
+                <FolderPlus size={13} />
+              </button>
+            )}
+          />
           {otherProjects.map((p) => renderProjectBlock(p))}
         </div>
         {unassignedSessions.length > 0 && (
@@ -299,7 +302,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
           </div>
         )}
         {sortedProjects.length === 0 && (
-          <p className="px-2.5 py-3 text-xs text-[var(--ink-soft)] opacity-70 text-center">还没有项目，点上方 + 新建一个</p>
+          <p className="px-2.5 py-3 text-xs text-[var(--ink-soft)] opacity-70 text-center">还没有项目，点「项目」右侧按钮新建一个</p>
         )}
       </div>
 
@@ -404,7 +407,10 @@ function ProjectRow({ project, expanded, onToggle, onActivate, onRename, onDelet
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   return (
-    <div className="group relative flex items-center rounded-[10px] hover:bg-black/[0.04] transition">
+    <div
+      className="group relative flex items-center rounded-[10px] hover:bg-black/[0.04] transition"
+      onContextMenu={(e) => { e.preventDefault(); setMenuOpen(true) }}
+    >
       <button onClick={() => { onActivate(); onToggle() }}
         className="flex-1 flex items-center gap-2.5 px-2.5 py-1.5 text-left min-w-0">
         <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">
@@ -414,9 +420,6 @@ function ProjectRow({ project, expanded, onToggle, onActivate, onRename, onDelet
         {project.pinned && <Pin size={10} className="text-amber-400 flex-shrink-0" />}
         {expanded ? <ChevronDown size={13} className="text-[var(--ink-soft)] flex-shrink-0" /> : <ChevronRight size={13} className="text-[var(--ink-soft)] flex-shrink-0" />}
       </button>
-      <div className="hidden group-hover:flex items-center gap-0.5 mr-0.5">
-        <IconBtn title="更多" onClick={() => setMenuOpen((v) => !v)}><MoreHorizontal size={11} /></IconBtn>
-      </div>
       {menuOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
@@ -481,6 +484,8 @@ function SessionRow({ session, active, onClick, onDragStart, onDragOver, onDrop,
   return (
     <div
       draggable={!!onDragStart}
+      onClick={onClick}
+      onContextMenu={(e) => { e.preventDefault(); setMenuOpen(true) }}
       onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDrop={onDrop}
@@ -489,12 +494,12 @@ function SessionRow({ session, active, onClick, onDragStart, onDragOver, onDrop,
         active ? 'bg-black/[0.07]' : 'hover:bg-black/[0.04]'
       } ${isDragging ? 'opacity-40' : ''} ${isDragOver ? 'border-t-2 border-blue-400' : ''}`}
     >
-      <button onClick={onClick} className="flex-1 flex items-center gap-2.5 min-w-0 text-left pr-1">
+      <div className="flex-1 flex items-center gap-2.5 min-w-0 text-left pr-1">
         <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">{icon}</span>
         <span className={`flex-1 truncate text-xs ${active ? 'text-[var(--ink)] font-medium' : 'text-[var(--ink)]/75'}`}>{session.title}</span>
-      </button>
+      </div>
       {/* 右侧：项目标签 + 相对时间/状态 + 置顶图标 */}
-      <div className="flex items-center gap-1 flex-shrink-0">
+      <div className="ml-auto flex items-center gap-1 flex-shrink-0">
         {showProject && <span className="text-[11px] text-[var(--ink-soft)]/60 bg-black/[0.04] px-1 rounded max-w-[48px] truncate">{showProject}</span>}
         {session.status === 'executing' ? (
           <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse flex-shrink-0" title="进行中" />
@@ -505,10 +510,6 @@ function SessionRow({ session, active, onClick, onDragStart, onDragOver, onDrop,
         )}
         {session.pinned && <Pin size={9} className="text-amber-400 flex-shrink-0" />}
       </div>
-      <button onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v) }}
-        className="no-drag w-5 h-5 rounded-sm flex items-center justify-center text-[var(--ink-soft)] hover:bg-black/[0.08] hover:text-[var(--ink)] opacity-0 group-hover:opacity-100 transition flex-shrink-0">
-        <MoreHorizontal size={12} />
-      </button>
       {menuOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
@@ -528,15 +529,6 @@ function SessionRow({ session, active, onClick, onDragStart, onDragOver, onDrop,
 
 /* ---- 小工具 ---- */
 interface MenuAction { id: string; label: string; icon: React.ReactNode; onClick: () => void; danger?: boolean }
-
-function IconBtn({ children, title, onClick, danger }: { children: React.ReactNode; title: string; onClick: () => void; danger?: boolean }) {
-  return (
-    <button title={title} onClick={(e) => { e.stopPropagation(); onClick() }}
-      className={`w-6 h-6 rounded flex items-center justify-center transition ${danger ? 'text-red-500 hover:bg-red-50' : 'text-[var(--ink-soft)] hover:bg-black/[0.08] hover:text-[var(--ink)]'}`}>
-      {children}
-    </button>
-  )
-}
 
 function timeAgo(ts: number): string {
   const diff = Date.now() - ts
