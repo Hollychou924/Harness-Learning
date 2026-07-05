@@ -45,17 +45,18 @@ export function Composer() {
         <div className="mb-2 flex justify-center">
           <ProgressPill status={status} currentTurn={currentTurn} todos={todos} hasApprovalPending={Boolean(approvalPending)} />
         </div>
-        {pendingQuestion && (
+        {pendingQuestion ? (
           <ComposerQuestionPanel question={pendingQuestion} onAnswer={respondQuestion} />
+        ) : (
+          <ChatInput
+            value={message}
+            onChange={setMessage}
+            onSend={handleSend}
+            onStop={() => void cancelTask()}
+            isRunning={isExecuting}
+            placeholder={pending ? '发送中…' : placeholder}
+          />
         )}
-        <ChatInput
-          value={message}
-          onChange={setMessage}
-          onSend={handleSend}
-          onStop={() => void cancelTask()}
-          isRunning={isExecuting}
-          placeholder={pending ? '发送中…' : placeholder}
-        />
       </div>
     </div>
   )

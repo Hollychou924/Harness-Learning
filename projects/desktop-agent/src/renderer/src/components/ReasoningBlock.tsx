@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Brain, ChevronRight, Loader2, XCircle, StopCircle } from 'lucide-react'
+import { Brain, ChevronRight, XCircle, StopCircle } from 'lucide-react'
 import type { ReasoningItem } from '../../../agent/src/items'
 import { useDetailLevelStore } from './detailLevelStore'
 
@@ -70,7 +70,7 @@ export function ReasoningBlock({
   }, [])
 
   const elapsedLabel = formatElapsed(item, liveElapsed, isActive)
-  const headline = getHeadline(item.status, elapsedLabel)
+  const headline = isActive ? '思考过程' : getHeadline(item.status, elapsedLabel)
   const fullContent = item.content.filter(Boolean).join('')
   const summaryText = item.summary.filter(Boolean).join('') || fullContent.slice(0, 80)
 
@@ -82,19 +82,19 @@ export function ReasoningBlock({
   }
 
   return (
-    <div className="glass rounded-xl overflow-hidden">
+    <div className="rounded-xl overflow-hidden text-[var(--ink-soft)]">
       <button
         onClick={handleToggle}
-        className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition ${
-          forceExpanded ? 'cursor-default' : 'hover:bg-black/[0.02] cursor-pointer'
-        } ${isActive ? 'whale-shimmer bg-sky-50/40' : ''}`}
+        className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm transition ${
+          forceExpanded ? 'cursor-default' : 'hover:text-[var(--ink)] cursor-pointer'
+        }`}
       >
-        {getStatusIcon(item.status)}
-        <span className={`flex-shrink-0 ${isFailed ? 'text-red-500' : isStopped ? 'text-amber-500' : 'text-[var(--ink)]'}`}>
+        {!isActive && getStatusIcon(item.status)}
+        <span className={`flex-shrink-0 ${isFailed ? 'text-red-500' : isStopped ? 'text-amber-500' : 'text-[var(--ink-soft)]'}`}>
           {headline}
         </span>
-        {isActive && (
-          <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse flex-shrink-0" />
+        {isActive && elapsedLabel && (
+          <span className="text-xs text-[var(--ink-soft)]/70 flex-shrink-0">{elapsedLabel}</span>
         )}
         {!expanded && summaryText && (
           <span className="text-xs text-[var(--ink-soft)] truncate flex-1 text-left">{summaryText}</span>
@@ -107,8 +107,8 @@ export function ReasoningBlock({
         )}
       </button>
       {expanded && fullContent && (
-        <div className="px-3 pb-2 pt-1">
-          <div className="text-xs text-[var(--ink-soft)] bg-black/[0.03] rounded-md p-2 leading-relaxed whitespace-pre-wrap max-h-[300px] overflow-y-auto">
+        <div className="px-2 pb-2 pt-0.5">
+          <div className="text-xs text-[var(--ink-soft)]/80 leading-relaxed whitespace-pre-wrap max-h-[300px] overflow-y-auto border-l border-black/[0.06] pl-3">
             {fullContent}
           </div>
         </div>
@@ -118,7 +118,6 @@ export function ReasoningBlock({
 }
 
 function getStatusIcon(status: ReasoningItem['status']) {
-  if (status === 'running') return <Loader2 size={14} className="text-sky-500 animate-spin flex-shrink-0" />
   if (status === 'failed') return <XCircle size={14} className="text-red-500 flex-shrink-0" />
   if (status === 'stopped') return <StopCircle size={14} className="text-amber-500 flex-shrink-0" />
   return <Brain size={14} className="text-[var(--ink-soft)] flex-shrink-0" />

@@ -100,103 +100,109 @@ export function ComposerQuestionPanel({ question, onAnswer }: Props) {
   }
 
   return (
-    <div className="mb-3 overflow-hidden rounded-2xl floating-surface">
-      <div className="flex items-center gap-3 border-b border-black/[0.06] bg-sky-50 px-4 py-3">
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-sky-600 shadow-sm">
-          <Edit3 size={14} />
-        </div>
+    <div className="overflow-hidden rounded-[26px] floating-surface px-5 py-4">
+      <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium text-[var(--ink)]">需要你选择一下</div>
-          <div className="truncate text-xs text-[var(--ink-soft)]">选择后会继续执行，也可以输入其他想法</div>
+          <div className="text-sm font-semibold leading-relaxed text-[var(--ink)]">{current.question}</div>
+          {current.detail && (
+            <div className="mt-3 max-h-28 overflow-y-auto whitespace-pre-wrap rounded-2xl bg-black/[0.025] px-3 py-2 font-mono text-xs leading-relaxed text-[var(--ink-soft)]">
+              {current.detail}
+            </div>
+          )}
         </div>
-        <span className="rounded-full bg-white px-2 py-1 text-xs text-[var(--ink-soft)] shadow-sm">{index + 1} / {prompts.length}</span>
-        <WhaleTooltip label="跳过全部问题">
-          <button
-            type="button"
-            onClick={skipAll}
-            disabled={submitting}
-            className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--ink-soft)] transition hover:bg-white disabled:opacity-40"
-          >
-            <X size={15} />
-          </button>
-        </WhaleTooltip>
-      </div>
-
-      <div className="space-y-3 px-4 py-3">
-        <div>
-          <div className="text-sm font-medium leading-relaxed text-[var(--ink)]">{current.question}</div>
-          {current.detail && <div className="mt-1 text-xs leading-relaxed text-[var(--ink-soft)]">{current.detail}</div>}
-        </div>
-
-        {current.options.length > 0 && (
-          <div className="grid gap-2 sm:grid-cols-2">
-            {current.options.map((option) => {
-              const checked = draft.selectedOptionIds.includes(option.id)
-              return (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => void toggleOption(option.id)}
-                  disabled={submitting}
-                  className={`rounded-xl border px-3 py-2 text-left transition disabled:opacity-50 ${checked ? 'border-sky-300 bg-sky-50' : 'border-black/[0.06] bg-white hover:bg-black/[0.02]'}`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className={`flex h-4 w-4 items-center justify-center rounded-full border ${checked ? 'border-sky-500 bg-sky-500 text-white' : 'border-black/20'}`}>
-                      {checked && <Check size={11} />}
-                    </span>
-                    <span className="text-sm text-[var(--ink)]">{option.label}</span>
-                  </div>
-                  {option.description && <div className="ml-6 mt-1 text-xs leading-relaxed text-[var(--ink-soft)]">{option.description}</div>}
-                </button>
-              )
-            })}
-          </div>
-        )}
-
-        {current.allowCustom && (
-          <label className="block space-y-1.5">
-            <span className="text-xs text-[var(--ink-soft)]">其他</span>
-            <textarea
-              value={draft.customAnswer}
-              onChange={(e) => setDraft({ ...draft, customAnswer: e.target.value, skipped: false })}
-              disabled={submitting}
-              placeholder="输入你的答案，发送后继续"
-              className="max-h-28 min-h-16 w-full resize-none rounded-xl border border-black/[0.08] bg-white px-3 py-2 text-sm outline-none transition focus:border-sky-300 disabled:opacity-50"
-            />
-          </label>
-        )}
-
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-shrink-0 items-center gap-1">
+          <WhaleTooltip label="上一题">
             <button
               type="button"
               onClick={() => setIndex(Math.max(0, index - 1))}
               disabled={index === 0 || submitting}
-              className="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-sm text-[var(--ink-soft)] transition hover:bg-black/[0.03] disabled:opacity-40"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--ink-soft)] transition hover:bg-black/[0.04] disabled:opacity-30"
             >
-              <ChevronLeft size={14} /> 上一题
+              <ChevronLeft size={14} />
             </button>
-            {current.allowSkip && (
+          </WhaleTooltip>
+          <span className="rounded-full bg-black/[0.04] px-2.5 py-1 text-xs font-medium text-[var(--ink-soft)]">{index + 1} / {prompts.length}</span>
+          <WhaleTooltip label="下一题">
+            <button
+              type="button"
+              onClick={() => setIndex(Math.min(prompts.length - 1, index + 1))}
+              disabled={isLast || submitting}
+              className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--ink-soft)] transition hover:bg-black/[0.04] disabled:opacity-30"
+            >
+              <ChevronRight size={14} />
+            </button>
+          </WhaleTooltip>
+          <WhaleTooltip label="跳过全部问题">
+            <button
+              type="button"
+              onClick={skipAll}
+              disabled={submitting}
+              className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--ink-soft)] transition hover:bg-black/[0.04] disabled:opacity-40"
+            >
+              <X size={15} />
+            </button>
+          </WhaleTooltip>
+        </div>
+      </div>
+
+      {current.options.length > 0 && (
+        <div className="mt-4 space-y-1.5">
+          {current.options.map((option, optionIndex) => {
+            const checked = draft.selectedOptionIds.includes(option.id)
+            return (
               <button
+                key={option.id}
                 type="button"
-                onClick={() => void skipCurrent()}
+                onClick={() => void toggleOption(option.id)}
                 disabled={submitting}
-                className="h-8 rounded-lg px-3 text-sm text-[var(--ink-soft)] transition hover:bg-black/[0.03] disabled:opacity-40"
+                className={`w-full rounded-2xl px-3 py-2 text-left transition disabled:opacity-50 ${checked ? 'bg-black/[0.055]' : 'hover:bg-black/[0.025]'}`}
               >
-                跳过
+                <div className="flex items-center gap-2.5">
+                  <span className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${checked ? 'bg-[var(--ink)] text-white' : 'bg-black/[0.06] text-[var(--ink-soft)]'}`}>
+                    {current.multiple && checked ? <Check size={12} /> : optionIndex + 1}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--ink)]">{option.label}</span>
+                </div>
+                {option.description && <div className="ml-7 mt-1 text-xs leading-relaxed text-[var(--ink-soft)]">{option.description}</div>}
               </button>
-            )}
-          </div>
+            )
+          })}
+        </div>
+      )}
+
+      <div className="mt-3 flex items-end gap-2">
+        {current.allowCustom && (
+          <label className="flex min-h-10 min-w-0 flex-1 items-center gap-2 rounded-2xl border border-black/[0.08] bg-white px-3 py-2 transition focus-within:border-[#0071e3]">
+            <Edit3 size={15} className="flex-shrink-0 text-[var(--ink-soft)]" />
+            <textarea
+              value={draft.customAnswer}
+              onChange={(e) => setDraft({ ...draft, customAnswer: e.target.value, skipped: false })}
+              disabled={submitting}
+              placeholder="没有合适选项？直接写你的想法"
+              rows={1}
+              className="max-h-24 min-h-5 flex-1 resize-none bg-transparent text-sm leading-5 text-[var(--ink)] outline-none placeholder:text-[var(--ink-soft)] disabled:opacity-50"
+            />
+          </label>
+        )}
+        {current.allowSkip && (
           <button
             type="button"
-            onClick={() => void submitCustom()}
-            disabled={!canSubmit || submitting}
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[#0071e3] px-4 text-sm font-medium text-white transition hover:brightness-110 disabled:opacity-40"
+            onClick={() => void skipCurrent()}
+            disabled={submitting}
+            className="h-10 flex-shrink-0 rounded-full px-3 text-sm font-medium text-[var(--ink-soft)] transition hover:bg-black/[0.04] disabled:opacity-40"
           >
-            {isLast ? '完成' : '下一题'}
-            {!isLast && <ChevronRight size={14} />}
+            跳过
           </button>
-        </div>
+        )}
+        <button
+          type="button"
+          onClick={() => void submitCustom()}
+          disabled={!canSubmit || submitting}
+          className="inline-flex h-10 flex-shrink-0 items-center gap-1.5 rounded-full bg-[var(--ink)] px-4 text-sm font-medium text-white transition hover:brightness-110 disabled:opacity-35"
+        >
+          {isLast ? '提交' : '下一题'}
+          {!isLast && <ChevronRight size={14} />}
+        </button>
       </div>
     </div>
   )

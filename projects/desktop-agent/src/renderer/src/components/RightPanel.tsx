@@ -10,6 +10,7 @@ import {
   GitCompare,
   Flag,
   CheckCircle2,
+  PanelRightClose,
   RotateCcw,
   Wand2
 } from 'lucide-react'
@@ -18,6 +19,7 @@ import { api } from '../api'
 import type { ArtifactEntry, SourceEntry } from '../store/task'
 import type { ToolCallItem, Turn } from '../../../agent/src/items'
 import { WhaleTooltip } from './WhaleTooltip'
+import { RunningStatusText } from './RunningStatusText'
 
 function deriveSourcesFromTurns(turns: Turn[], currentTurn: Turn | null): SourceEntry[] {
   const allTurns = currentTurn ? [...turns, currentTurn] : turns
@@ -44,7 +46,15 @@ function deriveSourcesFromTurns(turns: Turn[], currentTurn: Turn | null): Source
 }
 
 // 右栏：目标状态 + 产物 + 来源 + 用量，优先展示用户能拿走的结果
-export function RightPanel({ collapsed }: { collapsed: boolean }) {
+export function RightPanel({
+  collapsed,
+  showToggle = false,
+  onToggleRight
+}: {
+  collapsed: boolean
+  showToggle?: boolean
+  onToggleRight?: () => void
+}) {
   const { status, taskId, goal, turns, currentTurn, artifacts, usage, startedAt, finishedAt, error, message, projects, activeProjectId, setMessage, requestManualCompact } =
     useTaskStore()
   const activeWorkspaceDir = projects.find((p) => p.id === activeProjectId)?.folderPath
@@ -86,14 +96,24 @@ export function RightPanel({ collapsed }: { collapsed: boolean }) {
 
   return (
     <aside
-      className={`glass-soft flex-shrink-0 flex flex-col border-l border-white/40 transition-all duration-300 ease-in-out overflow-hidden ${
+      className={`glass-soft min-w-0 flex-shrink-0 flex flex-col border-l border-white/40 transition-all duration-300 ease-in-out overflow-hidden ${
         collapsed ? 'w-0 border-l-0' : 'w-72'
       }`}
     >
-      <div className="drag h-9 flex-shrink-0" />
-      <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-3">
+      <div className="drag relative h-10 flex-shrink-0">
+        {showToggle && onToggleRight && (
+          <button
+            title="折叠右栏"
+            onClick={onToggleRight}
+            className="no-drag absolute right-3 top-1/2 z-10 -translate-y-1/2 w-7 h-7 rounded-md flex items-center justify-center transition text-[var(--ink-soft)] hover:bg-black/[0.06] hover:text-[var(--ink)]"
+          >
+            <PanelRightClose size={16} />
+          </button>
+        )}
+      </div>
+      <div className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-3 pt-2 pb-4 space-y-3">
         {/* 目标卡 */}
-        <section className="glass rounded-xl p-3">
+        <section className="min-w-0 overflow-hidden glass rounded-xl p-3">
           <div className="flex items-center gap-2 mb-2">
             <Target size={14} className="text-[var(--ink-soft)]" />
             <span className="text-xs font-semibold tracking-wide text-[var(--ink-soft)] uppercase">
@@ -110,7 +130,7 @@ export function RightPanel({ collapsed }: { collapsed: boolean }) {
         </section>
 
         {/* 产物 */}
-        <section className="glass rounded-xl p-3">
+        <section className="min-w-0 overflow-hidden glass rounded-xl p-3">
           <div className="flex items-center gap-2 mb-2.5">
             <FileCode size={14} className="text-[var(--ink-soft)]" />
             <span className="text-xs font-semibold tracking-wide text-[var(--ink-soft)] uppercase">产物</span>
@@ -139,7 +159,7 @@ export function RightPanel({ collapsed }: { collapsed: boolean }) {
         )}
 
         {/* 来源 */}
-        <section className="glass rounded-xl p-3">
+        <section className="min-w-0 overflow-hidden glass rounded-xl p-3">
           <div className="flex items-center gap-2 mb-2.5">
             <FileText size={14} className="text-[var(--ink-soft)]" />
             <span className="text-xs font-semibold tracking-wide text-[var(--ink-soft)] uppercase">来源</span>
@@ -156,7 +176,7 @@ export function RightPanel({ collapsed }: { collapsed: boolean }) {
         <ContextCapacityIndicator usedTokens={usage.inputTokens + usage.outputTokens} running={status === 'executing'} onManualCompact={requestManualCompact} />
 
         {/* 用量与计时 */}
-        <section className="glass rounded-xl p-3 space-y-2">
+        <section className="min-w-0 overflow-hidden glass rounded-xl p-3 space-y-2">
           <div className="flex items-center gap-2">
             <Clock size={14} className="text-[var(--ink-soft)]" />
             <span className="text-xs font-semibold tracking-wide text-[var(--ink-soft)] uppercase">
@@ -188,7 +208,7 @@ export function RightPanel({ collapsed }: { collapsed: boolean }) {
 
 function StatusBadge({ status, className = '' }: { status: string; className?: string }) {
   const map: Record<string, { label: string; cls: string }> = {
-    executing: { label: '执行中', cls: 'bg-sky-100 text-sky-600' },
+    executing: { label: '执行中', cls: 'text-[var(--ink)]' },
     completed: { label: '已完成', cls: 'bg-green-100 text-green-600' },
     failed: { label: '失败', cls: 'bg-red-100 text-red-600' },
     idle: { label: '待机', cls: 'bg-black/5 text-[var(--ink-soft)]' }
@@ -196,9 +216,9 @@ function StatusBadge({ status, className = '' }: { status: string; className?: s
   const m = map[status] || map.idle
   return (
     <span
-      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${m.cls} ${className}`}
+      className={`text-[10px] font-semibold ${status === 'executing' ? 'px-0 py-0' : 'px-2 py-0.5 rounded-full'} ${m.cls} ${className}`}
     >
-      {m.label}
+      {status === 'executing' ? <RunningStatusText>{m.label}</RunningStatusText> : m.label}
     </span>
   )
 }
@@ -208,18 +228,18 @@ function ArtifactItem({ art, onPreview }: { art: ArtifactEntry; onPreview: () =>
   const name = artifactName(art.filePath)
   return (
     <li>
-      <button onClick={onPreview} className="w-full flex items-center gap-2 text-xs rounded-md px-1 py-1 hover:bg-black/[0.04] transition text-left">
+      <button onClick={onPreview} className="min-w-0 w-full flex items-center gap-2 text-xs rounded-md px-1 py-1 hover:bg-black/[0.04] transition text-left">
       <span className="text-[var(--ink-soft)] flex-shrink-0">{meta.icon}</span>
-      <WhaleTooltip label={art.filePath} className="min-w-0">
+      <WhaleTooltip label={art.filePath} className="min-w-0 flex-1">
         <span className="truncate text-[var(--ink)]">
           {name}
         </span>
       </WhaleTooltip>
       {art.added != null && (
-        <span className="ml-auto text-green-600 font-mono">+{art.added}</span>
+        <span className="ml-auto flex-shrink-0 text-green-600 font-mono">+{art.added}</span>
       )}
       {art.removed != null && art.removed > 0 && (
-        <span className="text-red-500 font-mono">-{art.removed}</span>
+        <span className="flex-shrink-0 text-red-500 font-mono">-{art.removed}</span>
       )}
       </button>
     </li>
@@ -240,7 +260,7 @@ function ArtifactPreview({ art, content, dataUrl, kind, error, accepted, onAccep
 }) {
   const name = artifactName(art.filePath)
   return (
-    <section className="glass rounded-xl p-3 space-y-2">
+    <section className="min-w-0 overflow-hidden glass rounded-xl p-3 space-y-2">
       <div className="flex items-center gap-2">
         <Eye size={14} className="text-[var(--ink-soft)]" />
         <span className="text-xs font-semibold tracking-wide text-[var(--ink-soft)] uppercase">预览</span>
@@ -253,7 +273,7 @@ function ArtifactPreview({ art, content, dataUrl, kind, error, accepted, onAccep
           <img src={dataUrl} alt={name} className="max-h-52 w-full object-contain rounded-md" />
         </div>
       ) : content ? (
-        <pre className="max-h-52 overflow-y-auto rounded-lg bg-black/[0.03] px-2.5 py-2 text-[11px] text-[var(--ink-soft)] whitespace-pre-wrap break-all font-mono">
+        <pre className="max-h-52 overflow-y-auto overflow-x-hidden rounded-lg bg-black/[0.03] px-2.5 py-2 text-[11px] text-[var(--ink-soft)] whitespace-pre-wrap break-all font-mono">
           {kind === 'table' ? '表格预览\n' : kind === 'document' ? '文档预览\n' : ''}{content.slice(0, 5000)}{content.length > 5000 ? '\n...（仅显示前 5000 字）' : ''}
         </pre>
       ) : (
@@ -281,7 +301,7 @@ function artifactName(path: string): string {
 
 function SourceItem({ source }: { source: SourceEntry }) {
   return (
-    <li className="flex items-center gap-2 text-xs">
+    <li className="min-w-0 flex items-center gap-2 text-xs">
       <span className="text-[var(--ink-soft)] flex-shrink-0">{source.type === 'web' ? '🔗' : '📄'}</span>
       <WhaleTooltip label={source.path || source.url || source.label} className="min-w-0 flex-1">
         <span className="truncate text-[var(--ink)]">{source.label}</span>
@@ -292,10 +312,10 @@ function SourceItem({ source }: { source: SourceEntry }) {
 
 function UsageRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-2 text-xs">
+    <div className="min-w-0 flex items-center gap-2 text-xs">
       <span className="text-[var(--ink-soft)] flex-shrink-0">{icon}</span>
-      <span className="text-[var(--ink-soft)]">{label}</span>
-      <span className="ml-auto font-mono text-[var(--ink)]">{value}</span>
+      <span className="flex-shrink-0 text-[var(--ink-soft)]">{label}</span>
+      <span className="ml-auto min-w-0 truncate font-mono text-[var(--ink)]">{value}</span>
     </div>
   )
 }
@@ -366,10 +386,10 @@ function ContextCapacityIndicator({ usedTokens, running, onManualCompact }: { us
   const strokeDashoffset = circumference - (percentage / 100) * circumference
 
   return (
-    <section className="glass rounded-xl p-3 space-y-2">
+    <section className="min-w-0 overflow-hidden glass rounded-xl p-3 space-y-2">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-2"
+        className="min-w-0 w-full flex items-center gap-2"
       >
         <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
           <svg width={size} height={size} className="-rotate-90">
@@ -387,10 +407,10 @@ function ContextCapacityIndicator({ usedTokens, running, onManualCompact }: { us
             />
           </svg>
         </div>
-        <span className="text-xs font-semibold tracking-wide text-[var(--ink-soft)] uppercase">
+        <span className="flex-shrink-0 text-xs font-semibold tracking-wide text-[var(--ink-soft)] uppercase">
           上下文
         </span>
-        <span className="ml-auto text-xs font-mono text-[var(--ink-soft)]">
+        <span className="ml-auto min-w-0 truncate text-xs font-mono text-[var(--ink-soft)]">
           {formatTokens(usedTokens)} / {formatTokens(contextLimit)}
         </span>
       </button>

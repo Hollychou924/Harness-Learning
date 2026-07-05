@@ -1,7 +1,7 @@
-import { Loader2, Brain, CheckCircle2, AlertCircle } from 'lucide-react'
 import { useTaskStore } from '../store/task'
 import type { ToolCallItem, ReasoningItem, Turn } from '../../../agent/src/items'
 import { describeToolCall } from './toolActivityText'
+import { RunningStatusText } from './RunningStatusText'
 
 // 底部状态条：融合 harnessclaw 三层降级 + Codex 计数摘要
 // 四层降级（优先级从高到低）：
@@ -16,9 +16,8 @@ export function LiveStatusBar() {
   const layer = pickLayer(currentTurn)
 
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg glass text-sm sticky bottom-0">
-      {layer.icon}
-      <span className={layer.className}>{layer.text}</span>
+    <div className="flex items-center gap-2 px-1 py-1 text-sm sticky bottom-0">
+      <RunningStatusText className={layer.className}>{layer.text}</RunningStatusText>
       {layer.elapsed && (
         <span className="text-xs text-[var(--ink-soft)] tabular-nums">{layer.elapsed}</span>
       )}
@@ -28,7 +27,6 @@ export function LiveStatusBar() {
 
 function pickLayer(turn: Turn): {
   text: string
-  icon: React.ReactNode
   className: string
   elapsed: string | null
 } {
@@ -41,7 +39,6 @@ function pickLayer(turn: Turn): {
   if (activeTool) {
     return {
       text: describeToolCall(activeTool),
-      icon: <Loader2 size={14} className="text-sky-500 animate-spin flex-shrink-0" />,
       className: 'text-[var(--ink)]',
       elapsed: activeTool.startedAt ? formatLive(activeTool.startedAt) : null
     }
@@ -52,7 +49,6 @@ function pickLayer(turn: Turn): {
   if (activeReasoning) {
     return {
       text: '思考中',
-      icon: <Brain size={14} className="text-sky-500 animate-pulse flex-shrink-0" />,
       className: 'text-[var(--ink)]',
       elapsed: activeReasoning.startedAt ? formatLive(activeReasoning.startedAt) : null
     }
@@ -69,7 +65,6 @@ function pickLayer(turn: Turn): {
     if (failed > 0) parts.push(`${failed} 步出错`)
     return {
       text: parts.join(' · '),
-      icon: <Loader2 size={14} className="text-sky-500 animate-spin flex-shrink-0" />,
       className: 'text-[var(--ink-soft)]',
       elapsed: null
     }
@@ -78,7 +73,6 @@ function pickLayer(turn: Turn): {
   // 层4：兜底
   return {
     text: '思考中…',
-    icon: <Loader2 size={14} className="text-sky-500 animate-spin flex-shrink-0" />,
     className: 'text-[var(--ink-soft)]',
     elapsed: null
   }

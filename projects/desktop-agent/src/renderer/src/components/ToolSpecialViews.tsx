@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { MouseEvent, ReactNode } from 'react'
-import { AlertTriangle, ChevronRight, Clipboard, ClipboardCheck, FileCode, FileText, FolderOpen, Loader2, Terminal } from 'lucide-react'
+import { AlertTriangle, ChevronRight, Clipboard, ClipboardCheck, FileCode, FileText, FolderOpen, Terminal } from 'lucide-react'
 import type { ToolCallItem } from '../../../agent/src/items'
 import { WhaleTooltip } from './WhaleTooltip'
+import { RunningStatusText } from './RunningStatusText'
 
 // 工具特化视图：让命令、读文件、列文件、写文件都变成用户能看懂的过程卡。
 
@@ -102,11 +103,11 @@ function DetailPre({ children, tone = 'neutral', maxHeight = 'max-h-60' }: { chi
   const toneClass = tone === 'danger'
     ? 'bg-red-50/70 text-red-700'
     : tone === 'success'
-      ? 'bg-green-50/60 text-green-700'
-      : 'bg-black/[0.03] text-[var(--ink-soft)]'
+      ? 'text-green-700 border-l border-green-200 pl-3'
+      : 'text-[var(--ink-soft)]/80 border-l border-black/[0.06] pl-3'
 
   return (
-    <pre className={`px-3 py-2 text-xs whitespace-pre-wrap break-all font-mono overflow-y-auto ${maxHeight} ${toneClass}`}>
+    <pre className={`py-2 text-xs whitespace-pre-wrap break-all font-mono overflow-y-auto ${maxHeight} ${toneClass}`}>
       {children}
     </pre>
   )
@@ -127,22 +128,22 @@ export function WriteFileDiffView({ item }: { item: ToolCallItem }) {
   const hasError = item.status === 'failed' || typeof parsed?.error === 'string'
 
   return (
-    <div className={`rounded-lg overflow-hidden text-sm border ${hasError ? 'border-red-200 bg-red-50/30' : 'border-black/[0.06]'}`}>
+    <div className={`rounded-lg overflow-hidden text-sm ${hasError ? 'border border-red-200 bg-red-50/30' : 'text-[var(--ink-soft)]'}`}>
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-black/[0.02] transition"
+        className="w-full flex items-center gap-2 px-2 py-1.5 hover:text-[var(--ink)] transition"
       >
-        <FileCode size={14} className={hasError ? 'text-red-500 flex-shrink-0' : 'text-sky-600 flex-shrink-0'} />
+        <FileCode size={14} className={hasError ? 'text-red-500 flex-shrink-0' : 'text-[var(--ink-soft)] flex-shrink-0'} />
         <WhaleTooltip label={filePath} className="min-w-0">
-          <span className="text-[var(--ink)] font-mono truncate">{fileName}</span>
+          <span className="text-[var(--ink-soft)] font-mono truncate">{fileName}</span>
         </WhaleTooltip>
         <span className="text-xs text-green-600 flex-shrink-0">写入 {lines} 行</span>
         {hasError && <span className="text-xs text-red-500 flex-shrink-0">写入失败</span>}
         <ChevronRight size={14} className={`text-[var(--ink-soft)] transition-transform ml-auto ${open ? 'rotate-90' : ''}`} />
       </button>
       {open && (
-        <div className="border-t border-black/[0.04]">
-          <div className="flex items-center justify-between gap-2 px-3 py-1.5 text-xs text-[var(--ink-soft)] bg-black/[0.015]">
+        <div className="px-2 pb-2">
+          <div className="flex items-center justify-between gap-2 py-1.5 text-xs text-[var(--ink-soft)]">
             <WhaleTooltip label={filePath || '未提供路径'} className="min-w-0 flex-1">
               <span className="truncate">{filePath || '未提供路径'}</span>
             </WhaleTooltip>
@@ -153,7 +154,7 @@ export function WriteFileDiffView({ item }: { item: ToolCallItem }) {
           ) : content ? (
             <DetailPre tone="success">{content.slice(0, 2400)}{content.length > 2400 ? `\n...（共 ${content.length} 字，仅显示前 2400 字）` : ''}</DetailPre>
           ) : (
-            <div className="px-3 py-2 text-xs text-[var(--ink-soft)]">写入的是空文件。</div>
+            <div className="py-2 text-xs text-[var(--ink-soft)]">写入的是空文件。</div>
           )}
         </div>
       )}
@@ -179,17 +180,17 @@ export function ShellOutputView({ item }: { item: ToolCallItem }) {
   const shortCommand = shortenMiddle(command)
 
   return (
-    <div className={`rounded-lg overflow-hidden text-sm border ${hasError ? 'border-red-200 bg-red-50/25' : hasDeletionRisk ? 'border-amber-200 bg-amber-50/30' : 'border-black/[0.06]'}`}>
+    <div className={`rounded-lg overflow-hidden text-sm ${hasError ? 'border border-red-200 bg-red-50/25' : hasDeletionRisk ? 'border border-amber-200 bg-amber-50/30' : 'text-[var(--ink-soft)]'}`}>
       <button
         onClick={() => setOpen(!open)}
-        className={`w-full flex items-center gap-2 px-3 py-1.5 hover:bg-black/[0.02] transition ${isRunning ? 'whale-shimmer bg-sky-50/40' : ''}`}
+        className="w-full flex items-center gap-2 px-2 py-1.5 hover:text-[var(--ink)] transition"
       >
-        {isRunning ? <Loader2 size={14} className="text-sky-500 animate-spin flex-shrink-0" /> : <Terminal size={14} className="text-[var(--ink-soft)] flex-shrink-0" />}
+        <Terminal size={14} className="text-[var(--ink-soft)] flex-shrink-0" />
         <WhaleTooltip label={command || '命令'} className="min-w-0 flex-1">
-          <span className="text-[var(--ink)] font-mono truncate text-left">$ {shortCommand || '命令'}</span>
+          <span className="text-[var(--ink-soft)] font-mono truncate text-left">$ {shortCommand || '命令'}</span>
         </WhaleTooltip>
         {hasDeletionRisk && <span className="inline-flex items-center gap-1 text-xs text-amber-600 flex-shrink-0"><AlertTriangle size={12} />删除动作</span>}
-        {isRunning && <span className="text-xs text-sky-600 flex-shrink-0">运行中</span>}
+        {isRunning && <RunningStatusText className="text-xs flex-shrink-0 opacity-75">运行中</RunningStatusText>}
         {elapsed && <span className="text-xs text-[var(--ink-soft)] flex-shrink-0">{elapsed}</span>}
         {outputLines > 0 && <span className="text-xs text-[var(--ink-soft)] flex-shrink-0">{outputLines} 行输出</span>}
         {hasError && <span className="text-xs text-red-500 flex-shrink-0">{exitCode !== null ? `退出码 ${exitCode}` : '出错'}</span>}
@@ -197,8 +198,8 @@ export function ShellOutputView({ item }: { item: ToolCallItem }) {
         <ChevronRight size={14} className={`text-[var(--ink-soft)] transition-transform ${open ? 'rotate-90' : ''}`} />
       </button>
       {open && (
-        <div className="border-t border-black/[0.04]">
-          <div className="flex items-center justify-between gap-2 px-3 py-1.5 text-xs text-[var(--ink-soft)] bg-black/[0.015]">
+        <div className="px-2 pb-2">
+          <div className="flex items-center justify-between gap-2 py-1.5 text-xs text-[var(--ink-soft)]">
             <WhaleTooltip label={command || '未提供命令'} className="min-w-0 flex-1">
               <span className="truncate">完整命令：{command || '未提供命令'}</span>
             </WhaleTooltip>
@@ -208,15 +209,14 @@ export function ShellOutputView({ item }: { item: ToolCallItem }) {
             </div>
           </div>
           {hasDeletionRisk && (
-            <div className="flex items-start gap-2 px-3 py-2 text-xs text-amber-700 bg-amber-50/70 border-b border-amber-100">
+            <div className="flex items-start gap-2 py-2 text-xs text-amber-700">
               <AlertTriangle size={13} className="mt-0.5 flex-shrink-0" />
               这条命令包含删除动作，执行前后都要重点关注结果。
             </div>
           )}
           {isRunning && !output && (
-            <div className="px-3 py-3 text-xs text-sky-600 flex items-center gap-2">
-              <Loader2 size={13} className="animate-spin" />
-              正在等待命令返回结果...
+            <div className="py-3 text-xs">
+              <RunningStatusText>正在等待命令返回结果...</RunningStatusText>
             </div>
           )}
           {output && (
@@ -246,11 +246,11 @@ export function ReadFileView({ item }: { item: ToolCallItem }) {
   const lines = countLines(content)
 
   return (
-    <div className={`rounded-lg overflow-hidden text-sm border ${hasError ? 'border-red-200 bg-red-50/25' : 'border-black/[0.06]'}`}>
-      <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-black/[0.02] transition">
+    <div className={`rounded-lg overflow-hidden text-sm ${hasError ? 'border border-red-200 bg-red-50/25' : 'text-[var(--ink-soft)]'}`}>
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-2 px-2 py-1.5 hover:text-[var(--ink)] transition">
         <FileText size={14} className={hasError ? 'text-red-500 flex-shrink-0' : 'text-[var(--ink-soft)] flex-shrink-0'} />
         <WhaleTooltip label={filePath || '文件'} className="min-w-0">
-          <span className="text-[var(--ink)] font-mono truncate">{fileNameOf(filePath, '文件')}</span>
+          <span className="text-[var(--ink-soft)] font-mono truncate">{fileNameOf(filePath, '文件')}</span>
         </WhaleTooltip>
         {!hasError && lines > 0 && <span className="text-xs text-[var(--ink-soft)] flex-shrink-0">{lines} 行</span>}
         {!hasError && size && <span className="text-xs text-[var(--ink-soft)] flex-shrink-0">{size}</span>}
@@ -258,8 +258,8 @@ export function ReadFileView({ item }: { item: ToolCallItem }) {
         <ChevronRight size={14} className={`text-[var(--ink-soft)] transition-transform ml-auto ${open ? 'rotate-90' : ''}`} />
       </button>
       {open && (
-        <div className="border-t border-black/[0.04]">
-          <div className="flex items-center justify-between gap-2 px-3 py-1.5 text-xs text-[var(--ink-soft)] bg-black/[0.015]">
+        <div className="px-2 pb-2">
+          <div className="flex items-center justify-between gap-2 py-1.5 text-xs text-[var(--ink-soft)]">
             <WhaleTooltip label={filePath || '未提供路径'} className="min-w-0 flex-1">
               <span className="truncate">{filePath || '未提供路径'}</span>
             </WhaleTooltip>
@@ -282,39 +282,39 @@ export function ListFilesView({ item }: { item: ToolCallItem }) {
   const dirCount = items.filter((it) => it.type === 'dir').length
 
   return (
-    <div className={`rounded-lg overflow-hidden text-sm border ${hasError ? 'border-red-200 bg-red-50/25' : 'border-black/[0.06]'}`}>
-      <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-black/[0.02] transition">
+    <div className={`rounded-lg overflow-hidden text-sm ${hasError ? 'border border-red-200 bg-red-50/25' : 'text-[var(--ink-soft)]'}`}>
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-2 px-2 py-1.5 hover:text-[var(--ink)] transition">
         <FolderOpen size={14} className={hasError ? 'text-red-500 flex-shrink-0' : 'text-[var(--ink-soft)] flex-shrink-0'} />
         <WhaleTooltip label={dir} className="min-w-0">
-          <span className="text-[var(--ink)] font-mono truncate">列出 {dir}</span>
+          <span className="text-[var(--ink-soft)] font-mono truncate">列出 {dir}</span>
         </WhaleTooltip>
         {!hasError && <span className="text-xs text-[var(--ink-soft)] flex-shrink-0">{fileCount} 个文件 · {dirCount} 个文件夹</span>}
         {hasError && <span className="text-xs text-red-500 flex-shrink-0">检索失败</span>}
         <ChevronRight size={14} className={`text-[var(--ink-soft)] transition-transform ml-auto ${open ? 'rotate-90' : ''}`} />
       </button>
       {open && (
-        <div className="border-t border-black/[0.04]">
+        <div className="px-2 pb-2">
           {hasError ? (
             <DetailPre tone="danger">{String(parsed?.error || item.error || '检索失败')}</DetailPre>
           ) : items.length === 0 ? (
-            <div className="px-3 py-2 text-xs text-[var(--ink-soft)]">这个位置没有列出文件。</div>
+            <div className="py-2 text-xs text-[var(--ink-soft)]">这个位置没有列出文件。</div>
           ) : (
-            <div className="max-h-72 overflow-y-auto divide-y divide-black/[0.04]">
+            <div className="max-h-72 overflow-y-auto">
               {items.slice(0, 80).map((entry, index) => {
                 const name = typeof entry.name === 'string' ? entry.name : '未命名'
                 const path = typeof entry.path === 'string' ? entry.path : name
                 const type = entry.type === 'dir' ? '文件夹' : '文件'
                 return (
-                  <div key={`${path}-${index}`} className="flex items-center gap-2 px-3 py-1.5 text-xs">
+                  <div key={`${path}-${index}`} className="flex items-center gap-2 py-1.5 text-xs">
                     <span className="text-[var(--ink-soft)] w-10 flex-shrink-0">{type}</span>
                     <WhaleTooltip label={path} className="min-w-0">
-                      <span className="font-mono text-[var(--ink)] truncate">{name}</span>
+                      <span className="font-mono text-[var(--ink-soft)] truncate">{name}</span>
                     </WhaleTooltip>
                     <span className="ml-auto text-[var(--ink-soft)] flex-shrink-0">{formatBytes(entry.size) || ''}</span>
                   </div>
                 )
               })}
-              {items.length > 80 && <div className="px-3 py-2 text-xs text-[var(--ink-soft)]">仅显示前 80 项，共 {items.length} 项。</div>}
+              {items.length > 80 && <div className="py-2 text-xs text-[var(--ink-soft)]">仅显示前 80 项，共 {items.length} 项。</div>}
             </div>
           )}
         </div>

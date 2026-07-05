@@ -11,19 +11,28 @@ import { MessageActions, actionIcons, useMessageFeedback } from './MessageAction
 import { useSettingsStore } from './settings/settingsStore'
 import { useTimelineScroll } from './useTimelineScroll'
 import { useDeferredRender } from './useDeferredRender'
-import { ChevronUp } from 'lucide-react'
+import { ChevronUp, PanelRightOpen } from 'lucide-react'
 import type { Item, Turn, UserMessageContent } from '../../../agent/src/items'
 import { WhaleTooltip } from './WhaleTooltip'
 
-export function Workbench() {
+export function Workbench({
+  rightCollapsed = false,
+  showRightToggle = false,
+  onToggleRight
+}: {
+  rightCollapsed?: boolean
+  showRightToggle?: boolean
+  onToggleRight?: () => void
+}) {
   const { status, goal, message, summary, messages } = useTaskStore()
   const greeting = greetingText()
   const taskTitle = status !== 'idle' ? goal || message : ''
+  const showTopDivider = status !== 'idle' || messages.length > 0
 
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
       {/* 顶部栏 */}
-      <div className="drag h-14 flex items-center justify-center px-6 border-b border-black/[0.06]">
+      <div className={`drag relative h-14 flex items-center justify-center px-6 ${showTopDivider ? 'border-b border-black/[0.06]' : ''}`}>
         <div className="no-drag flex items-center gap-3 min-w-0">
           {taskTitle && (
             <WhaleTooltip label={taskTitle} className="min-w-0">
@@ -33,6 +42,15 @@ export function Workbench() {
             </WhaleTooltip>
           )}
         </div>
+        {showRightToggle && rightCollapsed && onToggleRight && (
+          <button
+            title="展开右栏"
+            onClick={onToggleRight}
+            className="no-drag absolute right-4 top-1/2 z-10 -translate-y-1/2 w-7 h-7 rounded-md flex items-center justify-center transition bg-black/[0.06] text-[var(--ink)]"
+          >
+            <PanelRightOpen size={16} />
+          </button>
+        )}
       </div>
 
       {/* 主区域：滚动由各子视图自行管理，避免双层 overflow 导致双滚动条 */}
@@ -138,7 +156,6 @@ function RunningView({ summary, status }: { summary: string; status: string }) {
           status={status}
           showToast={showToast}
           live
-          showStatusLine
         />
       )}
       {toast && <FloatingToast text={toast} />}
@@ -214,7 +231,6 @@ function ConversationView({ status }: { status: string }) {
             status={status}
             showToast={showToast}
             live
-            showStatusLine
           />
         )}
         {status === 'idle' && (
@@ -280,8 +296,7 @@ function TurnContentFlow({
   isLatest = false,
   status,
   showToast,
-  live = false,
-  showStatusLine = false
+  live = false
 }: {
   turn: Turn
   showThinking: boolean
@@ -289,7 +304,6 @@ function TurnContentFlow({
   status: string
   showToast: (text: string) => void
   live?: boolean
-  showStatusLine?: boolean
 }) {
   const blocks: JSX.Element[] = []
   let pendingProcessItems: Item[] = []
@@ -303,7 +317,6 @@ function TurnContentFlow({
         key={key}
         turn={{ ...turn, items: pendingProcessItems }}
         showThinking={showThinking}
-        showStatusLine={showStatusLine && blocks.length === 0}
       />
     )
     pendingProcessItems = []

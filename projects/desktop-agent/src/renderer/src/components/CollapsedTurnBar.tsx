@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { ChevronRight, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
+import { ChevronRight, CheckCircle2, AlertCircle } from 'lucide-react'
 import type { Turn, ToolCallItem, ReasoningItem } from '../../../agent/src/items'
 import { useDetailLevelStore } from './detailLevelStore'
 import { formatCompactDuration } from './executionExperience'
+import { RunningStatusText } from './RunningStatusText'
 
 // 轮次折叠条：某轮已完成且有最终回复时，把思考+工具活动收起成一条可点击摘要
 // 融合 Codex 的过程折叠 + opencowork 状态色 + Codex 计数摘要
@@ -17,10 +18,10 @@ export function CollapsedTurnBar({ turn, children }: { turn: Turn; children: Rea
   const hasStopped = toolItems.some((t) => t.status === 'stopped')
   const isRunning = turn.status === 'running'
 
-  const statusIcon = isRunning
-    ? <Loader2 size={14} className="text-sky-500 animate-spin flex-shrink-0" />
-    : hasError
+  const statusIcon = hasError
     ? <AlertCircle size={14} className="text-red-500 flex-shrink-0" />
+    : isRunning
+    ? null
     : <CheckCircle2 size={14} className="text-green-500 flex-shrink-0" />
 
   const summaryText = `思考 ${reasoningItems.length} 次，执行了 ${toolItems.length} 个动作${elapsedMs > 0 ? `，总耗时 ${formatCompactDuration(elapsedMs)}` : ''}`
@@ -33,7 +34,11 @@ export function CollapsedTurnBar({ turn, children }: { turn: Turn; children: Rea
         className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-sm text-[var(--ink-soft)] hover:bg-black/[0.04] transition-colors"
       >
         {statusIcon}
-        <span>{collapsed ? summaryText : '收起过程'}</span>
+        {isRunning ? (
+          <RunningStatusText>{collapsed ? summaryText : '收起过程'}</RunningStatusText>
+        ) : (
+          <span>{collapsed ? summaryText : '收起过程'}</span>
+        )}
         <ChevronRight
           size={14}
           className={`text-[var(--ink-soft)] transition-transform duration-200 ${collapsed ? 'rotate-0' : 'rotate-90'}`}

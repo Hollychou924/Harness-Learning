@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Loader2, Check, AlertCircle, ChevronRight, FilePlus } from 'lucide-react'
+import { ChevronRight, FilePlus } from 'lucide-react'
 import type { Turn, ToolCallItem } from '../../../agent/src/items'
 import { ReasoningBlock } from './ReasoningBlock'
 import { ToolActivityGroupView, groupToolItems } from './ToolActivityGroup'
@@ -41,7 +41,7 @@ function collectFileChanges(items: ToolCallItem[]): FileChangeEntry[] {
   return Array.from(byPath.values())
 }
 
-export function TurnItemsView({ turn, showThinking, showStatusLine }: { turn: Turn; showThinking: boolean; showStatusLine?: boolean }) {
+export function TurnItemsView({ turn, showThinking }: { turn: Turn; showThinking: boolean }) {
   const detailLevel = useDetailLevelStore((s) => s.level)
   const items = turn.items
   const toolItems = items.filter((it): it is ToolCallItem => it.type === 'toolCall')
@@ -49,8 +49,6 @@ export function TurnItemsView({ turn, showThinking, showStatusLine }: { turn: Tu
   const fileChanges = collectFileChanges(toolItems)
   const finalAnswerStarted = items.some((it) => it.type === 'agentMessage' && it.phase === 'final_answer')
 
-  const doneCount = toolItems.filter((t) => t.status === 'completed' || t.status === 'failed').length
-  const runningCount = toolItems.filter((t) => t.status === 'running' || t.status === 'pending').length
   const isCompleted = turn.status === 'completed'
   const groups = groupToolItems(toolItems)
 
@@ -74,7 +72,7 @@ export function TurnItemsView({ turn, showThinking, showStatusLine }: { turn: Tu
       )}
 
       {groups.length > 0 && (
-        <div className={`glass rounded-xl p-1.5 ${isCompleted ? 'opacity-70' : ''}`}>
+        <div className={`rounded-xl text-[var(--ink-soft)] ${isCompleted ? 'opacity-70' : ''}`}>
           <ProcessFold>
             {groups.map((g, i) => (
               <ToolActivityGroupView key={`${g.kind}-${i}`} group={g} />
@@ -87,48 +85,7 @@ export function TurnItemsView({ turn, showThinking, showStatusLine }: { turn: Tu
 
   return (
     <div className="space-y-2">
-      {showStatusLine && (toolItems.length > 0 || turn.status === 'running') && (
-        <StatusLine status={turn.status} doneCount={doneCount} runningCount={runningCount} total={toolItems.length} />
-      )}
-
       {shouldCollapse ? <CollapsedTurnBar turn={turn}>{processContent}</CollapsedTurnBar> : processContent}
-    </div>
-  )
-}
-
-function StatusLine({ status, doneCount, runningCount, total }: {
-  status: string; doneCount: number; runningCount: number; total: number
-}) {
-  // 融合 Codex 计数摘要 + harnessclaw 降级展示
-  const failedCount = 0 // TurnItemsView 传入时未拆分 failed，此处占位
-  let label: string
-  if (status === 'running') {
-    if (runningCount > 0 && doneCount > 0) {
-      label = `${doneCount} 步完成 · ${runningCount} 步进行中`
-    } else if (runningCount > 0) {
-      label = `执行中 · ${runningCount} 步`
-    } else {
-      label = '思考中…'
-    }
-  } else if (status === 'completed') {
-    label = total > 0 ? `任务完成 · 共 ${total} 步` : '任务完成'
-  } else if (status === 'failed') {
-    label = '任务失败'
-  } else {
-    label = '已停止'
-  }
-  return (
-    <div className="flex items-center gap-2 text-sm text-[var(--ink-soft)]">
-      {status === 'running' ? (
-        <Loader2 size={14} className="text-sky-500 animate-spin" />
-      ) : status === 'completed' ? (
-        <Check size={14} className="text-green-500" />
-      ) : status === 'failed' ? (
-        <AlertCircle size={14} className="text-red-500" />
-      ) : (
-        <AlertCircle size={14} className="text-amber-500" />
-      )}
-      {label}
     </div>
   )
 }
@@ -137,10 +94,10 @@ function FileChangeSection({ changes, collapsed }: { changes: FileChangeEntry[];
   const [open, setOpen] = useState(!collapsed)
   const totalLines = changes.reduce((sum, c) => sum + c.totalLines, 0)
   return (
-    <div className="glass rounded-xl overflow-hidden">
+    <div className="rounded-xl overflow-hidden text-[var(--ink-soft)]">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-black/[0.02] transition"
+        className="w-full flex items-center gap-2 px-2 py-1.5 text-sm hover:text-[var(--ink)] transition"
       >
         <FilePlus size={14} className="text-sky-600 flex-shrink-0" />
         <span className="text-[var(--ink)]">文件变更</span>
@@ -148,7 +105,7 @@ function FileChangeSection({ changes, collapsed }: { changes: FileChangeEntry[];
         <ChevronRight size={14} className={`text-[var(--ink-soft)] transition-transform ml-auto ${open ? 'rotate-90' : ''}`} />
       </button>
       {open && (
-        <div className="px-3 pb-2 space-y-1.5">
+        <div className="px-2 pb-2 space-y-1.5">
           {changes.map((c, i) => (
             <div key={i} className="flex items-center gap-2 text-sm">
               <WhaleTooltip label={c.path} className="min-w-0 flex-1">

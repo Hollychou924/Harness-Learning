@@ -158,9 +158,9 @@ export function deriveExecutionSummary(status: string, turn: Turn | null, now: n
     turn.items.some((item) => item.type === 'agentMessage' && item.text.trim().length > 0)
   const elapsedLabel = formatDuration(now - turn.startedAt)
   if (!hasFirstResult) {
-    return { mode: 'thinking', label: '正在思考', elapsedLabel, hasFirstResult }
+    return { mode: 'thinking', label: `思考中 · ${elapsedLabel}`, elapsedLabel, hasFirstResult }
   }
-  return { mode: 'processed', label: `已处理 ${elapsedLabel}`, elapsedLabel, hasFirstResult }
+  return { mode: 'processed', label: `执行中 · ${elapsedLabel}`, elapsedLabel, hasFirstResult }
 }
 
 export function deriveProgressSteps(turn: Turn | null, todos: TodoItem[]): ProgressStepView[] {

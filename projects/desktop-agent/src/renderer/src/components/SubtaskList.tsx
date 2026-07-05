@@ -1,6 +1,7 @@
-import { Check, X, Loader2 } from 'lucide-react'
+import { Check, X } from 'lucide-react'
 import { useTaskStore } from '../store/task'
 import { WhaleTooltip } from './WhaleTooltip'
+import { RunningStatusText } from './RunningStatusText'
 
 export function SubtaskList() {
   const { subtasks } = useTaskStore()
@@ -11,26 +12,28 @@ export function SubtaskList() {
   return (
     <div className="glass rounded-xl p-3 space-y-2">
       <div className="flex items-center gap-2 text-sm text-[var(--ink-soft)]">
-        {running.length > 0 ? (
-          <Loader2 size={13} className="text-sky-500 animate-spin" />
-        ) : (
+        {running.length === 0 && (
           <Check size={13} className="text-green-500" />
         )}
-        <span className="font-medium">子任务 · {subtasks.length} 个{running.length > 0 ? `（${running.length} 个进行中）` : ''}</span>
+        {running.length > 0 ? (
+          <RunningStatusText className="font-medium">子任务 · {subtasks.length} 个（{running.length} 个进行中）</RunningStatusText>
+        ) : (
+          <span className="font-medium">子任务 · {subtasks.length} 个</span>
+        )}
       </div>
       <div className="space-y-1">
         {subtasks.map((st) => (
           <div key={st.id} className="flex items-center gap-2 text-sm">
-            {st.status === 'running' ? (
-              <Loader2 size={12} className="text-sky-500 animate-spin flex-shrink-0" />
-            ) : st.status === 'completed' ? (
+            {st.status === 'completed' ? (
               <Check size={12} className="text-green-500 flex-shrink-0" />
-            ) : (
+            ) : st.status === 'running' ? null : (
               <X size={12} className="text-red-500 flex-shrink-0" />
             )}
-            <span className={`truncate ${st.status === 'running' ? 'text-[var(--ink)]' : 'text-[var(--ink-soft)]'}`}>
-              {st.title}
-            </span>
+            {st.status === 'running' ? (
+              <RunningStatusText className="truncate">{st.title}</RunningStatusText>
+            ) : (
+              <span className="truncate text-[var(--ink-soft)]">{st.title}</span>
+            )}
             {st.status === 'completed' && st.durationMs && (
               <span className="ml-auto text-xs text-[var(--ink-soft)] flex-shrink-0">
                 {(st.durationMs / 1000).toFixed(0)}s{st.toolCount ? ` · ${st.toolCount} 工具` : ''}

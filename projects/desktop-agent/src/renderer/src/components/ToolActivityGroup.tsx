@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { ChevronRight, Loader2, Check, AlertCircle, RotateCcw, StopCircle, Ban } from 'lucide-react'
+import { ChevronRight, Check, AlertCircle, RotateCcw, StopCircle, Ban } from 'lucide-react'
 import type { ToolCallItem, ToolKind } from '../../../agent/src/items'
 import { describeToolCall, describeToolGroup, getToolSummaryNode, getToolStatusColor } from './toolActivityText'
 import { DetailBlock } from './ToolCardShell'
 import { ErrorCard } from './ErrorCard'
 import { trySpecialView } from './ToolSpecialViews'
+import { RunningStatusText } from './RunningStatusText'
 
 export interface ToolGroup {
   kind: ToolKind
@@ -63,12 +64,12 @@ function SingleToolCard({ item }: { item: ToolCallItem }) {
   }
 
   return (
-    <div className="rounded-lg overflow-hidden text-sm">
+    <div className="rounded-lg overflow-hidden text-sm text-[var(--ink-soft)]">
       <button
         onClick={handleToggle}
-        className={`w-full flex items-center gap-2 px-3 py-1.5 transition ${
-          isOpen ? 'bg-black/[0.04]' : 'hover:bg-black/[0.02]'
-        } ${hasDetail && !isRunning ? 'cursor-pointer' : 'cursor-default'}`}
+        className={`w-full flex items-center gap-2 px-2 py-1.5 transition hover:text-[var(--ink)] ${
+          hasDetail && !isRunning ? 'cursor-pointer' : 'cursor-default'
+        }`}
       >
         {/* 状态圆点（来自 MyAgents） */}
         <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusColor.dot}`} />
@@ -77,9 +78,13 @@ function SingleToolCard({ item }: { item: ToolCallItem }) {
         {/* 失败重试链 */}
         {item.retryOfItemId && <RotateCcw size={12} className="text-amber-500 flex-shrink-0" />}
         {/* 主文案 */}
-        <span className={`${isRunning ? 'text-[var(--ink-soft)]' : isFailed ? 'text-red-500' : isStopped ? 'text-amber-500' : isCanceled ? 'text-[var(--ink-soft)]' : 'text-[var(--ink)]'}`}>
-          {text}
-        </span>
+        {isRunning ? (
+          <RunningStatusText className="opacity-75">{text}</RunningStatusText>
+        ) : (
+          <span className={`${isFailed ? 'text-red-500' : isStopped ? 'text-amber-500' : isCanceled ? 'text-[var(--ink-soft)]' : 'text-[var(--ink-soft)]'}`}>
+            {text}
+          </span>
+        )}
         {/* 摘要节点（来自 MyAgents） */}
         {summaryNode && (
           <span className="text-xs text-[var(--ink-soft)] font-mono flex-shrink-0">{summaryNode}</span>
@@ -93,7 +98,7 @@ function SingleToolCard({ item }: { item: ToolCallItem }) {
         )}
       </button>
       {isOpen && hasDetail && (
-        <div className="px-3 pb-2 pt-1 space-y-1.5">
+        <div className="px-2 pb-2 pt-1 space-y-1.5">
           {Object.keys(item.args).length > 0 && (
             <DetailBlock title="参数" content={JSON.stringify(item.args, null, 2)} />
           )}
@@ -121,21 +126,25 @@ function MergedToolGroupCard({ group }: { group: ToolGroup }) {
     ? { dot: 'bg-amber-500', icon: <StopCircle size={14} className="text-amber-500 flex-shrink-0" /> }
     : allDone
     ? { dot: 'bg-[var(--ink-muted)]/40', icon: <Check size={14} className="text-green-500 flex-shrink-0" /> }
-    : { dot: 'bg-sky-500 animate-pulse', icon: <Loader2 size={14} className="text-sky-500 animate-spin flex-shrink-0" /> }
+    : { dot: 'bg-sky-400', icon: null }
 
   return (
-    <div className="rounded-lg overflow-hidden text-sm">
+    <div className="rounded-lg overflow-hidden text-sm text-[var(--ink-soft)]">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-black/[0.02] transition"
+        className="w-full flex items-center gap-2 px-2 py-1.5 hover:text-[var(--ink)] transition"
       >
         <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${groupColor.dot}`} />
         {groupColor.icon}
-        <span className="text-[var(--ink)]">{text}</span>
+        {allDone ? (
+          <span className="text-[var(--ink-soft)]">{text}</span>
+        ) : (
+          <RunningStatusText className="opacity-75">{text}</RunningStatusText>
+        )}
         <ChevronRight size={14} className={`text-[var(--ink-soft)] transition-transform ml-auto ${open ? 'rotate-90' : ''}`} />
       </button>
       {open && (
-        <div className="px-3 pb-2 pt-1 space-y-0.5">
+        <div className="px-2 pb-2 pt-1 space-y-0.5">
           {group.items.map((item) => (
             <SingleToolCard key={item.id} item={item} />
           ))}
@@ -147,7 +156,7 @@ function MergedToolGroupCard({ group }: { group: ToolGroup }) {
 
 function ToolStatusIcon({ status }: { status: ToolCallItem['status'] }) {
   if (status === 'running' || status === 'pending') {
-    return <Loader2 size={14} className="text-sky-500 animate-spin flex-shrink-0" />
+    return null
   }
   if (status === 'failed') {
     return <AlertCircle size={14} className="text-red-500 flex-shrink-0" />

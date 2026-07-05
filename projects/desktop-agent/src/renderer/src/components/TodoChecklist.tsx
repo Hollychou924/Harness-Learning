@@ -1,5 +1,6 @@
-import { Check, Loader2 } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { useTaskStore } from '../store/task'
+import { RunningStatusText } from './RunningStatusText'
 
 export function TodoChecklist() {
   const { todos } = useTaskStore()
@@ -20,7 +21,7 @@ export function TodoChecklist() {
             <div
               key={todo.id}
               className={`flex items-start gap-2.5 rounded-lg px-2.5 py-1.5 transition-colors ${
-                isInProgress ? 'bg-sky-50' : 'hover:bg-black/[0.02]'
+                isInProgress ? '' : 'hover:bg-black/[0.02]'
               }`}
             >
               <div className={`mt-0.5 flex w-4 h-4 shrink-0 items-center justify-center rounded border-2 transition-colors ${
@@ -30,21 +31,15 @@ export function TodoChecklist() {
                   ? 'border-sky-400 bg-sky-50'
                   : 'border-black/20'
               }`}>
-                {isCompleted ? (
-                  <Check size={11} strokeWidth={3} />
-                ) : isInProgress ? (
-                  <Loader2 size={11} className="animate-spin text-sky-500" />
-                ) : null}
+                {isCompleted ? <Check size={11} strokeWidth={3} /> : null}
               </div>
-              <span className={`text-sm leading-relaxed ${
-                isCompleted
-                  ? 'text-[var(--ink-soft)] line-through'
-                  : isInProgress
-                  ? 'text-sky-600 font-medium'
-                  : 'text-[var(--ink-soft)]'
-              }`}>
-                {todo.content}
-              </span>
+              {isInProgress ? (
+                <RunningStatusText className="text-sm leading-relaxed">{todo.content}</RunningStatusText>
+              ) : (
+                <span className={`text-sm leading-relaxed ${isCompleted ? 'text-[var(--ink-soft)] line-through' : 'text-[var(--ink-soft)]'}`}>
+                  {todo.content}
+                </span>
+              )}
             </div>
           )
         })}

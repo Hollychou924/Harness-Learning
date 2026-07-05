@@ -265,7 +265,7 @@ export function getToolStatusColor(status: ToolCallItem['status']): {
   switch (status) {
     case 'running':
     case 'pending':
-      return { dot: 'bg-sky-500 animate-pulse', text: 'text-sky-500' }
+      return { dot: 'bg-sky-400', text: 'text-sky-500' }
     case 'completed':
       return { dot: 'bg-[var(--ink-muted)]/40', text: 'text-[var(--ink)]' }
     case 'failed':

@@ -31,7 +31,7 @@ export function ProcessFlow({ showTurnItems = true }: { showTurnItems?: boolean 
         </button>
       )}
 
-      {showTurnItems && latestTurn && <TurnItemsView turn={latestTurn} showThinking={showThinking} showStatusLine />}
+      {showTurnItems && latestTurn && <TurnItemsView turn={latestTurn} showThinking={showThinking} />}
 
       <PlanCard />
       <TodoChecklist />
