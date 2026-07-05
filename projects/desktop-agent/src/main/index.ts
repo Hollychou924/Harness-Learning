@@ -24,6 +24,35 @@ function getConfigPath(): string {
   return join(app.getPath('userData'), 'model-config.json')
 }
 
+type ThemeMode = 'system' | 'light' | 'dark'
+
+function getAppearanceConfigPath(): string {
+  return join(app.getPath('userData'), 'appearance-config.json')
+}
+
+function normalizeThemeMode(value: unknown): ThemeMode {
+  return value === 'light' || value === 'dark' || value === 'system' ? value : 'system'
+}
+
+function loadThemeMode(): ThemeMode {
+  try {
+    const p = getAppearanceConfigPath()
+    if (!existsSync(p)) return 'system'
+    const raw = readFileSync(p, 'utf-8')
+    return normalizeThemeMode(JSON.parse(raw)?.themeMode)
+  } catch {
+    return 'system'
+  }
+}
+
+function saveThemeMode(themeMode: ThemeMode): void {
+  writeFileSync(getAppearanceConfigPath(), JSON.stringify({ themeMode }, null, 2), 'utf-8')
+}
+
+function applyThemeMode(themeMode: ThemeMode): void {
+  nativeTheme.themeSource = themeMode
+}
+
 // 会话消息持久化目录：~/Library/Application Support/小蓝鲸/sessions/<id>.json
 function getSessionsDir(): string {
   return join(app.getPath('userData'), 'sessions')
@@ -198,7 +227,7 @@ if (process.env.ELECTRON_RENDERER_URL) {
 }
 
 app.whenReady().then(() => {
-  nativeTheme.themeSource = 'light'
+  applyThemeMode(loadThemeMode())
   agentBridge.start()
   createWindow()
 
@@ -213,7 +242,7 @@ app.on('window-all-closed', () => {
 })
 
 // IPC 通道（依据 docs/09 第二章）
-ipcMain.handle('agent:startTask', async (_e, args: { mode: 'work' | 'code'; message: string; workspaceDir?: string; maxIterations?: number; autoApproveLow?: boolean; sessionId?: string; history?: unknown[]; attachments?: unknown[] }) => {
+ipcMain.handle('agent:startTask', async (_e, args: { mode: 'work' | 'code'; message: string; workspaceDir?: string; maxIterations?: number; approvalMode?: 'always_ask' | 'risk_only' | 'auto'; autoApproveLow?: boolean; sessionId?: string; history?: unknown[]; attachments?: unknown[] }) => {
   const sessionId = args.sessionId || randomUUID()
   const traceId = randomUUID()
   const savedConfig = getActiveModelConfig() || loadConfig()
@@ -226,9 +255,12 @@ ipcMain.handle('agent:startTask', async (_e, args: { mode: 'work' | 'code'; mess
     return { taskId: sessionId, traceId, error: '未检测到模型访问配置，请在模型设置里重新选择或配置模型' }
   }
   if (args.maxIterations) config.maxIterations = args.maxIterations
+  if (args.approvalMode) config.approvalMode = args.approvalMode
   if (args.autoApproveLow !== undefined) config.autoApproveLow = args.autoApproveLow
   activeTaskId = sessionId
   activeTraceId = traceId
+  // 输出目录：优先用用户指定，否则用系统文档目录下的「小蓝鲸产出」
+  const outputDir = args.workspaceDir || join(app.getPath('documents'), '小蓝鲸产出')
   startTrace(traceId, {
     taskId: sessionId,
     sessionId,
@@ -239,16 +271,16 @@ ipcMain.handle('agent:startTask', async (_e, args: { mode: 'work' | 'code'; mess
     model: config.model,
     provider: config.provider,
     maxIterations: config.maxIterations,
+    approvalMode: config.approvalMode,
     autoApproveLow: config.autoApproveLow ?? false,
     apiKey: config.apiKey,
     apiBaseUrl: config.apiBaseUrl,
     providerId: config.providerId,
     customProviderId: config.customProviderId,
     attachmentCount: Array.isArray(args.attachments) ? args.attachments.length : 0,
-    historyCount: Array.isArray(args.history) ? args.history.length : 0
+    historyCount: Array.isArray(args.history) ? args.history.length : 0,
+    workspaceDir: outputDir
   })
-  // 输出目录：优先用用户指定，否则用系统文档目录下的「小蓝鲸产出」
-  const outputDir = args.workspaceDir || join(app.getPath('documents'), '小蓝鲸产出')
   if (!existsSync(outputDir)) mkdirSync(outputDir, { recursive: true })
   agentBridge.startTask(sessionId, args.message, config, outputDir, args.history, args.attachments as MessageAttachment[] | undefined)
   return { taskId: sessionId, traceId }
@@ -285,7 +317,15 @@ ipcMain.handle('config:get', async (_e, key: string) => {
   if (key === 'customProviderId') return cfg?.customProviderId || null
   if (key === 'autoApproveLow') return cfg?.autoApproveLow ?? false
   if (key === 'maxIterations') return (cfg as Record<string, unknown> | null)?.maxIterations ?? null
+  if (key === 'themeMode') return loadThemeMode()
   return null
+})
+
+ipcMain.handle('appearance:setThemeMode', async (_e, themeMode: ThemeMode) => {
+  const normalized = normalizeThemeMode(themeMode)
+  saveThemeMode(normalized)
+  applyThemeMode(normalized)
+  return { success: true, themeMode: normalized }
 })
 
 ipcMain.handle('config:saveModel', async (_e, cfg: ModelConfig) => {

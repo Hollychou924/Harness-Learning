@@ -4,6 +4,7 @@ import { send } from './protocol.js'
 import { runReact } from './loop/react.js'
 import { clearTaskApprovalMemory, resolveApproval } from './approval.js'
 import { resolveQuestion } from './question.js'
+import { resolvePlanResponse } from './tools/plan.js'
 
 // Agent 子进程入口：读 stdin JSON Lines，写 stdout JSON Lines
 // 不依赖任何 Electron API（依据 docs/03 第四章进程边界）
@@ -98,6 +99,11 @@ async function handleStdin(msg: StdinMessage): Promise<void> {
       customAnswer: msg.custom_answer,
       skipped: msg.skipped
     })
+    return
+  }
+
+  if (msg.type === 'plan_response') {
+    resolvePlanResponse(msg.request_id, msg.decision, msg.feedback)
     return
   }
 

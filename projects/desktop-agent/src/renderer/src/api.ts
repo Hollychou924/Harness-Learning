@@ -111,7 +111,7 @@ export interface ReplayBundle {
 }
 
 type Api = {
-  startTask: (args: { mode: 'work' | 'code'; message: string; workspaceDir?: string; maxIterations?: number; autoApproveLow?: boolean; sessionId?: string; history?: unknown[]; attachments?: unknown[] }) =>
+  startTask: (args: { mode: 'work' | 'code'; message: string; workspaceDir?: string; maxIterations?: number; approvalMode?: 'always_ask' | 'risk_only' | 'auto'; autoApproveLow?: boolean; sessionId?: string; history?: unknown[]; attachments?: unknown[] }) =>
     Promise<{ taskId: string; traceId?: string; error?: string }>
   saveSessionMessages: (sessionId: string, messages: unknown[]) => Promise<{ success: boolean; error?: string }>
   loadSessionMessages: (sessionId: string) => Promise<unknown[]>
@@ -128,6 +128,7 @@ type Api = {
   sendPlanResponse: (requestId: string, decision: 'approve' | 'reject_stop' | 'reject_revise', feedback?: string) => Promise<void>
   appendInput: (taskId: string, message: string, mode?: 'inject' | 'queue') => Promise<void>
   configGet: (key: string) => Promise<unknown>
+  setThemeMode: (themeMode: 'system' | 'light' | 'dark') => Promise<{ success: boolean; themeMode: 'system' | 'light' | 'dark' }>
   saveModelConfig: (cfg: ModelConfig) => Promise<{ success: boolean; error?: string }>
   getModelList: () => Promise<{ configs: Array<ModelConfig & { _id?: string }>; activeId: string | null }>
   setActiveModel: (modelId: string) => Promise<{ success: boolean }>
@@ -169,6 +170,7 @@ const empty: Api = {
   sendPlanResponse: async () => {},
   appendInput: async () => {},
   configGet: async () => null,
+  setThemeMode: async (themeMode) => ({ success: false, themeMode }),
   saveModelConfig: async () => ({ success: false }),
   getModelList: async () => ({ configs: [], activeId: null }),
   setActiveModel: async () => ({ success: false }),

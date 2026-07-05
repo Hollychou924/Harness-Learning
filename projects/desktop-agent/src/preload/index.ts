@@ -3,7 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 type StdoutMessage = Record<string, unknown>
 
 const api = {
-  startTask: (args: { mode: 'work' | 'code'; message: string; workspaceDir?: string; maxIterations?: number; autoApproveLow?: boolean; sessionId?: string; history?: unknown[]; attachments?: unknown[] }) =>
+  startTask: (args: { mode: 'work' | 'code'; message: string; workspaceDir?: string; maxIterations?: number; approvalMode?: 'always_ask' | 'risk_only' | 'auto'; autoApproveLow?: boolean; sessionId?: string; history?: unknown[]; attachments?: unknown[] }) =>
     ipcRenderer.invoke('agent:startTask', args) as Promise<{ taskId: string; traceId?: string; error?: string }>,
   saveSessionMessages: (sessionId: string, messages: unknown[]) =>
     ipcRenderer.invoke('session:saveMessages', { sessionId, messages }) as Promise<{ success: boolean; error?: string }>,
@@ -37,6 +37,8 @@ const api = {
   appendInput: (taskId: string, message: string, mode?: 'inject' | 'queue') =>
     ipcRenderer.invoke('agent:appendInput', { taskId, message, mode }) as Promise<void>,
   configGet: (key: string) => ipcRenderer.invoke('config:get', key) as Promise<unknown>,
+  setThemeMode: (themeMode: 'system' | 'light' | 'dark') =>
+    ipcRenderer.invoke('appearance:setThemeMode', themeMode) as Promise<{ success: boolean; themeMode: 'system' | 'light' | 'dark' }>,
   saveModelConfig: (cfg: { providerId: string; model: string; apiKey: string; apiBaseUrl: string; apiFormat: 'openai' | 'anthropic'; contextLimit: number; customProviderId?: string; autoApproveLow?: boolean }) =>
     ipcRenderer.invoke('config:saveModel', cfg) as Promise<{ success: boolean; error?: string }>,
   getModelList: () => ipcRenderer.invoke('config:getModelList') as Promise<{ configs: Array<Record<string, unknown>>; activeId: string | null }>,

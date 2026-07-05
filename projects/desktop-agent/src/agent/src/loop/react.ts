@@ -2,7 +2,7 @@ import type { AgentConfig, AgentMessage, StdoutMessage, MessageAttachment } from
 import type { Item, ItemStatus, ToolCallItem, ToolKind } from '../items.js'
 import { isSafe, isBlocked } from '../tools/index.js'
 import { shellRiskLevel } from '../tools/shell.js'
-import { parsePlanArgs, clearPendingPlanRequestId } from '../tools/plan.js'
+import { parsePlanArgs, clearPendingPlanRequestId, waitForPlanResponse } from '../tools/plan.js'
 import { parseQuestionArgs } from '../tools/question.js'
 import { makeTodoExecuteHandler } from '../tools/todo.js'
 import { hasRememberedApproval, rememberApproval, waitForApproval } from '../approval.js'
@@ -363,6 +363,13 @@ export async function runReact(
         appendRuntimeInputs(appendedAfterAnswer)
         continue
       }
+      if (assistantText) {
+        messages.push({
+          role: 'assistant',
+          content: assistantText,
+          ...(turnThinkingText && turnThinkingSignature ? { thinkingBlocks: [{ type: 'thinking' as const, thinking: turnThinkingText, signature: turnThinkingSignature }] } : {})
+        })
+      }
       break
     }
 
@@ -479,16 +486,20 @@ export async function runReact(
       continue
     }
 
-    // 权限判定：根据 autoApproveLow 开关和工具风险等级决定是否需要审批
+    // 权限判定：根据用户在输入框选择的模式和工具风险等级决定是否需要审批
     // shell 工具的风险按命令内容动态判定（只读查询=low，写操作=medium，高风险=high）
     const effectiveRisk = toolUse.name === 'shell' && typeof toolUse.args.command === 'string'
       ? shellRiskLevel(toolUse.args.command)
       : tool.riskLevel
-    const autoApprove = config.autoApproveLow !== false
+    const approvalMode = config.approvalMode ?? (config.autoApproveLow === false ? 'always_ask' : 'risk_only')
     const rememberedApproval = taskId ? hasRememberedApproval(taskId, toolUse.name, toolUse.args) : false
-    const needsApproval = !rememberedApproval && (!autoApprove
-      ? !isSafe(toolUse.name) && effectiveRisk !== 'low'
-      : effectiveRisk === 'high' || effectiveRisk === 'critical')
+    const needsApproval = !rememberedApproval && (
+      approvalMode === 'always_ask'
+        ? !isSafe(toolUse.name) && effectiveRisk !== 'low'
+        : approvalMode === 'risk_only'
+          ? effectiveRisk === 'high' || effectiveRisk === 'critical'
+          : false
+    )
 
     if (needsApproval) {
       const approvalId = `approval-${randomUUID()}`
@@ -545,13 +556,34 @@ export async function runReact(
       } else if (toolUse.name === 'propose_plan') {
         const { plan, steps, requestId } = parsePlanArgs(toolUse.args)
         const planItemId = `planItem-${randomUUID()}`
+        const planItem: Item = { type: 'plan', id: planItemId, plan, steps, decision: 'pending', requestId }
+        const planResponse = waitForPlanResponse(requestId)
         onEvent({
           type: 'item_started',
           turn_id: turnId,
-          item: { type: 'plan', id: planItemId, plan, steps, decision: 'pending', requestId }
+          item: planItem
         })
         onEvent({ type: 'plan_proposed', request_id: requestId, plan, steps })
-        result = JSON.stringify({ status: 'submitted', request_id: requestId })
+        const response = await planResponse
+        const decision = response.decision === 'approve'
+          ? 'approved'
+          : response.decision === 'reject_revise'
+            ? 'revise_requested'
+            : 'rejected'
+        onEvent({
+          type: 'item_completed',
+          turn_id: turnId,
+          item: { ...planItem, decision, feedback: response.feedback }
+        })
+        if (response.decision === 'reject_stop') {
+          result = JSON.stringify({ status: 'rejected', feedback: response.feedback })
+          finalText = response.feedback || '已按你的要求停止执行。'
+        } else {
+          result = JSON.stringify({
+            status: response.decision === 'approve' ? 'approved' : 'revise_requested',
+            feedback: response.feedback
+          })
+        }
       } else if (toolUse.name === 'update_todo') {
         result = todoExecute(toolUse.args)
       } else {
@@ -573,6 +605,16 @@ export async function runReact(
 
     finishToolItem(toolFailed ? 'failed' : 'completed', result)
 
+    let stopAfterTool = false
+    if (toolUse.name === 'propose_plan') {
+      try {
+        const parsed = JSON.parse(result)
+        stopAfterTool = parsed?.status === 'rejected'
+      } catch {
+        // 非 JSON 结果继续交给模型处理
+      }
+    }
+
     messages.push({
       role: 'assistant',
       content: assistantText,
@@ -590,6 +632,8 @@ export async function runReact(
       tool_call_id: toolUse.id,
       content: result
     })
+
+    if (stopAfterTool) break
   }
 
   // 到达迭代上限，兜底收尾

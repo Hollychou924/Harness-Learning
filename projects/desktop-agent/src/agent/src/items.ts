@@ -111,6 +111,7 @@ export interface PlanItem {
   steps: PlanStepItem[]
   decision: 'pending' | 'approved' | 'rejected' | 'revise_requested'
   requestId: string
+  feedback?: string
 }
 
 

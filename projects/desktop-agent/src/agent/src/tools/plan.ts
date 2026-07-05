@@ -2,6 +2,13 @@ import type { AgentTool } from './index.js'
 import type { PlanStepItem } from '../items.js'
 
 let pendingPlanRequestId: string | null = null
+export type PlanDecision = 'approve' | 'reject_stop' | 'reject_revise'
+export interface PlanResponse {
+  decision: PlanDecision
+  feedback: string
+}
+
+const pendingPlanResponses = new Map<string, { resolve: (response: PlanResponse) => void; timer: ReturnType<typeof setTimeout> }>()
 
 export function getPendingPlanRequestId(): string | null {
   return pendingPlanRequestId
@@ -9,6 +16,25 @@ export function getPendingPlanRequestId(): string | null {
 
 export function clearPendingPlanRequestId(): void {
   pendingPlanRequestId = null
+}
+
+export function waitForPlanResponse(requestId: string): Promise<PlanResponse> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      pendingPlanResponses.delete(requestId)
+      resolve({ decision: 'reject_stop', feedback: '等待确认超时，任务已停止' })
+    }, 30 * 60 * 1000)
+    pendingPlanResponses.set(requestId, { resolve, timer })
+  })
+}
+
+export function resolvePlanResponse(requestId: string, decision: PlanDecision, feedback = ''): boolean {
+  const pending = pendingPlanResponses.get(requestId)
+  if (!pending) return false
+  clearTimeout(pending.timer)
+  pendingPlanResponses.delete(requestId)
+  pending.resolve({ decision, feedback })
+  return true
 }
 
 export const planTool: AgentTool = {

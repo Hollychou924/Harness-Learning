@@ -985,7 +985,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     // 取当前项目绑定的文件夹作为工作区目录；无绑定则走主进程默认产出目录
     const curProject = get().projects.find((p) => p.id === get().activeProjectId)
     const workspaceDir = curProject?.folderPath || undefined
-    const res = await api.startTask({ mode, message, workspaceDir, maxIterations: settingsState.maxIterations, autoApproveLow: settingsState.autoApproveLow, sessionId, history, attachments: messageAttachments })
+    const res = await api.startTask({ mode, message, workspaceDir, maxIterations: settingsState.maxIterations, approvalMode: settingsState.approvalMode, autoApproveLow: settingsState.autoApproveLow, sessionId, history, attachments: messageAttachments })
     if (res.error) {
       const now = Date.now()
       const failureText = `模型调用失败：${res.error}`

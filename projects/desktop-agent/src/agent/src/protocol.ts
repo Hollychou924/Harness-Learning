@@ -17,6 +17,7 @@ export interface AgentConfig {
   apiFormat?: 'openai' | 'anthropic'
   contextLimit?: number
   customProviderId?: string
+  approvalMode?: 'always_ask' | 'risk_only' | 'auto'
   autoApproveLow?: boolean
   /** 思考深度：auto=按模型能力自动、off=关闭。默认 auto */
   thinkingLevel?: 'auto' | 'off'

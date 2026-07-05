@@ -205,6 +205,7 @@ export function startTrace(traceId: string, opts: {
   model: string
   provider: string
   maxIterations: number
+  approvalMode?: 'always_ask' | 'risk_only' | 'auto'
   autoApproveLow: boolean
   apiKey: string
   apiBaseUrl?: string
@@ -212,6 +213,7 @@ export function startTrace(traceId: string, opts: {
   customProviderId?: string
   attachmentCount?: number
   historyCount?: number
+  workspaceDir?: string
 }): void {
   ensureDirs()
   const identity: TraceIdentity = {
@@ -256,9 +258,12 @@ export function startTrace(traceId: string, opts: {
       apiBaseUrl: opts.apiBaseUrl,
       apiKeyMasked: maskApiKey(opts.apiKey),
       maxIterations: opts.maxIterations,
+      approvalMode: opts.approvalMode,
       autoApproveLow: opts.autoApproveLow,
       attachmentCount: opts.attachmentCount || 0,
-      historyCount: opts.historyCount || 0
+      historyCount: opts.historyCount || 0,
+      workspaceDir: opts.workspaceDir,
+      workspaceName: opts.workspaceDir ? basename(opts.workspaceDir) : undefined
     }
   })
   updateMeta(traceId, (m) => { m.eventCount++ })
