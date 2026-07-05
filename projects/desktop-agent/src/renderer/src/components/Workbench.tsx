@@ -12,7 +12,8 @@ import { useSettingsStore } from './settings/settingsStore'
 import { useTimelineScroll } from './useTimelineScroll'
 import { useDeferredRender } from './useDeferredRender'
 import { ChevronUp } from 'lucide-react'
-import type { Turn, UserMessageContent } from '../../../agent/src/items'
+import type { Item, Turn, UserMessageContent } from '../../../agent/src/items'
+import { WhaleTooltip } from './WhaleTooltip'
 
 export function Workbench() {
   const { status, goal, message, summary, messages } = useTaskStore()
@@ -25,9 +26,11 @@ export function Workbench() {
       <div className="drag h-14 flex items-center justify-center px-6 border-b border-black/[0.06]">
         <div className="no-drag flex items-center gap-3 min-w-0">
           {taskTitle && (
-            <span className="text-sm font-medium text-[var(--ink)] truncate" title={taskTitle}>
-              {taskTitle}
-            </span>
+            <WhaleTooltip label={taskTitle} className="min-w-0">
+              <span className="text-sm font-medium text-[var(--ink)] truncate">
+                {taskTitle}
+              </span>
+            </WhaleTooltip>
           )}
         </div>
       </div>
@@ -107,7 +110,7 @@ function HomeView({ greeting }: { greeting: string }) {
 
 function RunningView({ summary, status }: { summary: string; status: string }) {
   const { goal, message, currentTurn, startedAt } = useTaskStore()
-  const chunks = getFinalAnswerOfTurn(currentTurn)
+  const { showThinking } = useSettingsStore()
   const userDraft = userDraftFromTurn(currentTurn) || { text: goal || message, attachments: [] }
   const [toast, setToast] = useState<string | null>(null)
   const showToast = (text: string) => {
@@ -126,10 +129,17 @@ function RunningView({ summary, status }: { summary: string; status: string }) {
         />
       )}
 
-      {/* 执行过程 + 回复：左侧 */}
-      <ProcessFlow />
-      {(chunks || status === 'completed') && (
-        <ResultView content={chunks} />
+      {/* 执行过程 + 回复：左侧，按真实顺序穿插展示 */}
+      <ProcessFlow showTurnItems={false} />
+      {currentTurn && (
+        <TurnContentFlow
+          turn={currentTurn}
+          showThinking={showThinking}
+          status={status}
+          showToast={showToast}
+          live
+          showStatusLine
+        />
       )}
       {toast && <FloatingToast text={toast} />}
     </div>
@@ -145,7 +155,12 @@ function ConversationView({ status }: { status: string }) {
   const { turns, currentTurn, goal, message, startedAt } = useTaskStore()
   const liveUserDraft = userDraftFromTurn(currentTurn) || { text: goal || message, attachments: [] }
   const { showThinking } = useSettingsStore()
-  const chunks = getFinalAnswerOfTurn(currentTurn)
+  const liveRevision = currentTurn?.items.map((item) => {
+    if (item.type === 'agentMessage') return `${item.id}:${item.text.length}`
+    if (item.type === 'reasoning') return `${item.id}:${item.status}:${item.content.join('').length}`
+    if (item.type === 'toolCall') return `${item.id}:${item.status}:${(item.result || '').length}`
+    return item.id
+  }).join('|') || ''
   const scrollRef = useRef<HTMLDivElement>(null)
   const [toast, setToast] = useState<string | null>(null)
   const showToast = (text: string) => {
@@ -157,7 +172,7 @@ function ConversationView({ status }: { status: string }) {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [turns.length, chunks, status])
+  }, [turns.length, liveRevision, status])
 
   // 本轮正在进行：currentTurn 存在时才走实时渲染；完成后 currentTurn 置空并入 turns，交由历史轮统一渲染，避免重复
   const isLiveTurn = Boolean(currentTurn)
@@ -189,9 +204,19 @@ function ConversationView({ status }: { status: string }) {
             onCopy={() => copyDraft(liveUserDraft, showToast)}
           />
         )}
-        {/* 本轮执行过程 + 实时回复 */}
-        {isLiveTurn && <ProcessFlow />}
-        {isLiveTurn && chunks && <ResultView content={chunks} />}
+        {/* 本轮执行过程 + 实时回复，按真实顺序穿插展示 */}
+        {isLiveTurn && <ProcessFlow showTurnItems={false} />}
+        {isLiveTurn && currentTurn && (
+          <TurnContentFlow
+            turn={currentTurn}
+            showThinking={showThinking}
+            isLatest
+            status={status}
+            showToast={showToast}
+            live
+            showStatusLine
+          />
+        )}
         {status === 'idle' && (
           <p className="text-center text-xs text-[var(--ink-soft)] py-2">在下方输入继续对话，上下文已完整保留</p>
         )}
@@ -233,22 +258,86 @@ function HistoryTurnView({
       )}
       {shouldRender ? (
         <>
-          <TurnItemsView turn={turn} showThinking={showThinking} />
-          {finalAnswer && (
-            <AssistantMessageBlock
-              turn={turn}
-              content={finalAnswer}
-              isLatest={isLatest}
-              status={status}
-              showToast={showToast}
-            />
-          )}
+          <TurnContentFlow
+            turn={turn}
+            showThinking={showThinking}
+            isLatest={isLatest}
+            status={status}
+            showToast={showToast}
+          />
         </>
       ) : (
         <div className="h-8" />
       )}
     </div>
   )
+}
+
+
+function TurnContentFlow({
+  turn,
+  showThinking,
+  isLatest = false,
+  status,
+  showToast,
+  live = false,
+  showStatusLine = false
+}: {
+  turn: Turn
+  showThinking: boolean
+  isLatest?: boolean
+  status: string
+  showToast: (text: string) => void
+  live?: boolean
+  showStatusLine?: boolean
+}) {
+  const blocks: JSX.Element[] = []
+  let pendingProcessItems: Item[] = []
+  const answerItems = turn.items.filter((item) => item.type === 'agentMessage' && item.phase === 'final_answer')
+  const lastAnswerId = answerItems[answerItems.length - 1]?.id
+
+  const flushProcess = (key: string) => {
+    if (pendingProcessItems.length === 0) return
+    blocks.push(
+      <TurnItemsView
+        key={key}
+        turn={{ ...turn, items: pendingProcessItems }}
+        showThinking={showThinking}
+        showStatusLine={showStatusLine && blocks.length === 0}
+      />
+    )
+    pendingProcessItems = []
+  }
+
+  for (const item of turn.items) {
+    if (item.type === 'userMessage') continue
+    if (item.type === 'agentMessage' && item.phase === 'final_answer') {
+      flushProcess(`process-before-${item.id}`)
+      if (!item.text) continue
+      const isLastAnswer = item.id === lastAnswerId
+      blocks.push(
+        live || !isLastAnswer ? (
+          <div key={item.id} className="group/message">
+            <ResultView content={item.text} />
+          </div>
+        ) : (
+          <AssistantMessageBlock
+            key={item.id}
+            turn={turn}
+            content={item.text}
+            isLatest={isLatest}
+            status={status}
+            showToast={showToast}
+          />
+        )
+      )
+      continue
+    }
+    pendingProcessItems.push(item)
+  }
+
+  flushProcess('process-tail')
+  return <div className="space-y-3">{blocks}</div>
 }
 
 /** 虚拟分页的历史轮次渲染：超阈值自动折叠，可手动加载/折叠更早轮次（来自 Kun） */
@@ -469,7 +558,7 @@ function AssistantMessageBlock({
 
 function FloatingToast({ text }: { text: string }) {
   return (
-    <div className="pointer-events-none fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full bg-black/75 px-3 py-1.5 text-xs text-white shadow-lg">
+    <div className="pointer-events-none fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full floating-toast px-3 py-1.5 text-xs text-white">
       {text}
     </div>
   )

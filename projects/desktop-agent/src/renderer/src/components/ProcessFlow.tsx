@@ -13,7 +13,7 @@ import type { Turn } from '../../../agent/src/items'
 
 // 当前实时轮次的执行过程展示 + 全局态卡片(计划/待办/子任务/审批)
 // 条目本身的渲染逻辑在 TurnItemsView，历史轮次也共用它
-export function ProcessFlow() {
+export function ProcessFlow({ showTurnItems = true }: { showTurnItems?: boolean } = {}) {
   const { status, currentTurn, error, compactNotice, clearCompactNotice } = useTaskStore()
   const { showThinking } = useSettingsStore()
   // 只渲染实时轮(currentTurn)；历史轮由 Workbench 的 turns.map 统一渲染，避免重复
@@ -31,7 +31,7 @@ export function ProcessFlow() {
         </button>
       )}
 
-      {latestTurn && <TurnItemsView turn={latestTurn} showThinking={showThinking} showStatusLine />}
+      {showTurnItems && latestTurn && <TurnItemsView turn={latestTurn} showThinking={showThinking} showStatusLine />}
 
       <PlanCard />
       <TodoChecklist />
