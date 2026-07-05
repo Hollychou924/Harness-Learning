@@ -7,10 +7,16 @@ import { ProviderEditor } from './ProviderEditor'
 export function ModelConfigSection() {
   const { modelConfig, refreshModelConfig, saveModelConfig } = useSettingsStore()
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [error, setError] = useState('')
 
   const handleSave = async (cfg: ModelConfig) => {
-    await saveModelConfig(cfg)
-    setEditingId(null)
+    try {
+      await saveModelConfig(cfg)
+      setError('')
+      setEditingId(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '模型保存失败，请重试')
+    }
   }
 
   return (
@@ -21,12 +27,19 @@ export function ModelConfigSection() {
       </header>
 
       {editingId ? (
-        <ProviderEditor
-          providerId={editingId}
-          current={modelConfig}
-          onSave={handleSave}
-          onCancel={() => setEditingId(null)}
-        />
+        <>
+          {error && (
+            <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">
+              {error}
+            </div>
+          )}
+          <ProviderEditor
+            providerId={editingId}
+            current={modelConfig}
+            onSave={handleSave}
+            onCancel={() => { setError(''); setEditingId(null) }}
+          />
+        </>
       ) : (
         <div className="space-y-1.5">
           {/* 当前配置 */}

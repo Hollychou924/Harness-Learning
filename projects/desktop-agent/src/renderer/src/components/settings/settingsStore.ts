@@ -81,7 +81,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   saveModelConfig: async (cfg) => {
-    await api.saveModelConfig(cfg)
+    const result = await api.saveModelConfig(cfg)
+    if (!result.success) throw new Error(result.error || '模型保存失败，请重试')
     set({ modelConfig: cfg, hasApiKey: Boolean(cfg.apiKey) })
   },
 

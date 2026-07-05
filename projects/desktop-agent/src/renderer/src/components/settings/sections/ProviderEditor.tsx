@@ -19,20 +19,29 @@ interface Props {
 
 export function ProviderEditor({ providerId, current, onSave, onCancel }: Props) {
   const preset = PROVIDER_PRESETS[providerId]
+  const currentForProvider = current?.providerId === providerId ? current : null
   const isMify = preset.isMify === true
   const hasBuiltinKey = Boolean(preset.builtinApiKey)
+  const inheritedConfigWasCleared = Boolean(
+    current?.providerId === providerId &&
+    current.apiKey === '' &&
+    current.model
+  )
+  const [error, setError] = useState(
+    inheritedConfigWasCleared ? '当前模型访问配置异常，已清空，请重新粘贴访问配置' : ''
+  )
 
   const [customProviderId, setCustomProviderId] = useState(
-    current?.customProviderId || (isMify ? 'xiaomi' : '')
+    currentForProvider?.customProviderId || (isMify ? 'xiaomi' : '')
   )
   const mifyModels = isMify ? getMifyModelIds(customProviderId) : []
   const [model, setModel] = useState(
-    current?.model ||
+    currentForProvider?.model ||
     (isMify ? MIFY_GATEWAY_DEFAULT_MODEL_ID : preset.modelCandidates[0] || '')
   )
   // mify 或内置 Key 厂商：不要求用户填 Key，用预置值
-  const [apiKey, setApiKey] = useState(current?.apiKey || preset.builtinApiKey || '')
-  const [apiBaseUrl, setApiBaseUrl] = useState(current?.apiBaseUrl || preset.baseUrl)
+  const [apiKey, setApiKey] = useState(currentForProvider?.apiKey || preset.builtinApiKey || '')
+  const [apiBaseUrl, setApiBaseUrl] = useState(currentForProvider?.apiBaseUrl || preset.baseUrl)
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [useCustomKey, setUseCustomKey] = useState(false)
 
@@ -41,7 +50,16 @@ export function ProviderEditor({ providerId, current, onSave, onCancel }: Props)
     const finalKey = (isMify || hasBuiltinKey) && !useCustomKey
       ? (preset.builtinApiKey || '')
       : apiKey.trim()
+    if (/[\u0100-\uFFFF]/.test(finalKey)) {
+      setError('模型访问配置里包含中文或特殊字符，请重新填写')
+      return
+    }
+    if (/[\r\n\t]/.test(finalKey)) {
+      setError('模型访问配置里包含换行，请重新填写')
+      return
+    }
     if (!finalKey.trim() || !model.trim()) return
+    setError('')
     onSave({
       providerId,
       model,
@@ -126,7 +144,7 @@ export function ProviderEditor({ providerId, current, onSave, onCancel }: Props)
             <input
               type="password"
               value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
+              onChange={(e) => { setApiKey(e.target.value); setError('') }}
               placeholder={preset.keyPlaceholder}
               className="w-full h-9 px-2 rounded-lg glass-soft text-sm outline-none"
             />
@@ -179,6 +197,7 @@ export function ProviderEditor({ providerId, current, onSave, onCancel }: Props)
           >
             使用此模型
           </button>
+          {error && <span className="self-center text-xs text-red-500">{error}</span>}
           <button
             onClick={onCancel}
             className="h-9 px-4 rounded-lg glass text-sm font-medium hover:brightness-105 transition"

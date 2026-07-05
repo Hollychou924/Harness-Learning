@@ -106,9 +106,23 @@ function getActiveModelConfig(): ModelConfig | null {
   return active || store.configs[0] || null
 }
 
+function validateModelConfig(cfg: ModelConfig): string | null {
+  const key = cfg.apiKey || ''
+  if (!key.trim()) return '模型访问配置为空，请重新配置模型'
+  if (/[\u0100-\uFFFF]/.test(key)) return '模型访问配置里包含中文或特殊字符，请重新配置模型'
+  if (/[\r\n\t]/.test(key)) return '模型访问配置里包含换行或制表符，请重新配置模型'
+  return null
+}
+
+function sanitizeModelConfigForRenderer(cfg: ModelConfig | null): ModelConfig | null {
+  if (!cfg) return null
+  if (!validateModelConfig(cfg)) return cfg
+  return { ...cfg, apiKey: '' }
+}
+
 function buildAgentConfig(): AgentConfig {
   const saved = getActiveModelConfig() || loadConfig()
-  if (saved && saved.apiKey) {
+  if (saved && saved.apiKey && !validateModelConfig(saved)) {
     const isMify = saved.providerId === 'mify'
     const preset = getModelThinkingConfig(
       saved.providerId,
@@ -213,9 +227,14 @@ app.on('window-all-closed', () => {
 // IPC 通道（依据 docs/09 第二章）
 ipcMain.handle('agent:startTask', async (_e, args: { mode: 'work' | 'code'; message: string; workspaceDir?: string; maxIterations?: number; autoApproveLow?: boolean; sessionId?: string; history?: unknown[]; attachments?: unknown[] }) => {
   const sessionId = args.sessionId || randomUUID()
+  const savedConfig = getActiveModelConfig() || loadConfig()
+  const configError = savedConfig ? validateModelConfig(savedConfig) : null
+  if (configError) {
+    return { taskId: sessionId, error: configError }
+  }
   const config = buildAgentConfig()
   if (!config.apiKey) {
-    return { taskId: sessionId, error: '未检测到模型凭证，请在环境变量配置 ANTHROPIC_API_KEY' }
+    return { taskId: sessionId, error: '未检测到模型访问配置，请在模型设置里重新选择或配置模型' }
   }
   if (args.maxIterations) config.maxIterations = args.maxIterations
   if (args.autoApproveLow !== undefined) config.autoApproveLow = args.autoApproveLow
@@ -241,10 +260,13 @@ ipcMain.handle('agent:startTask', async (_e, args: { mode: 'work' | 'code'; mess
 
 ipcMain.handle('config:get', async (_e, key: string) => {
   const cfg = loadConfig()
-  if (key === 'hasApiKey') return Boolean(getActiveModelConfig()?.apiKey || cfg?.apiKey || process.env.ANTHROPIC_API_KEY)
+  if (key === 'hasApiKey') {
+    const active = getActiveModelConfig()
+    return Boolean((active && !validateModelConfig(active)) || process.env.ANTHROPIC_API_KEY)
+  }
   if (key === 'model') return cfg?.model || process.env.XLJ_MODEL || 'claude-sonnet-4-5-20250929'
   if (key === 'modelConfig') {
-    const active = getActiveModelConfig()
+    const active = sanitizeModelConfigForRenderer(getActiveModelConfig())
     if (active) return active
     if (cfg) return cfg
     const envKey = process.env.ANTHROPIC_API_KEY
@@ -269,6 +291,8 @@ ipcMain.handle('config:get', async (_e, key: string) => {
 })
 
 ipcMain.handle('config:saveModel', async (_e, cfg: ModelConfig) => {
+  const configError = validateModelConfig(cfg)
+  if (configError) return { success: false, error: configError }
   // 同时写入旧单配置(兼容)和多模型存储
   saveConfigFile(cfg)
   const store = loadModelsStore()
