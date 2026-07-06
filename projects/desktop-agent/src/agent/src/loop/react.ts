@@ -6,7 +6,7 @@ import { parsePlanArgs, clearPendingPlanRequestId, waitForPlanResponse } from '.
 import { parseQuestionArgs } from '../tools/question.js'
 import { makeTodoExecuteHandler } from '../tools/todo.js'
 import { hasRememberedApproval, rememberApproval, waitForApproval } from '../approval.js'
-import { waitForQuestion } from '../question.js'
+import { waitForQuestion, waitForContinuation, type ContinuationDecision } from '../question.js'
 import { randomUUID } from 'node:crypto'
 import { AnthropicProvider, type LlmProvider } from '../providers/anthropic.js'
 import { OpenAIProvider } from '../providers/openai.js'
@@ -14,7 +14,7 @@ import { buildSystemPrompt } from '../prompt/system.js'
 import { summarizeToolResult } from './tool-summary.js'
 
 // ReAct 引擎（依据 docs/01 第三章，参考已验证实现）
-// maxIterations 硬上限，到顶兜底收尾，禁止无限转
+// maxIterations 硬上限，到顶后先询问用户是否继续/停止/拆分，禁止无限转
 // 空回复重试一次，工具后报错合成收尾
 // 2026-07-02 起改为 Turn/Item 事件模型：本轮内每个思考/工具调用/审批都是独立条目，带 id 可追溯
 export interface ReactResult {
@@ -178,7 +178,10 @@ export async function runReact(
     return consumeAppendedInput ? consumeAppendedInput() : []
   }
 
-  for (let iter = 0; iter < config.maxIterations; iter++) {
+  let maxIterations = config.maxIterations
+  let continuationCount = 0
+  let iter = 0
+  while (iter < maxIterations) {
     appendRuntimeInputs(takeAppendedInputs())
 
     let assistantText = ''
@@ -634,6 +637,37 @@ export async function runReact(
     })
 
     if (stopAfterTool) break
+
+    // 到达当前预算上限，且任务未自然结束：询问用户是否继续/停止/拆分
+    if (iter >= maxIterations - 1 && taskId) {
+      const hint =
+        continuationCount >= 2
+          ? '任务已连续续跑 2 次，建议拆分为更小的子任务继续。'
+          : '当前任务已执行到步数上限，是否继续执行、停止并查看结果，或拆成更小的子任务？'
+      onEvent({ type: 'continuation_request', task_id: taskId, current_step: iter + 1, hint })
+      const decision: ContinuationDecision = await waitForContinuation(taskId)
+      if (decision === 'continue') {
+        continuationCount += 1
+        maxIterations += 30
+        iter++
+        onEvent({
+          type: 'status',
+          status: 'INFO',
+          message: `已续跑第 ${continuationCount} 次，追加 30 步执行预算`
+        })
+        continue
+      } else if (decision === 'split') {
+        if (!finalText) {
+          finalText = '任务已达到复杂度上限，建议拆分为更明确、更小的子任务继续。'
+        }
+        break
+      } else {
+        // stop or timeout fallback: fall through to finalization
+        break
+      }
+    }
+
+    iter++
   }
 
   // 到达迭代上限，兜底收尾

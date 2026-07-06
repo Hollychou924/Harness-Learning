@@ -11,6 +11,7 @@ import type { StdoutMessage, AgentConfig, MessageAttachment } from '../agent/src
 import { getModelThinkingConfig } from '../renderer/src/components/providerPresets.js'
 import {
   resolveModelConfigForSave,
+  sameModelSlot,
   sanitizeModelConfigForRenderer,
   sanitizeModelConfigStoreForRenderer,
   validateModelConfig,
@@ -89,7 +90,8 @@ function getModelsStorePath(): string {
 
 function generateModelId(cfg: ModelConfig): string {
   const sub = cfg.customProviderId ? `-${cfg.customProviderId}` : ''
-  return `${cfg.providerId}${sub}-${cfg.model}-${Date.now().toString(36)}`
+  const custom = cfg.customModelId ? `-${cfg.customModelId}` : ''
+  return `${cfg.providerId}${sub}${custom}-${cfg.model}-${Date.now().toString(36)}`
 }
 
 function loadModelsStore(): ModelConfigStore {
@@ -118,6 +120,91 @@ function loadModelsStore(): ModelConfigStore {
 
 function saveModelsStore(store: ModelConfigStore): void {
   writeFileSync(getModelsStorePath(), JSON.stringify(store, null, 2), 'utf-8')
+}
+
+function resolveModelConfigWithSavedKey(cfg: ModelConfig): ModelConfig {
+  const store = loadModelsStore()
+  const legacyConfig = loadConfig()
+  const envConfig: ModelConfig | null = process.env.ANTHROPIC_API_KEY && cfg.providerId === 'anthropic'
+    ? {
+        providerId: 'anthropic',
+        model: process.env.XLJ_MODEL || cfg.model,
+        apiKey: process.env.ANTHROPIC_API_KEY,
+        apiBaseUrl: process.env.ANTHROPIC_BASE_URL || '',
+        apiFormat: 'anthropic',
+        contextLimit: 200000,
+        autoApproveLow: false
+      }
+    : null
+  return resolveModelConfigForSave(cfg, [
+    ...store.configs,
+    ...(legacyConfig ? [legacyConfig] : []),
+    ...(envConfig ? [envConfig] : [])
+  ])
+}
+
+function joinEndpoint(baseUrl: string, path: string): string {
+  const base = baseUrl.replace(/\/+$/, '')
+  return `${base}${path}`
+}
+
+async function testModelConnection(cfg: ModelConfig): Promise<{ success: boolean; message?: string; error?: string; latencyMs?: number }> {
+  const resolvedCfg = resolveModelConfigWithSavedKey(cfg)
+  const configError = validateModelConfig(resolvedCfg)
+  if (configError) return { success: false, error: configError }
+  if (!resolvedCfg.model.trim()) return { success: false, error: '请先填写模型 ID' }
+  if (!resolvedCfg.apiBaseUrl.trim()) return { success: false, error: '请先填写连接地址' }
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 15000)
+  const started = Date.now()
+  try {
+    const headers: Record<string, string> = { 'content-type': 'application/json' }
+    let url = ''
+    let body: Record<string, unknown>
+    if (resolvedCfg.apiFormat === 'anthropic') {
+      url = joinEndpoint(resolvedCfg.apiBaseUrl, '/v1/messages')
+      headers['x-api-key'] = resolvedCfg.apiKey
+      headers['anthropic-version'] = '2023-06-01'
+      body = {
+        model: resolvedCfg.model,
+        max_tokens: 16,
+        messages: [{ role: 'user', content: 'ping' }]
+      }
+    } else {
+      url = joinEndpoint(resolvedCfg.apiBaseUrl, '/chat/completions')
+      headers.authorization = `Bearer ${resolvedCfg.apiKey}`
+      if (resolvedCfg.providerId === 'mify' && resolvedCfg.customProviderId) {
+        headers['x-model-provider-id'] = resolvedCfg.customProviderId
+      }
+      body = {
+        model: resolvedCfg.model,
+        messages: [{ role: 'user', content: 'ping' }],
+        max_tokens: 16,
+        stream: false
+      }
+    }
+    const res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal
+    })
+    const text = await res.text()
+    const latencyMs = Date.now() - started
+    if (!res.ok) {
+      const detail = text.replace(/\s+/g, ' ').slice(0, 180)
+      return { success: false, error: detail || `连接失败：${res.status}`, latencyMs }
+    }
+    return { success: true, message: `连接成功，用时 ${latencyMs}ms`, latencyMs }
+  } catch (e) {
+    const message = e instanceof Error && e.name === 'AbortError'
+      ? '连接超时，请检查网络或连接地址'
+      : e instanceof Error ? e.message : '连接失败，请检查配置'
+    return { success: false, error: message, latencyMs: Date.now() - started }
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 function getActiveModelConfig(): ModelConfig | null {
@@ -170,6 +257,12 @@ let mainWindow: BrowserWindow | null = null
 let activeTaskId: string | null = null
 let activeTraceId: string | null = null
 
+function getWindowIconPath(): string {
+  const packagedIconPath = join(process.resourcesPath, 'build', 'icon.png')
+  const localIconPath = join(__dirname, '../../build/icon.png')
+  return existsSync(packagedIconPath) ? packagedIconPath : localIconPath
+}
+
 function activeTraceForTask(taskId?: string): string | null {
   if (!activeTraceId) return null
   if (!taskId) return activeTraceId
@@ -183,6 +276,7 @@ function createWindow(): void {
     minWidth: 1080,
     minHeight: 640,
     show: false,
+    icon: getWindowIconPath(),
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 13 },
     // Mac 液态玻璃：原生 vibrancy + 透明背景
@@ -328,42 +422,33 @@ ipcMain.handle('appearance:setThemeMode', async (_e, themeMode: ThemeMode) => {
   return { success: true, themeMode: normalized }
 })
 
-ipcMain.handle('config:saveModel', async (_e, cfg: ModelConfig) => {
+ipcMain.handle('config:saveModel', async (_e, input: ModelConfig | { cfg: ModelConfig; activate?: boolean }) => {
+  const cfg = 'cfg' in input ? input.cfg : input
+  const activate = 'cfg' in input ? input.activate !== false : true
   const store = loadModelsStore()
-  const legacyConfig = loadConfig()
-  const envConfig: ModelConfig | null = process.env.ANTHROPIC_API_KEY && cfg.providerId === 'anthropic'
-    ? {
-        providerId: 'anthropic',
-        model: process.env.XLJ_MODEL || cfg.model,
-        apiKey: process.env.ANTHROPIC_API_KEY,
-        apiBaseUrl: process.env.ANTHROPIC_BASE_URL || '',
-        apiFormat: 'anthropic',
-        contextLimit: 200000,
-        autoApproveLow: false
-      }
-    : null
-  const resolvedCfg = resolveModelConfigForSave(cfg, [
-    ...store.configs,
-    ...(legacyConfig ? [legacyConfig] : []),
-    ...(envConfig ? [envConfig] : [])
-  ])
+  const resolvedCfg = resolveModelConfigWithSavedKey(cfg)
   const configError = validateModelConfig(resolvedCfg)
   if (configError) return { success: false, error: configError }
-  // 同时写入旧单配置(兼容)和多模型存储
-  saveConfigFile(resolvedCfg)
   const id = generateModelId(resolvedCfg)
   const newEntry = { ...resolvedCfg, _id: id } as ModelConfig & { _id: string }
-  // 同 providerId+model 视为同一条，覆盖更新
-  const idx = store.configs.findIndex((c) => c.providerId === resolvedCfg.providerId && c.model === resolvedCfg.model && c.customProviderId === resolvedCfg.customProviderId)
+  // 同一个模型配置位直接覆盖更新，避免保存后重复出现。
+  const idx = store.configs.findIndex((c) => sameModelSlot(c, resolvedCfg))
   if (idx >= 0) {
     newEntry._id = (store.configs[idx] as ModelConfig & { _id?: string })._id || id
     store.configs[idx] = newEntry
   } else {
     store.configs.push(newEntry)
   }
-  store.activeId = newEntry._id
+  if (activate) {
+    store.activeId = newEntry._id
+    saveConfigFile(resolvedCfg)
+  }
   saveModelsStore(store)
-  return { success: true }
+  return { success: true, modelId: newEntry._id }
+})
+
+ipcMain.handle('config:testModel', async (_e, cfg: ModelConfig) => {
+  return testModelConnection(cfg)
 })
 
 // 获取已配置模型列表
@@ -455,6 +540,13 @@ ipcMain.handle('agent:planResponse', async (_e, args: { requestId: string; decis
   const traceId = activeTraceForTask()
   if (traceId) logUserAction(traceId, 'plan_response', { requestId: args.requestId, decision: args.decision, feedback: args.feedback })
   agentBridge.send({ type: 'plan_response', request_id: args.requestId, decision: args.decision, feedback: args.feedback })
+})
+
+// 续跑决策响应通道（转发为 stdin continuation_response）
+ipcMain.handle('agent:continuationResponse', async (_e, args: { taskId: string; decision: 'continue' | 'stop' | 'split' }) => {
+  const traceId = activeTraceForTask(args.taskId)
+  if (traceId) logUserAction(traceId, 'continuation_response', { taskId: args.taskId, decision: args.decision })
+  agentBridge.send({ type: 'continuation_response', task_id: args.taskId, decision: args.decision })
 })
 
 // 追加指令通道（转发为 stdin append_input）

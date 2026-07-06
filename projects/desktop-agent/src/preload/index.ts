@@ -34,13 +34,17 @@ const api = {
     ipcRenderer.invoke('agent:questionResponse', { requestId, selectedOptionIds, customAnswer, skipped }) as Promise<void>,
   sendPlanResponse: (requestId: string, decision: 'approve' | 'reject_stop' | 'reject_revise', feedback?: string) =>
     ipcRenderer.invoke('agent:planResponse', { requestId, decision, feedback }) as Promise<void>,
+  sendContinuationResponse: (taskId: string, decision: 'continue' | 'stop' | 'split') =>
+    ipcRenderer.invoke('agent:continuationResponse', { taskId, decision }) as Promise<void>,
   appendInput: (taskId: string, message: string, mode?: 'inject' | 'queue') =>
     ipcRenderer.invoke('agent:appendInput', { taskId, message, mode }) as Promise<void>,
   configGet: (key: string) => ipcRenderer.invoke('config:get', key) as Promise<unknown>,
   setThemeMode: (themeMode: 'system' | 'light' | 'dark') =>
     ipcRenderer.invoke('appearance:setThemeMode', themeMode) as Promise<{ success: boolean; themeMode: 'system' | 'light' | 'dark' }>,
-  saveModelConfig: (cfg: { providerId: string; model: string; apiKey: string; apiBaseUrl: string; apiFormat: 'openai' | 'anthropic'; contextLimit: number; customProviderId?: string; autoApproveLow?: boolean }) =>
-    ipcRenderer.invoke('config:saveModel', cfg) as Promise<{ success: boolean; error?: string }>,
+  saveModelConfig: (cfg: { providerId: string; model: string; apiKey: string; apiBaseUrl: string; apiFormat: 'openai' | 'anthropic'; contextLimit: number; customProviderId?: string; customModelId?: string; displayName?: string; autoApproveLow?: boolean }, opts?: { activate?: boolean }) =>
+    ipcRenderer.invoke('config:saveModel', { cfg, activate: opts?.activate ?? true }) as Promise<{ success: boolean; error?: string; modelId?: string }>,
+  testModelConfig: (cfg: { providerId: string; model: string; apiKey: string; apiBaseUrl: string; apiFormat: 'openai' | 'anthropic'; contextLimit: number; customProviderId?: string; customModelId?: string; displayName?: string; autoApproveLow?: boolean }) =>
+    ipcRenderer.invoke('config:testModel', cfg) as Promise<{ success: boolean; error?: string; message?: string; latencyMs?: number }>,
   getModelList: () => ipcRenderer.invoke('config:getModelList') as Promise<{ configs: Array<Record<string, unknown>>; activeId: string | null }>,
   setActiveModel: (modelId: string) => ipcRenderer.invoke('config:setActiveModel', modelId) as Promise<{ success: boolean }>,
   deleteModel: (modelId: string) => ipcRenderer.invoke('config:deleteModel', modelId) as Promise<{ success: boolean }>,

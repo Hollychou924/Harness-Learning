@@ -19,6 +19,8 @@ export interface ModelConfig {
   apiFormat: 'openai' | 'anthropic'
   contextLimit: number
   customProviderId?: string
+  customModelId?: string
+  displayName?: string
   autoApproveLow?: boolean
   hasSavedApiKey?: boolean
 }
@@ -126,10 +128,12 @@ type Api = {
   sendApproval: (requestId: string, approved: boolean, scope?: 'once' | 'task' | 'always') => Promise<void>
   sendQuestionResponse: (requestId: string, selectedOptionIds?: string[], customAnswer?: string, skipped?: boolean) => Promise<void>
   sendPlanResponse: (requestId: string, decision: 'approve' | 'reject_stop' | 'reject_revise', feedback?: string) => Promise<void>
+  sendContinuationResponse: (taskId: string, decision: 'continue' | 'stop' | 'split') => Promise<void>
   appendInput: (taskId: string, message: string, mode?: 'inject' | 'queue') => Promise<void>
   configGet: (key: string) => Promise<unknown>
   setThemeMode: (themeMode: 'system' | 'light' | 'dark') => Promise<{ success: boolean; themeMode: 'system' | 'light' | 'dark' }>
-  saveModelConfig: (cfg: ModelConfig) => Promise<{ success: boolean; error?: string }>
+  saveModelConfig: (cfg: ModelConfig, opts?: { activate?: boolean }) => Promise<{ success: boolean; error?: string; modelId?: string }>
+  testModelConfig: (cfg: ModelConfig) => Promise<{ success: boolean; error?: string; message?: string; latencyMs?: number }>
   getModelList: () => Promise<{ configs: Array<ModelConfig & { _id?: string }>; activeId: string | null }>
   setActiveModel: (modelId: string) => Promise<{ success: boolean }>
   deleteModel: (modelId: string) => Promise<{ success: boolean }>
@@ -168,10 +172,12 @@ const empty: Api = {
   sendApproval: async () => {},
   sendQuestionResponse: async () => {},
   sendPlanResponse: async () => {},
+  sendContinuationResponse: async () => {},
   appendInput: async () => {},
   configGet: async () => null,
   setThemeMode: async (themeMode) => ({ success: false, themeMode }),
   saveModelConfig: async () => ({ success: false }),
+  testModelConfig: async () => ({ success: false, error: 'preload 未就绪' }),
   getModelList: async () => ({ configs: [], activeId: null }),
   setActiveModel: async () => ({ success: false }),
   deleteModel: async () => ({ success: false }),

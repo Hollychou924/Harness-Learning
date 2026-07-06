@@ -3,7 +3,7 @@ import type { StdinMessage, StdoutMessage, AgentMessage } from './protocol.js'
 import { send } from './protocol.js'
 import { runReact } from './loop/react.js'
 import { clearTaskApprovalMemory, resolveApproval } from './approval.js'
-import { resolveQuestion } from './question.js'
+import { resolveQuestion, resolveContinuation } from './question.js'
 import { resolvePlanResponse } from './tools/plan.js'
 
 // Agent 子进程入口：读 stdin JSON Lines，写 stdout JSON Lines
@@ -110,6 +110,11 @@ async function handleStdin(msg: StdinMessage): Promise<void> {
   if (msg.type === 'append_input') {
     enqueueAppendInput(msg.task_id, msg.message)
     send({ type: 'status', status: 'INFO', message: '补充要求已收到，正在并入当前任务' })
+    return
+  }
+
+  if (msg.type === 'continuation_response') {
+    resolveContinuation(msg.task_id, msg.decision)
     return
   }
 }

@@ -365,6 +365,11 @@ export function logAgentEvent(traceId: string, msg: StdoutMessage): void {
       stepId = `question:${msg.request_id}`
       data = { requestId: msg.request_id, question: msg.question, detail: msg.detail, options: msg.options, multiple: msg.multiple, allowCustom: msg.allow_custom, allowSkip: msg.allow_skip }
       break
+    case 'continuation_request':
+      phase = 'question'
+      stepId = `continuation:${msg.task_id}`
+      data = { taskId: msg.task_id, currentStep: msg.current_step, hint: msg.hint }
+      break
     case 'todo_update':
       phase = 'todo'
       data = { todos: msg.todos }

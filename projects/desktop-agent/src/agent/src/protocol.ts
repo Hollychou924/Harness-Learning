@@ -67,6 +67,7 @@ export type StdinMessage =
   | { type: 'question_response'; request_id: string; selected_option_ids?: string[]; custom_answer?: string; skipped?: boolean }
   | { type: 'append_input'; task_id: string; message: string; mode?: 'inject' | 'queue' }
   | { type: 'plan_response'; request_id: string; decision: 'approve' | 'reject_stop' | 'reject_revise'; feedback?: string }
+  | { type: 'continuation_response'; task_id: string; decision: 'continue' | 'stop' | 'split' }
 
 // Agent -> 主进程 (stdout)：Turn/Item 事件模型
 export type StdoutMessage =
@@ -82,6 +83,7 @@ export type StdoutMessage =
   | { type: 'approval_request'; request_id: string; tool_name: string; args: Record<string, unknown>; risk_level: 'low' | 'medium' | 'high' | 'critical'; impact: string; can_rollback: boolean }
   | { type: 'plan_proposed'; request_id: string; plan: string; steps: PlanStep[] }
   | { type: 'question_proposed'; request_id: string; question: string; detail?: string; options: QuestionOption[]; multiple: boolean; allow_custom: boolean; allow_skip: boolean; prompts?: QuestionPrompt[] }
+  | { type: 'continuation_request'; task_id: string; current_step: number; hint: string }
   | { type: 'todo_update'; todos: TodoItem[] }
   // 用量与产物
   | { type: 'usage'; inputTokens: number; outputTokens: number }

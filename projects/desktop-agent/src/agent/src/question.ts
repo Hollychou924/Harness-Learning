@@ -28,3 +28,25 @@ export function resolveQuestion(requestId: string, response: Partial<QuestionRes
   })
   return true
 }
+export type ContinuationDecision = 'continue' | 'stop' | 'split'
+
+const pendingContinuations = new Map<string, { resolve: (decision: ContinuationDecision) => void; timer: ReturnType<typeof setTimeout> }>()
+
+export function waitForContinuation(taskId: string): Promise<ContinuationDecision> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      pendingContinuations.delete(taskId)
+      resolve('stop')
+    }, 30 * 60 * 1000)
+    pendingContinuations.set(taskId, { resolve, timer })
+  })
+}
+
+export function resolveContinuation(taskId: string, decision: ContinuationDecision): boolean {
+  const pending = pendingContinuations.get(taskId)
+  if (!pending) return false
+  clearTimeout(pending.timer)
+  pendingContinuations.delete(taskId)
+  pending.resolve(decision)
+  return true
+}
