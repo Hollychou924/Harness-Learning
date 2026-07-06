@@ -16,6 +16,9 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronUp,
+  Circle,
+  MailOpen,
+  Mail,
 } from 'lucide-react'
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useTaskStore, type Session, type Project, DEFAULT_PROJECT_ID } from '../store/task'
@@ -160,6 +163,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
           onDelete={isDefault ? null : () => { if (confirm(`删除项目「${p.name}」及其下所有对话？`)) store.deleteProject(p.id) }}
           onTogglePin={isDefault ? null : () => store.togglePinProject(p.id)}
           onArchiveAll={list.length > 0 ? () => store.archiveAllInProject(p.id) : null}
+          onMarkAllRead={() => store.markAllReadInProject(p.id)}
         />
         {expanded && (
           <>
@@ -411,10 +415,11 @@ function SectionLabel({ label, action, collapsed, onToggle }: { label: string; a
 }
 
 /* ---- 项目行 ---- */
-function ProjectRow({ project, expanded, onToggle, onActivate, onRename, onDelete, onTogglePin, onArchiveAll }: {
+function ProjectRow({ project, expanded, onToggle, onActivate, onRename, onDelete, onTogglePin, onArchiveAll, onMarkAllRead }: {
   project: Project; expanded: boolean; onToggle: () => void; onActivate: () => void
   onRename: (() => void) | null; onDelete: (() => void) | null
   onTogglePin: (() => void) | null; onArchiveAll: (() => void) | null
+  onMarkAllRead?: () => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   return (
@@ -440,17 +445,16 @@ function ProjectRow({ project, expanded, onToggle, onActivate, onRename, onDelet
                 {project.pinned ? <PinOff size={12} /> : <Pin size={12} />} {project.pinned ? '取消置顶' : '置顶'}
               </button>
             )}
+            {onMarkAllRead && (
+              <button onClick={(e) => { e.stopPropagation(); onMarkAllRead(); setMenuOpen(false) }} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-black/[0.05] transition">
+                <MailOpen size={12} /> 全部标记为已读
+              </button>
+            )}
             {onArchiveAll && (
               <button onClick={(e) => { e.stopPropagation(); onArchiveAll(); setMenuOpen(false) }} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-black/[0.05] transition">
                 <Archive size={12} /> 归档所有聊天
               </button>
             )}
-            <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false) }} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-black/[0.05] transition">
-              <Pencil size={12} /> 整理侧边栏
-            </button>
-            <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false) }} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-black/[0.05] transition">
-              <Clock size={12} /> 排序条件
-            </button>
             {onRename && (
               <button onClick={(e) => { e.stopPropagation(); onRename(); setMenuOpen(false) }} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-black/[0.05] transition">
                 <Pencil size={12} /> 重命名
@@ -469,11 +473,18 @@ function ProjectRow({ project, expanded, onToggle, onActivate, onRename, onDelet
 }
 
 /* ---- 单条对话行 ---- */
+
+/* ---- 未读判断：优先使用显式未读标记，否则按时间比较 ---- */
+function isUnread(session: Session): boolean {
+  if (session.unread === true) return true
+  return Boolean(session.lastMessageAt && (session.lastReadAt ?? 0) < session.lastMessageAt)
+}
 function SessionRow({ session, active, onClick, onDragStart, onDragOver, onDrop, isDragging, isDragOver, showProject, compact, onRename }: {
   session: Session; active: boolean; onClick: () => void
   onDragStart?: (e: React.DragEvent) => void; onDragOver?: (e: React.DragEvent) => void; onDrop?: (e: React.DragEvent) => void
   isDragging?: boolean; isDragOver?: boolean; showProject?: string; compact?: boolean; onRename?: () => void
 }) {
+  const unread = isUnread(session)
   const store = useTaskStore()
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -485,6 +496,7 @@ function SessionRow({ session, active, onClick, onDragStart, onDragOver, onDrop,
 
   const actions: MenuAction[] = [
     { id: 'pin', label: session.pinned ? '取消置顶' : '置顶', icon: session.pinned ? <PinOff size={12} /> : <Pin size={12} />, onClick: () => store.togglePinSession(session.id) },
+    { id: 'read', label: unread ? '标记为已读' : '标记为未读', icon: unread ? <MailOpen size={12} /> : <Mail size={12} />, onClick: () => store.markSessionRead(session.id, !unread) },
     { id: 'rename', label: '重命名', icon: <Pencil size={12} />, onClick: () => { onRename?.(); setMenuOpen(false) } },
     session.archived
       ? { id: 'unarchive', label: '取消归档', icon: <ArchiveRestore size={12} />, onClick: () => store.unarchiveSession(session.id) }
@@ -508,6 +520,7 @@ function SessionRow({ session, active, onClick, onDragStart, onDragOver, onDrop,
       <div className="flex-1 flex items-center gap-2.5 min-w-0 text-left pr-1">
         <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">{icon}</span>
         <span className={`flex-1 truncate text-xs ${active ? 'text-[var(--ink)] font-medium' : 'text-[var(--ink)]/75'}`}>{session.title}</span>
+        {unread && <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" aria-label="未读" />}
       </div>
       {/* 右侧：项目标签 + 相对时间/状态 + 置顶图标 */}
       <div className="ml-auto flex items-center gap-1 flex-shrink-0">
