@@ -754,7 +754,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const now = Date.now()
     const next = get().sessions.map((s) =>
       s.id === sessionId
-        ? { ...s, lastReadAt: read ? now : s.lastReadAt, unread: !read, updatedAt: now }
+        ? { ...s, lastReadAt: read ? now : s.lastReadAt, unread: read ? false : true, updatedAt: now }
         : s
     )
     saveSessionsToStorage(next)
