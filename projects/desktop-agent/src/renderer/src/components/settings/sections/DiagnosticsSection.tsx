@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, Download, Loader2, MessageSquareWarning } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, Loader2, MessageSquareWarning, Search, Shield, Wrench } from 'lucide-react'
 import { api, type TraceMeta, type TraceEvent, type FeedbackTicket, type DiagnosticPackageLevel, type DiagnosticsOverview, type ReplayBundle } from '../../../api'
 
 export function DiagnosticsSection() {
@@ -9,11 +9,9 @@ export function DiagnosticsSection() {
   const [exporting, setExporting] = useState(false)
   const [notice, setNotice] = useState('')
   const [feedbackOpen, setFeedbackOpen] = useState(false)
-  const [replay, setReplay] = useState<ReplayBundle | null>(null)
-  const [includeReplayConversation, setIncludeReplayConversation] = useState(false)
-  const [includeReplayFileSummary, setIncludeReplayFileSummary] = useState(false)
   const [feedbackList, setFeedbackList] = useState<FeedbackTicket[]>([])
   const [overview, setOverview] = useState<DiagnosticsOverview | null>(null)
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const [query, setQuery] = useState('')
 
   const refresh = useCallback(async () => {
@@ -62,34 +60,41 @@ export function DiagnosticsSection() {
     return <TraceDetail traceId={selectedId} onBack={() => { setSelectedId(null); void refresh() }} />
   }
 
+  const completedCount = overview?.completed ?? 0
+  const failedCount = overview?.failed ?? 0
+
   return (
     <section>
       <header className="mb-5">
         <div className="flex items-center justify-between gap-3">
-          <h3 className="text-lg font-semibold text-[var(--ink)]">日志</h3>
+          <h3 className="text-lg font-semibold text-[var(--ink)]">反馈</h3>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setFeedbackOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg floating-subsurface px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:brightness-105 transition"
-            >
-              <MessageSquareWarning size={13} />
-              提交诊断
-            </button>
             <button
               onClick={exportRecent}
               disabled={exporting || traces.length === 0}
               className="inline-flex items-center gap-1.5 rounded-lg floating-subsurface px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:brightness-105 disabled:opacity-40 transition"
             >
               {exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
-              导出最近记录
+              导出记录
+            </button>
+            <button
+              onClick={() => setFeedbackOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--ink)] px-3 py-1.5 text-xs font-medium text-white hover:brightness-110 transition"
+            >
+              <MessageSquareWarning size={13} />
+              反馈问题
             </button>
           </div>
         </div>
-        <p className="text-sm text-[var(--ink-soft)] mt-1">每条请求的完整执行链路记录，包含模型调用、工具执行、权限审批、异常等</p>
+        <p className="text-sm text-[var(--ink-soft)] mt-1">
+          这里可以看到你近期让小蓝鲸做过的事，也能直接反馈问题。反馈时我们会自动带上相关记录，方便排查。
+        </p>
+        <div className="mt-2 flex items-center gap-1.5 text-xs text-[var(--ink-soft)]">
+          <Shield size={12} />
+          <span>记录默认只保存在本机，反馈前会让你确认是否附带对话和文件摘要</span>
+        </div>
         {notice && <p className="text-xs text-[var(--ink-soft)] mt-2">{notice}</p>}
       </header>
-
-
 
       {feedbackOpen && (
         <FeedbackForm
@@ -97,41 +102,28 @@ export function DiagnosticsSection() {
           onClose={() => setFeedbackOpen(false)}
           onCreated={(ticket) => {
             setFeedbackList((items) => [ticket, ...items])
-            setNotice(`反馈已生成：${ticket.feedbackId}`)
+            setNotice(`反馈已提交，编号 ${ticket.feedbackId}`)
           }}
         />
       )}
 
-      <div className="mb-4 rounded-xl floating-subsurface px-4 py-3">
-        <div className="mb-2 text-xs font-semibold text-[var(--ink-soft)]">按编号查询</div>
-        <div className="flex gap-2">
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') searchById() }}
-            placeholder="输入反馈编号、任务编号或记录编号"
-            className="h-9 flex-1 rounded-lg bg-black/[0.04] px-3 text-sm text-[var(--ink)] outline-none"
-          />
-          <button onClick={searchById} className="rounded-lg bg-[var(--ink)] px-4 text-xs font-medium text-white hover:brightness-110 transition">
-            查询
-          </button>
-        </div>
-      </div>
-
-      {overview && <DiagnosticsOverviewPanel overview={overview} />}
-
       {feedbackList.length > 0 && (
         <div className="mb-4 rounded-xl floating-subsurface px-4 py-3">
-          <div className="mb-2 text-xs font-semibold text-[var(--ink-soft)]">最近反馈</div>
-          <div className="space-y-1">
-            {feedbackList.slice(0, 3).map((ticket) => (
-              <div key={ticket.feedbackId} className="flex items-center gap-2 text-xs text-[var(--ink-soft)]">
+          <div className="mb-2 text-xs font-semibold text-[var(--ink-soft)]">反馈记录</div>
+          <div className="space-y-2">
+            {feedbackList.slice(0, 5).map((ticket) => (
+              <div key={ticket.feedbackId} className="flex items-center gap-2 text-xs">
                 <span className="font-mono text-[var(--ink)]">{ticket.feedbackId}</span>
-                <span>{ticket.category}</span>
-                {ticket.traceId && <span>关联记录 {shortId(ticket.traceId)}</span>}
-                {ticket.packagePath && (
-                  <button onClick={() => void api.openPath(ticket.packagePath!)} className="ml-auto text-[var(--ink)] hover:underline">
-                    打开诊断文件
+                <span className="text-[var(--ink-soft)]">{ticket.category}</span>
+                <span className="ml-auto text-[var(--ink-soft)]">
+                  {new Date(ticket.createdAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                </span>
+                {ticket.traceId && (
+                  <button
+                    onClick={() => setSelectedId(ticket.traceId!)}
+                    className="text-[var(--ink)] hover:underline"
+                  >
+                    查看关联任务
                   </button>
                 )}
               </div>
@@ -140,12 +132,52 @@ export function DiagnosticsSection() {
         </div>
       )}
 
+      {overview && (
+        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <MetricCard label="已完成" value={String(completedCount)} />
+          <MetricCard label="失败" value={String(failedCount)} tone={failedCount > 0 ? 'warn' : undefined} />
+          <MetricCard label="进行中" value={String(overview.running)} />
+          <MetricCard label="已取消" value={String(overview.cancelled)} />
+        </div>
+      )}
+
+      <div className="mb-4 rounded-xl floating-subsurface px-4 py-3">
+        <button
+          onClick={() => setShowAdvanced((v) => !v)}
+          className="flex items-center gap-1.5 text-xs font-medium text-[var(--ink-soft)] hover:text-[var(--ink)] transition"
+        >
+          <Wrench size={13} />
+          {showAdvanced ? '收起高级排查' : '高级排查'}
+          <ChevronRight size={13} className={`transition-transform ${showAdvanced ? 'rotate-90' : ''}`} />
+        </button>
+        {showAdvanced && (
+          <div className="mt-3 pt-3 border-t border-black/[0.08]">
+            <div className="mb-2 text-xs font-semibold text-[var(--ink-soft)]">按编号查询</div>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--ink-soft)]" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') searchById() }}
+                  placeholder="输入反馈编号、任务编号或记录编号"
+                  className="h-9 w-full rounded-lg bg-black/[0.04] pl-8 pr-3 text-sm text-[var(--ink)] outline-none"
+                />
+              </div>
+              <button onClick={searchById} className="rounded-lg bg-[var(--ink)] px-4 text-xs font-medium text-white hover:brightness-110 transition">
+                查询
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-[var(--ink-soft)] py-8 justify-center">
           <Loader2 size={14} className="animate-spin" /> 加载中…
         </div>
       ) : traces.length === 0 ? (
-        <div className="text-sm text-[var(--ink-soft)] py-8 text-center">还没有日志记录，发起一次任务后即可查看</div>
+        <div className="text-sm text-[var(--ink-soft)] py-8 text-center">还没有使用记录，发起一次任务后即可查看</div>
       ) : (
         <div className="space-y-1.5">
           {traces.map((t) => (
@@ -160,17 +192,13 @@ export function DiagnosticsSection() {
                 <ChevronRight size={14} className="text-[var(--ink-soft)] flex-shrink-0" />
               </div>
               <div className="flex items-center gap-3 mt-1 text-[11px] text-[var(--ink-soft)]">
-                <span>{t.provider} / {t.model}</span>
-                <span>·</span>
-                <span>记录 {shortId(t.traceId)}</span>
-                <span>·</span>
                 <span>{new Date(t.startedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                 <span>·</span>
-                <span>{t.eventCount} 事件</span>
+                <span>{statusText(t.status)}</span>
                 {t.finishedAt && (
                   <>
                     <span>·</span>
-                    <span>{Math.round((t.finishedAt - t.startedAt) / 1000)}s</span>
+                    <span>耗时 {Math.round((t.finishedAt - t.startedAt) / 1000)}s</span>
                   </>
                 )}
               </div>
@@ -182,12 +210,25 @@ export function DiagnosticsSection() {
   )
 }
 
+function statusText(status: string): string {
+  switch (status) {
+    case 'completed': return '已完成'
+    case 'failed': return '失败'
+    case 'cancelled': return '已取消'
+    case 'running': return '进行中'
+    default: return status
+  }
+}
+
 function TraceDetail({ traceId, onBack }: { traceId: string; onBack: () => void }) {
   const [detail, setDetail] = useState<{ meta: TraceMeta | null; events: TraceEvent[] } | null>(null)
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
   const [notice, setNotice] = useState('')
   const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [replay, setReplay] = useState<ReplayBundle | null>(null)
+  const [includeReplayConversation, setIncludeReplayConversation] = useState(false)
+  const [includeReplayFileSummary, setIncludeReplayFileSummary] = useState(false)
 
   useEffect(() => {
     void (async () => {
@@ -203,13 +244,13 @@ function TraceDetail({ traceId, onBack }: { traceId: string; onBack: () => void 
   if (loading) {
     return (
       <div className="flex items-center gap-2 text-sm text-[var(--ink-soft)] py-8 justify-center">
-        <Loader2 size={14} className="animate-spin" /> 加载日志…
+        <Loader2 size={14} className="animate-spin" /> 加载中…
       </div>
     )
   }
 
   if (!detail || !detail.meta) {
-    return <div className="text-sm text-[var(--ink-soft)] py-8 text-center">日志不存在</div>
+    return <div className="text-sm text-[var(--ink-soft)] py-8 text-center">记录不存在</div>
   }
 
   const phases = new Set(detail.events.map((e) => e.phase))
@@ -258,10 +299,10 @@ function TraceDetail({ traceId, onBack }: { traceId: string; onBack: () => void 
         <div className="flex items-center gap-2">
           <button
             onClick={() => setFeedbackOpen(true)}
-            className="inline-flex items-center gap-1.5 rounded-lg floating-subsurface px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:brightness-105 transition"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--ink)] px-3 py-1.5 text-xs font-medium text-white hover:brightness-110 transition"
           >
             <MessageSquareWarning size={13} />
-            反馈问题
+            反馈这次任务
           </button>
           <button
             onClick={exportCurrent}
@@ -269,7 +310,7 @@ function TraceDetail({ traceId, onBack }: { traceId: string; onBack: () => void 
             className="inline-flex items-center gap-1.5 rounded-lg floating-subsurface px-3 py-1.5 text-xs font-medium text-[var(--ink)] hover:brightness-105 disabled:opacity-40 transition"
           >
             {exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
-            导出这次记录
+            导出记录
           </button>
         </div>
       </div>
@@ -280,7 +321,7 @@ function TraceDetail({ traceId, onBack }: { traceId: string; onBack: () => void 
           traceId={traceId}
           onClose={() => setFeedbackOpen(false)}
           onCreated={(ticket) => {
-            setNotice(`反馈已生成：${ticket.feedbackId}`)
+            setNotice(`反馈已提交，编号 ${ticket.feedbackId}`)
             setFeedbackOpen(false)
           }}
         />
@@ -293,18 +334,14 @@ function TraceDetail({ traceId, onBack }: { traceId: string; onBack: () => void 
           <span className="text-sm font-medium text-[var(--ink)]">{detail.meta.message || '(无消息)'}</span>
         </div>
         <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs mt-2">
-          <InfoRow label="记录编号" value={shortId(detail.meta.traceId)} />
-          <InfoRow label="对话编号" value={shortId(detail.meta.sessionId || detail.meta.taskId)} />
+          <InfoRow label="状态" value={statusText(detail.meta.status)} />
           <InfoRow label="模型" value={`${detail.meta.provider} / ${detail.meta.model}`} />
-          <InfoRow label="模式" value={detail.meta.mode} />
-          <InfoRow label="状态" value={detail.meta.status} />
-          <InfoRow label="事件数" value={String(detail.meta.eventCount)} />
-          <InfoRow label="开始" value={new Date(detail.meta.startedAt).toLocaleString('zh-CN')} />
+          <InfoRow label="开始时间" value={new Date(detail.meta.startedAt).toLocaleString('zh-CN')} />
           {detail.meta.finishedAt && <InfoRow label="耗时" value={`${Math.round((detail.meta.finishedAt - detail.meta.startedAt) / 1000)}s`} />}
-          <InfoRow label="阶段" value={Array.from(phases).join(' → ')} />
+          <InfoRow label="任务模式" value={detail.meta.mode} />
         </div>
         {errors.length > 0 && (
-          <div className="text-xs text-red-500 mt-2">⚠ {errors.length} 个异常</div>
+          <div className="text-xs text-red-500 mt-2">⚠ 这次任务发生了 {errors.length} 个异常</div>
         )}
       </div>
 
@@ -327,7 +364,7 @@ function TraceDetail({ traceId, onBack }: { traceId: string; onBack: () => void 
       )}
 
       {/* 时间线 */}
-      <div className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-soft)] mb-2">执行时间线</div>
+      <div className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-soft)] mb-2">执行过程</div>
       <div className="space-y-1">
         {detail.events.map((ev, i) => (
           <TimelineEvent key={i} event={ev} startTime={detail.meta!.startedAt} />
@@ -377,12 +414,6 @@ function TimelineEvent({ event, startTime }: { event: TraceEvent; startTime: num
             <span className="text-xs font-medium text-[var(--ink)]">{summary.title}</span>
             {summary.badge && <span className="text-[10px] text-[var(--ink-soft)]">{summary.badge}</span>}
           </div>
-          {(event.stepId || event.parentStepId) && (
-            <div className="ml-20 mt-0.5 text-[10px] text-[var(--ink-soft)]">
-              {event.stepId && <span>步骤 {shortId(event.stepId)}</span>}
-              {event.parentStepId && <span className="ml-2">上级 {shortId(event.parentStepId)}</span>}
-            </div>
-          )}
         </button>
         {expanded && summary.detail && (
           <pre className="text-[11px] text-[var(--ink-soft)] bg-black/[0.04] rounded-lg p-2 mt-1 ml-14 overflow-x-auto max-h-48 whitespace-pre-wrap break-all">
@@ -398,7 +429,7 @@ function getEventSummary(event: TraceEvent): { title: string; badge?: string; de
   const d = event.data
   switch (event.type) {
     case 'task_started':
-      return { title: '任务发起', badge: String(d.mode || ''), detail: JSON.stringify(d, null, 2), expandable: true }
+      return { title: '任务开始', badge: String(d.mode || ''), detail: JSON.stringify(d, null, 2), expandable: true }
     case 'turn_started':
       return { title: '新一轮开始', badge: String(d.turnId || ''), expandable: false }
     case 'turn_completed':
@@ -408,21 +439,21 @@ function getEventSummary(event: TraceEvent): { title: string; badge?: string; de
     case 'item_completed':
       return itemSummary(d.item as ItemLike, '完成')
     case 'item_delta':
-      return { title: '流式增量', badge: String((d.target as { field?: string })?.field || ''), expandable: false }
+      return { title: '流式输出', badge: String((d.target as { field?: string })?.field || ''), expandable: false }
     case 'approval_request':
-      return { title: `权限审批: ${d.toolName}`, badge: String(d.riskLevel || ''), detail: JSON.stringify({ impact: d.impact, args: d.args }, null, 2), expandable: true }
+      return { title: `请求确认: ${d.toolName}`, badge: String(d.riskLevel || ''), detail: JSON.stringify({ impact: d.impact, args: d.args }, null, 2), expandable: true }
     case 'approval_response':
-      return { title: `用户${d.approved ? '批准' : '拒绝'}`, expandable: false }
+      return { title: `用户${d.approved ? '允许' : '拒绝'}`, expandable: false }
     case 'plan_proposed':
-      return { title: '计划提案', detail: String(d.plan || ''), expandable: true }
+      return { title: '提出计划', detail: String(d.plan || ''), expandable: true }
     case 'plan_response':
       return { title: `计划决策: ${d.decision}`, detail: String(d.feedback || ''), expandable: Boolean(d.feedback) }
     case 'question_proposed':
-      return { title: '需要用户补充信息', detail: String(d.question || ''), expandable: true }
+      return { title: '需要补充信息', detail: String(d.question || ''), expandable: true }
     case 'question_response':
       return { title: '用户已补充信息', detail: String(d.customAnswer || ''), expandable: Boolean(d.customAnswer) }
     case 'todo_update':
-      return { title: 'Todo 更新', badge: `${(d.todos as unknown[])?.length || 0} 项`, detail: JSON.stringify(d.todos, null, 2), expandable: true }
+      return { title: '待办更新', badge: `${(d.todos as unknown[])?.length || 0} 项`, detail: JSON.stringify(d.todos, null, 2), expandable: true }
     case 'subtask_started':
       return { title: `子任务开始: ${d.title}`, expandable: false }
     case 'subtask_completed':
@@ -430,7 +461,7 @@ function getEventSummary(event: TraceEvent): { title: string; badge?: string; de
     case 'subtask_failed':
       return { title: `子任务失败: ${d.title}`, detail: String(d.error || ''), expandable: true }
     case 'usage':
-      return { title: 'Token 用量', badge: `↑${d.inputTokens} ↓${d.outputTokens}`, expandable: false }
+      return { title: '用量', badge: `↑${d.inputTokens} ↓${d.outputTokens}`, expandable: false }
     case 'artifact':
       return { title: `产物: ${d.artifactType}`, expandable: false }
     case 'error':
@@ -447,6 +478,8 @@ function getEventSummary(event: TraceEvent): { title: string; badge?: string; de
       return { title: '用户请求回滚', expandable: false }
     case 'append_input':
       return { title: '追加输入', detail: String(d.message || ''), expandable: true }
+    case 'feedback_submitted':
+      return { title: `已提交反馈 ${d.feedbackId || ''}`, expandable: false }
     default:
       return { title: event.type, detail: JSON.stringify(d, null, 2), expandable: true }
   }
@@ -471,18 +504,18 @@ function itemSummary(item: ItemLike | undefined, phase: string): { title: string
     case 'agentMessage':
       return { title: phase === '完成' ? `回复：${(item.text || '').slice(0, 40)}` : '回复生成中', expandable: phase === '完成' }
     case 'reasoning':
-      return { title: `思考${phase}`, expandable: false }
+      return { title: '思考中', expandable: false }
     case 'toolCall':
       return {
-        title: `工具 ${phase}: ${item.toolName || ''}`,
+        title: `执行工具: ${item.toolName || ''}`,
         badge: item.status,
         detail: item.resultSummary || item.error,
         expandable: Boolean(item.resultSummary || item.error)
       }
     case 'plan':
-      return { title: '计划提案', expandable: false }
+      return { title: '计划', expandable: false }
     case 'approval':
-      return { title: '审批请求', badge: item.status, expandable: false }
+      return { title: '等待确认', badge: item.status, expandable: false }
     default:
       return { title: `${item.type}${phase}`, expandable: false }
   }
@@ -530,16 +563,16 @@ function FeedbackForm({
       if (result.packagePath) void api.openPath(result.packagePath)
       return
     }
-    setError(result.error || '反馈生成失败，请重试')
+    setError(result.error || '反馈提交失败，请重试')
   }
 
   return (
     <div className="mb-4 rounded-xl floating-subsurface px-4 py-3">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <div className="text-sm font-semibold text-[var(--ink)]">提交诊断</div>
+          <div className="text-sm font-semibold text-[var(--ink)]">反馈问题</div>
           <div className="text-xs text-[var(--ink-soft)]">
-            {traceId ? `将自动关联记录 ${shortId(traceId)}` : '将自动关联最近一次任务'}
+            {traceId ? '将自动关联这次任务' : '将自动关联最近一次任务'}
           </div>
         </div>
         <button onClick={onClose} className="text-xs text-[var(--ink-soft)] hover:text-[var(--ink)]">取消</button>
@@ -576,11 +609,11 @@ function FeedbackForm({
         </label>
 
         <div className="rounded-lg bg-black/[0.03] p-3">
-          <div className="mb-2 text-xs font-semibold text-[var(--ink)]">诊断包范围</div>
+          <div className="mb-2 text-xs font-semibold text-[var(--ink)]">附带诊断信息</div>
           <div className="grid gap-2 text-xs text-[var(--ink-soft)]">
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={allowDiagnosticPackage} onChange={(e) => setAllowDiagnosticPackage(e.target.checked)} />
-              允许生成诊断包
+              允许附带任务执行信息，帮助我们排查
             </label>
             <select
               value={packageLevel}
@@ -588,17 +621,17 @@ function FeedbackForm({
               onChange={(e) => setPackageLevel(e.target.value as DiagnosticPackageLevel)}
               className="h-9 rounded-lg bg-white/60 px-3 text-sm text-[var(--ink)] outline-none disabled:opacity-50"
             >
-              <option value="basic">基础：只包含任务摘要、错误和环境信息</option>
-              <option value="enhanced">增强：包含执行步骤和工具摘要</option>
-              <option value="full">完整：包含更完整的本地记录</option>
+              <option value="basic">基础：任务摘要、错误和环境信息</option>
+              <option value="enhanced">增强：加上执行步骤和工具摘要</option>
+              <option value="full">完整：更完整的本地记录</option>
             </select>
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={includeConversation} disabled={!allowDiagnosticPackage} onChange={(e) => setIncludeConversation(e.target.checked)} />
-              允许包含对话内容
+              附带对话内容
             </label>
             <label className="flex items-center gap-2">
               <input type="checkbox" checked={includeFileSummary} disabled={!allowDiagnosticPackage} onChange={(e) => setIncludeFileSummary(e.target.checked)} />
-              允许包含文件摘要
+              附带文件摘要
             </label>
           </div>
         </div>
@@ -611,46 +644,10 @@ function FeedbackForm({
             className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--ink)] px-4 py-2 text-xs font-medium text-white hover:brightness-110 disabled:opacity-50 transition"
           >
             {submitting && <Loader2 size={13} className="animate-spin" />}
-            生成反馈编号
+            提交反馈
           </button>
         </div>
       </div>
-    </div>
-  )
-}
-
-function DiagnosticsOverviewPanel({ overview }: { overview: DiagnosticsOverview }) {
-  return (
-    <div className="mb-4 space-y-3">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-        <MetricCard label="任务总数" value={String(overview.total)} />
-        <MetricCard label="成功" value={String(overview.completed)} />
-        <MetricCard label="失败" value={String(overview.failed)} tone={overview.failed > 0 ? 'warn' : undefined} />
-        <MetricCard label="取消" value={String(overview.cancelled)} />
-        <MetricCard label="失败率" value={`${overview.failureRate}%`} tone={overview.failureRate > 10 ? 'warn' : undefined} />
-      </div>
-
-      <div className="grid gap-3 lg:grid-cols-3">
-        <RankPanel title="失败原因" empty="暂无失败记录" items={overview.failureCategories.map((item) => ({
-          label: item.category,
-          value: `${item.count} 次`
-        }))} />
-        <RankPanel title="模型稳定性和消耗" empty="暂无模型记录" items={overview.models.slice(0, 5).map((item) => ({
-          label: item.name,
-          value: `${item.total} 次 / 失败 ${item.failed} / ${item.inputTokens + item.outputTokens} 字量`
-        }))} />
-        <RankPanel title="工具成功率" empty="暂无工具记录" items={overview.tools.slice(0, 5).map((item) => ({
-          label: item.name,
-          value: `${item.total - item.failed}/${item.total} 成功`
-        }))} />
-      </div>
-
-      {overview.versions.length > 0 && (
-        <RankPanel title="版本对比" empty="暂无版本记录" items={overview.versions.slice(0, 3).map((item) => ({
-          label: item.name,
-          value: `${item.total} 次 / 失败 ${item.failed}`
-        }))} />
-      )}
     </div>
   )
 }
@@ -677,7 +674,7 @@ function ReplayPanel({
     <div className="mb-4 rounded-xl glass-soft px-4 py-3">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="text-sm font-semibold text-[var(--ink)]">场景回放</div>
+          <div className="text-sm font-semibold text-[var(--ink)]">场景还原</div>
           <div className="text-xs text-[var(--ink-soft)]">按时间还原用户输入、模型、工具、审批和异常</div>
         </div>
         <button
@@ -702,7 +699,7 @@ function ReplayPanel({
       </div>
 
       {visibleSteps.length === 0 ? (
-        <div className="text-xs text-[var(--ink-soft)]">暂无可回放步骤</div>
+        <div className="text-xs text-[var(--ink-soft)]">暂无可还原步骤</div>
       ) : (
         <div className="space-y-2">
           {visibleSteps.map((step, index) => (
@@ -746,26 +743,6 @@ function MetricCard({ label, value, tone }: { label: string; value: string; tone
     <div className="rounded-xl floating-subsurface px-3 py-2">
       <div className="text-[11px] text-[var(--ink-soft)]">{label}</div>
       <div className={`mt-1 text-lg font-semibold ${tone === 'warn' ? 'text-red-500' : 'text-[var(--ink)]'}`}>{value}</div>
-    </div>
-  )
-}
-
-function RankPanel({ title, empty, items }: { title: string; empty: string; items: Array<{ label: string; value: string }> }) {
-  return (
-    <div className="rounded-xl floating-subsurface px-4 py-3">
-      <div className="mb-2 text-xs font-semibold text-[var(--ink-soft)]">{title}</div>
-      {items.length === 0 ? (
-        <div className="text-xs text-[var(--ink-soft)]">{empty}</div>
-      ) : (
-        <div className="space-y-2">
-          {items.map((item) => (
-            <div key={`${title}-${item.label}`} className="flex items-start justify-between gap-3 text-xs">
-              <span className="min-w-0 flex-1 truncate text-[var(--ink)]">{item.label}</span>
-              <span className="shrink-0 text-[var(--ink-soft)]">{item.value}</span>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   )
 }
