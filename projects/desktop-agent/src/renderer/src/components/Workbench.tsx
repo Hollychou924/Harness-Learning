@@ -14,6 +14,8 @@ import { useDeferredRender } from './useDeferredRender'
 import { ChevronUp, PanelRightOpen } from 'lucide-react'
 import type { Item, Turn, UserMessageContent } from '../../../agent/src/items'
 import { WhaleTooltip } from './WhaleTooltip'
+// @ts-ignore - 静态图片类型声明待补齐
+import xiaolanjingIcon from '../assets/xiaolanjing-icon.png'
 
 export function Workbench({
   rightCollapsed = false,
@@ -94,7 +96,12 @@ function HomeView({ greeting }: { greeting: string }) {
     <div className="flex flex-col items-center justify-center min-h-full px-6 py-10">
       {/* 欢迎语 */}
       <div className="text-center mb-8 select-none">
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-400 to-indigo-500 mx-auto mb-4 shadow-lg shadow-sky-200" />
+        <img
+          src={xiaolanjingIcon}
+          alt="小蓝鲸"
+          className="w-14 h-14 rounded-2xl mx-auto mb-4"
+          draggable={false}
+        />
         <h1 className="text-2xl font-semibold tracking-tight">{greeting}</h1>
         <p className="text-sm text-[var(--ink-soft)] mt-1.5">你的桌面生产力 Agent</p>
       </div>

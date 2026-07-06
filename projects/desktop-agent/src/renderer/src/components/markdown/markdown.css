@@ -372,3 +372,61 @@
   color: var(--ink-soft);
   flex-shrink: 0;
 }
+
+:root[data-theme="dark"] .md-engine :not(pre) > code {
+  background: rgba(56, 189, 248, 0.14);
+}
+
+:root[data-theme="dark"] .md-engine thead {
+  background: rgba(148, 163, 184, 0.1);
+}
+
+:root[data-theme="dark"] .md-engine th {
+  border-bottom-color: var(--line-strong);
+}
+
+:root[data-theme="dark"] .md-engine td {
+  border-bottom-color: var(--line);
+}
+
+:root[data-theme="dark"] .md-engine tbody tr:hover {
+  background: var(--control-bg);
+}
+
+:root[data-theme="dark"] .md-engine blockquote {
+  background: rgba(56, 189, 248, 0.1);
+}
+
+:root[data-theme="dark"] .md-engine hr {
+  border-top-color: var(--line);
+}
+
+:root[data-theme="dark"] .md-engine .table-wrapper,
+:root[data-theme="dark"] .md-source-card {
+  border-color: var(--line);
+}
+
+:root[data-theme="dark"] .md-source-card {
+  background: var(--control-bg);
+}
+
+:root[data-theme="dark"] .md-source-card:hover {
+  background: var(--control-hover);
+}
+
+:root[data-theme="dark"] .md-source-card .md-source-favicon-placeholder {
+  background: var(--control-hover);
+}
+
+:root[data-theme="dark"] .md-mermaid-wrapper {
+  background: var(--floating-sub-bg);
+  border-color: var(--line);
+}
+
+:root[data-theme="dark"] .md-mermaid svg {
+  filter: saturate(0.86) brightness(0.92);
+}
+
+:root[data-theme="dark"] .md-mermaid-fullscreen {
+  background: rgba(2, 6, 23, 0.92);
+}
