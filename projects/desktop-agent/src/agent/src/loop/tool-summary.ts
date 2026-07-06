@@ -16,7 +16,7 @@ export function summarizeToolResult(toolName: string, args: Record<string, unkno
   switch (toolName) {
     case 'fetch_page':
     case 'parse_page': {
-      const text = typeof obj.text === 'string' ? obj.text : ''
+      const text = typeof obj.text === 'string' ? obj.text : typeof obj.content === 'string' ? obj.content : ''
       const title = typeof obj.title === 'string' ? obj.title : ''
       if (title) return `已读取「${title}」，共 ${text.length} 字`
       return text ? `已读取网页，共 ${text.length} 字` : '已读取网页'
@@ -26,7 +26,7 @@ export function summarizeToolResult(toolName: string, args: Record<string, unkno
       return `已检索到 ${items.length} 个文件`
     }
     case 'read_file': {
-      const text = typeof obj.text === 'string' ? obj.text : ''
+      const text = typeof obj.text === 'string' ? obj.text : typeof obj.content === 'string' ? obj.content : ''
       const lines = text ? text.split('\n').length : 0
       const path = typeof args.path === 'string' ? args.path.split('/').pop() : ''
       return path ? `已读取 ${path}，共 ${lines} 行` : `已读取文件，共 ${lines} 行`
@@ -38,12 +38,19 @@ export function summarizeToolResult(toolName: string, args: Record<string, unkno
       return path ? `已写入 ${path}，共 ${lines} 行` : `已写入文件，共 ${lines} 行`
     }
     case 'create_docx':
-      return '已生成 Word 文档'
-    case 'create_xlsx':
-      return '已生成 Excel 表格'
+    case 'create_xlsx': {
+      const fallback = toolName === 'create_docx' ? '文档' : '表格'
+      const path = typeof args.path === 'string' ? args.path.split('/').pop() || fallback : fallback
+      const added = typeof obj.addedChars === 'number' ? obj.addedChars : 0
+      const deleted = typeof obj.deletedChars === 'number' ? obj.deletedChars : 0
+      return `已创建：${path} +${added} -${deleted}`
+    }
     case 'shell': {
       const status = typeof obj.exitCode === 'number' ? obj.exitCode : null
-      return status === 0 || status === null ? '命令执行成功' : `命令退出码 ${status}`
+      const stdout = typeof obj.stdout === 'string' ? obj.stdout : ''
+      const stderr = typeof obj.stderr === 'string' ? obj.stderr : ''
+      const outputLines = (stdout || stderr) ? `${(stdout + stderr).split('\n').filter(Boolean).length} 行输出` : '无输出'
+      return status === 0 || status === null ? `命令执行成功，${outputLines}` : `命令退出码 ${status}，${outputLines}`
     }
     default:
       return '已完成'

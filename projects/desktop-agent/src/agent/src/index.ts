@@ -2,13 +2,30 @@ import { createInterface } from 'node:readline'
 import type { StdinMessage, StdoutMessage, AgentMessage } from './protocol.js'
 import { send } from './protocol.js'
 import { runReact } from './loop/react.js'
-import { resolveApproval } from './approval.js'
+import { clearTaskApprovalMemory, resolveApproval } from './approval.js'
+import { resolveQuestion, resolveContinuation } from './question.js'
+import { resolvePlanResponse } from './tools/plan.js'
 
 // Agent 子进程入口：读 stdin JSON Lines，写 stdout JSON Lines
 // 不依赖任何 Electron API（依据 docs/03 第四章进程边界）
 const rl = createInterface({ input: process.stdin })
 
 const sessionHistory = new Map<string, AgentMessage[]>()
+const appendInputQueues = new Map<string, string[]>()
+
+function enqueueAppendInput(taskId: string, message: string): void {
+  const text = message.trim()
+  if (!text) return
+  const queue = appendInputQueues.get(taskId) || []
+  queue.push(text)
+  appendInputQueues.set(taskId, queue)
+}
+
+function consumeAppendInputs(taskId: string): string[] {
+  const queue = appendInputQueues.get(taskId) || []
+  appendInputQueues.delete(taskId)
+  return queue
+}
 
 rl.on('line', (line) => {
   if (!line.trim()) return
@@ -40,9 +57,12 @@ async function handleStdin(msg: StdinMessage): Promise<void> {
         workspace_dir,
         'work',
         session_id,
-        attachments
+        attachments,
+        () => consumeAppendInputs(session_id)
       )
       sessionHistory.set(session_id, result.messages.slice(1))
+      appendInputQueues.delete(session_id)
+      clearTaskApprovalMemory(session_id)
 
       // 产出报告产物
       onEvent({
@@ -51,11 +71,13 @@ async function handleStdin(msg: StdinMessage): Promise<void> {
         file_path: 'inline'
       })
 
-      onEvent({ type: 'completed', task_id: session_id, summary: result.finalText })
+      onEvent({ type: 'completed', task_id: session_id, summary: result.finalText, messages: result.messages.slice(1) })
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e)
       onEvent({ type: 'error', message: errMsg })
       onEvent({ type: 'completed', task_id: session_id, summary: `任务失败：${errMsg}` })
+      appendInputQueues.delete(session_id)
+      clearTaskApprovalMemory(session_id)
     }
     return
   }
@@ -67,12 +89,32 @@ async function handleStdin(msg: StdinMessage): Promise<void> {
   }
 
   if (msg.type === 'approval_response') {
-    resolveApproval(msg.request_id, msg.approved)
+    resolveApproval(msg.request_id, msg.approved, msg.scope)
+    return
+  }
+
+  if (msg.type === 'question_response') {
+    resolveQuestion(msg.request_id, {
+      selectedOptionIds: msg.selected_option_ids,
+      customAnswer: msg.custom_answer,
+      skipped: msg.skipped
+    })
+    return
+  }
+
+  if (msg.type === 'plan_response') {
+    resolvePlanResponse(msg.request_id, msg.decision, msg.feedback)
     return
   }
 
   if (msg.type === 'append_input') {
-    send({ type: 'status', status: 'INFO', message: '追加输入已收到，一期暂不支持任务中追加' })
+    enqueueAppendInput(msg.task_id, msg.message)
+    send({ type: 'status', status: 'INFO', message: '补充要求已收到，正在并入当前任务' })
+    return
+  }
+
+  if (msg.type === 'continuation_response') {
+    resolveContinuation(msg.task_id, msg.decision)
     return
   }
 }

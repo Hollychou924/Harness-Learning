@@ -39,9 +39,13 @@ export function DurationBreakdown({ turn }: { turn: Turn }) {
         {segments.map((s, i) => (
           <div
             key={i}
+            className="relative group/duration"
             style={{ width: `${(s.ms / totalMs) * 100}%`, background: s.color }}
-            title={`${s.label} ${formatMs(s.ms)}`}
-          />
+          >
+            <span className="pointer-events-none absolute bottom-full left-1/2 z-[9999] mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md floating-tooltip px-2 py-1 text-[11px] font-medium leading-none text-white opacity-0 transition-opacity duration-150 group-hover/duration:opacity-100">
+              {s.label} {formatMs(s.ms)}
+            </span>
+          </div>
         ))}
       </div>
       <span className="font-mono">{formatMs(totalMs)}</span>

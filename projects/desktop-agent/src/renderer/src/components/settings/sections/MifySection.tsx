@@ -1,4 +1,4 @@
-import { useSettingsStore, MIFY_PROVIDER_ID_CHIPS, MIFY_PROVIDER_MODELS } from '../settingsStore'
+import { useSettingsStore, MIFY_PROVIDER_ID_CHIPS, getMifyModelIds } from '../settingsStore'
 
 export function MifySection() {
   const { modelConfig } = useSettingsStore()
@@ -13,7 +13,7 @@ export function MifySection() {
       </header>
 
       <div className="space-y-4">
-        <div className="glass-soft rounded-xl px-4 py-3">
+        <div className="floating-subsurface rounded-xl px-4 py-3">
           <div className="flex items-center gap-2">
             <span className={`w-2 h-2 rounded-full ${isMifyActive ? 'bg-green-500' : 'bg-gray-300'}`} />
             <span className="text-sm font-medium text-[var(--ink)]">
@@ -37,9 +37,9 @@ export function MifySection() {
           <label className="text-xs font-semibold uppercase tracking-wide text-[var(--ink-soft)]">可用路由供应商</label>
           <div className="grid grid-cols-2 gap-2 mt-2">
             {MIFY_PROVIDER_ID_CHIPS.map((chip) => {
-              const models = MIFY_PROVIDER_MODELS[chip.id] || []
+              const models = getMifyModelIds(chip.id)
               return (
-                <div key={chip.id} className="glass-soft rounded-xl px-3 py-2.5">
+                <div key={chip.id} className="floating-subsurface rounded-xl px-3 py-2.5">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-[var(--ink)]">{chip.label}</span>
                     {currentRoute === chip.id && (

@@ -8,6 +8,8 @@ import { listFilesTool } from './list_files.js'
 import { readFileTool } from './read_file.js'
 import { createDocxTool } from './create_docx.js'
 import { createXlsxTool } from './create_xlsx.js'
+import { shellTool } from './shell.js'
+import { questionTool } from './question.js'
 
 export interface AgentTool {
   name: string
@@ -22,7 +24,8 @@ export const SAFE_TOOLS = new Set<string>([
   'fetch_page',
   'parse_page',
   'list_files',
-  'read_file'
+  'read_file',
+  'ask_question'
 ])
 
 // BLOCKED 黑名单：Shell 危险命令正则（依据 docs/05 第二章），一期 Work 不启用 shell 工具
@@ -58,12 +61,14 @@ export async function getAvailableTools(workspaceDir?: string): Promise<AgentToo
     writeFileTool(workspaceDir),
     createDocxTool(workspaceDir),
     createXlsxTool(workspaceDir),
+    shellTool(),
+    questionTool,
     planTool,
     todoTool
   ]
 }
 
-export { fetchPageTool, parsePageTool, writeFileTool, listFilesTool, readFileTool, createDocxTool, createXlsxTool }
+export { fetchPageTool, parsePageTool, writeFileTool, listFilesTool, readFileTool, createDocxTool, createXlsxTool, shellTool, questionTool }
 
 // 导出给 provider 用的 JSON Schema 形式
 export function toolToFunctionSchema(tool: AgentTool) {

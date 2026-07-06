@@ -11,7 +11,7 @@ export function PermissionsSection() {
       </header>
 
       <div className="space-y-5">
-        <div className="glass-soft rounded-xl px-4 py-3.5 flex items-start justify-between gap-4">
+        <div className="floating-subsurface rounded-xl px-4 py-3.5 flex items-start justify-between gap-4">
           <div>
             <div className="text-sm font-medium text-[var(--ink)]">自动批准低风险操作</div>
             <div className="text-xs text-[var(--ink-soft)] mt-1">

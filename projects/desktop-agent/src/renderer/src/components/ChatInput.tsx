@@ -1,16 +1,21 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, ArrowUp, ChevronDown, Check, X, FileText, Image as ImageIcon, Eye, AlertCircle, FolderPlus, FolderInput } from 'lucide-react'
+import { Plus, ArrowUp, ChevronDown, Check, X, FileText, Image as ImageIcon, Eye, AlertCircle, FolderPlus, FolderOpen, Folder, History, AtSign, Target, StopCircle, RefreshCw, Loader2, Hand, ShieldCheck, ShieldAlert } from 'lucide-react'
 import { api, type ModelConfig, type AttachmentFile } from '../api'
-import { useSettingsStore } from './settings/settingsStore'
+import { useSettingsStore, type ApprovalMode } from './settings/settingsStore'
 import { useTaskStore, type Attachment, type Project, DEFAULT_PROJECT_ID } from '../store/task'
 import { PROVIDER_PRESETS, BUILTIN_PROVIDER_ORDER, modelSupportsVision } from './providerPresets'
+import { WhaleTooltip } from './WhaleTooltip'
 
 interface Props {
   value: string
   onChange: (v: string) => void
   onSend: () => void
+  onStop?: () => void
+  isRunning?: boolean
   placeholder?: string
+  /** 是否显示项目归属选择器：仅新对话时为 true，老对话归属已定不显示 */
+  showProjectPicker?: boolean
 }
 
 const PASTE_TEXT_THRESHOLD = 500
@@ -22,6 +27,46 @@ const COMPOSE_GUARD_MS = 120
 const WEIRD_LINE_BREAKS = /\r\n?|[\u2028\u2029]/g
 const WEIRD_DETECT = /\r|[\u2028\u2029]/
 
+function getModelLabel(config: ModelConfig | null): string {
+  if (!config) return '未配置'
+  if (config.providerId === 'custom') return config.displayName || '自定义模型'
+  return PROVIDER_PRESETS[config.providerId]?.label || config.providerId
+}
+
+const APPROVAL_MODE_OPTIONS: Array<{
+  id: ApprovalMode
+  label: string
+  desc: string
+  icon: ReactNode
+  activeClass: string
+  iconClass: string
+}> = [
+  {
+    id: 'always_ask',
+    label: '始终询问',
+    desc: '编辑文件时，每次都向你确认',
+    icon: <Hand size={15} />,
+    activeClass: 'text-[var(--ink-soft)]',
+    iconClass: 'text-[var(--ink-soft)]'
+  },
+  {
+    id: 'risk_only',
+    label: '仅风险询问',
+    desc: '仅在有高风险操作才请求确认',
+    icon: <ShieldCheck size={15} />,
+    activeClass: 'text-[#1f8fff]',
+    iconClass: 'text-[#1f8fff]'
+  },
+  {
+    id: 'auto',
+    label: '全自动执行',
+    desc: '不受限制访问文件',
+    icon: <ShieldAlert size={15} />,
+    activeClass: 'text-[#ff5a1f]',
+    iconClass: 'text-[#ff5a1f]'
+  }
+]
+
 function normalizePastedText(text: string): string {
   return text.replace(WEIRD_LINE_BREAKS, '\n')
 }
@@ -30,18 +75,101 @@ function hasWeirdLineBreaks(text: string): boolean {
   return WEIRD_DETECT.test(text)
 }
 
-export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
+function errorMessageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error || '上传失败')
+}
+
+function attachmentStatusOf(attachment: Attachment): 'ready' | 'uploading' | 'failed' {
+  return attachment.status ?? 'ready'
+}
+
+function attachmentFromPickedFile(file: AttachmentFile, id: string): Attachment {
+  return {
+    id,
+    name: file.name,
+    type: file.type,
+    size: file.size,
+    dataUrl: file.dataUrl,
+    textContent: file.textContent,
+    mime: file.mime,
+    sourcePath: file.sourcePath,
+    status: file.error ? 'failed' : 'ready',
+    error: file.error
+  }
+}
+
+async function attachmentFromBrowserFile(file: File, id: string): Promise<Attachment> {
+  const isImage = file.type.startsWith('image/')
+  const isText = file.type.startsWith('text/') || /\.(txt|md|json|csv|log|ts|js|tsx|jsx|py|go|rs|java|html|css|xml|yaml|yml|sh|sql)$/i.test(file.name)
+
+  try {
+    if (isImage) {
+      const dataUrl = await readFileAsDataURL(file)
+      return {
+        id,
+        name: file.name,
+        type: 'image',
+        size: file.size,
+        dataUrl,
+        mime: file.type,
+        status: 'ready',
+        sourceFile: file
+      }
+    }
+    if (isText) {
+      const textContent = await readFileAsText(file)
+      return {
+        id,
+        name: file.name,
+        type: 'text',
+        size: file.size,
+        textContent,
+        mime: file.type || 'text/plain',
+        status: 'ready',
+        sourceFile: file
+      }
+    }
+    return {
+      id,
+      name: file.name,
+      type: 'file',
+      size: file.size,
+      mime: file.type || 'application/octet-stream',
+      status: 'ready',
+      sourceFile: file
+    }
+  } catch (error) {
+    return {
+      id,
+      name: file.name,
+      type: isImage ? 'image' : isText ? 'text' : 'file',
+      size: file.size,
+      mime: file.type || 'application/octet-stream',
+      status: 'failed',
+      error: errorMessageOf(error),
+      sourceFile: file
+    }
+  }
+}
+
+export function ChatInput({ value, onChange, onSend, onStop, isRunning = false, placeholder, showProjectPicker = false }: Props) {
   const [config, setConfig] = useState<ModelConfig | null>(null)
   const [modelMenuOpen, setModelMenuOpen] = useState(false)
+  const [addMenuOpen, setAddMenuOpen] = useState(false)
+  const [approvalMenuOpen, setApprovalMenuOpen] = useState(false)
   const [menuPos, setMenuPos] = useState<{ left: number; bottom: number } | null>(null)
   const modelBtnRef = useRef<HTMLButtonElement>(null)
+  const addMenuRef = useRef<HTMLDivElement>(null)
+  const addButtonRef = useRef<HTMLButtonElement>(null)
+  const approvalMenuRef = useRef<HTMLDivElement>(null)
+  const approvalButtonRef = useRef<HTMLButtonElement>(null)
   const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null)
-  const { openSettings, modelConfig: storeConfig } = useSettingsStore()
-  const { attachments, setAttachments, projects, activeProjectId, setActiveProject, createProject } = useTaskStore()
+  const { openSettings, modelConfig: storeConfig, approvalMode, saveGeneral, maxIterations, showThinking } = useSettingsStore()
+  const { attachments, setAttachments, projects, activeProjectId, activeSessionId, setActiveProject, createProject } = useTaskStore()
+  const activeProject = projects.find((p) => p.id === activeProjectId)
+  const activeWorkspaceDir = activeProject?.folderPath
   const taRef = useRef<HTMLTextAreaElement>(null)
   const [projectMenuOpen, setProjectMenuOpen] = useState(false)
-  const [newProjectName, setNewProjectName] = useState('')
-  const [creatingProject, setCreatingProject] = useState(false)
 
   // IME 合成态跟踪
   const composingRef = useRef(false)
@@ -71,18 +199,48 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
     if (storeConfig) setConfig(storeConfig)
   }, [storeConfig])
 
+  useEffect(() => {
+    if (!addMenuOpen) return
+    const closeOnOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (addMenuRef.current?.contains(target)) return
+      if (addButtonRef.current?.contains(target)) return
+      setAddMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOnOutsidePointerDown, true)
+    return () => document.removeEventListener('pointerdown', closeOnOutsidePointerDown, true)
+  }, [addMenuOpen])
+
+  useEffect(() => {
+    if (!approvalMenuOpen) return
+    const closeOnOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (approvalMenuRef.current?.contains(target)) return
+      if (approvalButtonRef.current?.contains(target)) return
+      setApprovalMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOnOutsidePointerDown, true)
+    return () => document.removeEventListener('pointerdown', closeOnOutsidePointerDown, true)
+  }, [approvalMenuOpen])
+
   // textarea 自适应高度
   useEffect(() => {
     const ta = taRef.current
     if (!ta) return
     ta.style.height = 'auto'
-    ta.style.height = Math.min(ta.scrollHeight, 160) + 'px'
-  }, [value])
+    const minHeight = showProjectPicker ? 46 : 52
+    ta.style.height = Math.min(Math.max(ta.scrollHeight, minHeight), 180) + 'px'
+  }, [value, showProjectPicker])
 
-  const hasContent = value.trim().length > 0 || attachments.length > 0
-  const modelLabel = config
-    ? PROVIDER_PRESETS[config.providerId]?.label || config.providerId
-    : '未配置'
+  const hasBlockedAttachment = attachments.some((a) => attachmentStatusOf(a) !== 'ready')
+  const readyAttachmentCount = attachments.filter((a) => attachmentStatusOf(a) === 'ready').length
+  const hasContent = !hasBlockedAttachment && (value.trim().length > 0 || readyAttachmentCount > 0)
+  const shouldStop = isRunning && !hasContent && Boolean(onStop)
+  const sendLabel = hasBlockedAttachment ? '请先删除或重试失败附件' : '发送'
+  const modelLabel = getModelLabel(config)
+  const activeApprovalMode = APPROVAL_MODE_OPTIONS.find((option) => option.id === approvalMode) || APPROVAL_MODE_OPTIONS[0]
 
   const currentModelSupportsVision = config
     ? modelSupportsVision(config.providerId, config.model)
@@ -154,7 +312,7 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
   const loadMentionItems = useCallback(async (query: string) => {
     setMentionLoading(true)
     try {
-      const result = await api.workspaceListFiles()
+      const result = await api.workspaceListFiles(activeWorkspaceDir)
       let items = result.items
       if (query) {
         items = items.filter((i) => i.name.toLowerCase().includes(query.toLowerCase()))
@@ -178,21 +336,22 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
 
     // 读取文件内容，作为文本附件注入
     if (item.type === 'file') {
-      const result = await api.workspaceReadFile(item.path)
-      if (result.content) {
-        const newAtt: Attachment = {
-          id: `mention-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          name: item.name,
-          type: 'text',
-          size: item.size,
-          textContent: result.content,
-          mime: 'text/plain'
-        }
-        addAttachments([newAtt])
+      const result = await api.workspaceReadFile(item.path, activeWorkspaceDir)
+      const newAtt: Attachment = {
+        id: `mention-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        name: item.name,
+        type: 'text',
+        size: item.size,
+        textContent: result.content,
+        mime: 'text/plain',
+        sourcePath: activeWorkspaceDir ? `${activeWorkspaceDir}/${item.path}` : undefined,
+        status: result.content ? 'ready' : 'failed',
+        error: result.content ? undefined : (result.error || '文件读取失败')
       }
+      addAttachments([newAtt])
     }
     // 目录暂时不处理，仅关闭菜单
-  }, [value, onChange, mentionQuery, addAttachments])
+  }, [value, onChange, mentionQuery, addAttachments, activeWorkspaceDir])
 
   // ── 粘贴：图片转附件，大文本转附件，非标准换行规范化 ──
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
@@ -204,19 +363,8 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
         const file = item.getAsFile()
         if (file) {
           e.preventDefault()
-          const reader = new FileReader()
-          reader.onload = () => {
-            const newAtt: Attachment = {
-              id: `paste-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-              name: `粘贴图片.png`,
-              type: 'image',
-              size: file.size,
-              dataUrl: reader.result as string,
-              mime: item.type
-            }
-            addAttachments([newAtt])
-          }
-          reader.readAsDataURL(file)
+          void attachmentFromBrowserFile(file, `paste-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`)
+            .then((newAtt) => addAttachments([{ ...newAtt, name: '粘贴图片.png' }]))
           return
         }
       }
@@ -261,19 +409,50 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
 
   // ── 文件选择 ──
   const handleFileSelect = async () => {
+    setAddMenuOpen(false)
     const files = (await api.openFiles()) as AttachmentFile[]
     if (files.length === 0) return
-    const newAtts: Attachment[] = files.map((f, i) => ({
-      id: `file-${Date.now()}-${i}`,
-      name: f.name,
-      type: f.type,
-      size: f.size,
-      dataUrl: f.dataUrl,
-      textContent: f.textContent,
-      mime: f.mime
-    }))
+    const newAtts: Attachment[] = files.map((f, i) => attachmentFromPickedFile(f, `file-${Date.now()}-${i}`))
     addAttachments(newAtts)
   }
+
+
+  const openMentionPicker = useCallback(() => {
+    const prefix = value && !value.endsWith(' ') && !value.endsWith('\n') ? `${value} @` : `${value}@`
+    onChange(prefix)
+    mentionStartRef.current = prefix.lastIndexOf('@')
+    setMentionQuery('')
+    setMentionOpen(true)
+    setAddMenuOpen(false)
+    void loadMentionItems('')
+    setTimeout(() => taRef.current?.focus(), 0)
+  }, [value, onChange, loadMentionItems])
+
+  const handlePickFolderAsProject = useCallback(async () => {
+    const folderPath = await api.pickFolder()
+    if (!folderPath) return
+    const name = folderPath.split('/').filter(Boolean).pop() || '新项目'
+    const id = createProject(name, '📁', folderPath)
+    setActiveProject(id)
+    setAddMenuOpen(false)
+    setProjectMenuOpen(false)
+  }, [createProject, setActiveProject])
+
+  const handleCreateBlankProject = useCallback(async (name: string) => {
+    const folderPath = await api.createProjectFolder(name)
+    if (!folderPath) throw new Error('项目目录创建失败')
+    const id = createProject(name, '📁', folderPath)
+    setActiveProject(id)
+    setProjectMenuOpen(false)
+  }, [createProject, setActiveProject])
+
+  const appendQuickContext = useCallback((text: string) => {
+    const next = value.trim() ? `${value}
+${text}` : text
+    onChange(next)
+    setAddMenuOpen(false)
+    setTimeout(() => taRef.current?.focus(), 0)
+  }, [value, onChange])
 
   // ── 拖拽上传 ──
   const dragHasFiles = (e: React.DragEvent): boolean => {
@@ -305,38 +484,7 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
     const newAtts: Attachment[] = []
     for (let i = 0; i < droppedFiles.length; i++) {
       const file = droppedFiles[i]
-      const isImage = file.type.startsWith('image/')
-      const isText = file.type.startsWith('text/') || /\.(txt|md|json|csv|log|ts|js|tsx|jsx|py|go|rs|java|html|css|xml|yaml|yml|sh|sql)$/i.test(file.name)
-      if (isImage) {
-        // 大图用 Object URL 减少内存占用(不用 dataURL 永久驻留 base64)
-        const objectUrl = URL.createObjectURL(file)
-        newAtts.push({
-          id: `drop-${Date.now()}-${i}`,
-          name: file.name,
-          type: 'image',
-          size: file.size,
-          objectUrl,
-          mime: file.type
-        })
-      } else if (isText) {
-        const textContent = await readFileAsText(file)
-        newAtts.push({
-          id: `drop-${Date.now()}-${i}`,
-          name: file.name,
-          type: 'text',
-          size: file.size,
-          textContent,
-          mime: file.type || 'text/plain'
-        })
-      } else {
-        newAtts.push({
-          id: `drop-${Date.now()}-${i}`,
-          name: file.name,
-          type: 'file',
-          size: file.size,
-          mime: file.type || 'application/octet-stream'
-        })
-      }
+      newAtts.push(await attachmentFromBrowserFile(file, `drop-${Date.now()}-${i}`))
     }
     addAttachments(newAtts)
   }, [addAttachments])
@@ -344,13 +492,48 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
   const removeAttachment = (id: string) => {
     const att = attachments.find((a) => a.id === id)
     if (att?.objectUrl) URL.revokeObjectURL(att.objectUrl)
+    if (previewAttachment?.id === id) setPreviewAttachment(null)
     setAttachments(attachments.filter((a) => a.id !== id))
+  }
+
+  const retryAttachment = async (attachment: Attachment) => {
+    if (attachment.objectUrl) URL.revokeObjectURL(attachment.objectUrl)
+    setAttachments(attachments.map((a) => a.id === attachment.id ? { ...a, status: 'uploading', error: undefined } : a))
+    try {
+      const next = attachment.sourceFile
+        ? await attachmentFromBrowserFile(attachment.sourceFile, attachment.id)
+        : attachment.sourcePath
+          ? attachmentFromPickedFile(await api.readAttachmentFile(attachment.sourcePath), attachment.id)
+          : { ...attachment, status: 'failed' as const, error: '找不到原文件，无法重试' }
+      const current = useTaskStore.getState().attachments
+      setAttachments(current.map((a) => a.id === attachment.id ? { ...next, name: attachment.name } : a))
+    } catch (error) {
+      const current = useTaskStore.getState().attachments
+      setAttachments(current.map((a) => a.id === attachment.id ? { ...a, status: 'failed', error: errorMessageOf(error) } : a))
+    }
   }
 
   return (
     <>
+      <div className="relative w-full max-w-4xl">
+        {/* 新对话首页：项目归属条，贴在输入框上方 */}
+        {showProjectPicker && (
+          <ProjectPicker
+            projects={projects}
+            activeProjectId={activeProjectId}
+            onPick={(id) => { setActiveProject(id); setProjectMenuOpen(false) }}
+            onClearProject={() => { setActiveProject(DEFAULT_PROJECT_ID); setProjectMenuOpen(false) }}
+            onLoadExistingProject={handlePickFolderAsProject}
+            onCreateBlankProject={handleCreateBlankProject}
+            open={projectMenuOpen}
+            setOpen={setProjectMenuOpen}
+          />
+        )}
+
       <div
-        className="relative w-full max-w-3xl glass rounded-2xl shadow-lg transition-all"
+        className={`relative w-full floating-surface transition-all ${
+          showProjectPicker ? '-mt-px rounded-t-[20px] rounded-b-[28px]' : 'rounded-[28px]'
+        }`}
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -358,32 +541,10 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
       >
         {/* 拖拽高亮遮罩 */}
         {isDragging && (
-          <div className="absolute inset-0 z-10 rounded-2xl border-2 border-dashed border-[#0071e3] bg-sky-50/60 flex items-center justify-center pointer-events-none">
+          <div className="absolute inset-0 z-10 rounded-2xl border-2 border-dashed border-[#0071e3] bg-sky-50 flex items-center justify-center pointer-events-none">
             <span className="text-sm font-medium text-[#0071e3]">松开以上传文件</span>
           </div>
         )}
-
-        {/* 项目归属选择器 */}
-        <ProjectPicker
-          projects={projects}
-          activeProjectId={activeProjectId}
-          onPick={(id) => { setActiveProject(id); setProjectMenuOpen(false) }}
-          onCreateFromScratch={async (name) => {
-            const folderPath = await api.createProjectFolder(name)
-            createProject(name, '📁', folderPath ?? undefined)
-            setProjectMenuOpen(false)
-          }}
-          onPickFolder={async () => {
-            const folderPath = await api.pickFolder()
-            if (folderPath) {
-              const folderName = folderPath.split('/').pop() || folderPath
-              createProject(folderName, '📁', folderPath)
-            }
-            setProjectMenuOpen(false)
-          }}
-          open={projectMenuOpen}
-          setOpen={setProjectMenuOpen}
-        />
 
         {/* 视觉能力提示 */}
         {visionWarn && (
@@ -402,13 +563,14 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
                 attachment={att}
                 onRemove={() => removeAttachment(att.id)}
                 onPreview={() => setPreviewAttachment(att)}
+                onRetry={() => void retryAttachment(att)}
               />
             ))}
           </div>
         )}
 
         {/* 输入框 */}
-        <div className="px-3 pt-2.5">
+        <div className={`px-4 ${showProjectPicker ? 'pt-1.5' : 'pt-3'}`}>
           <textarea
             ref={taRef}
             value={value}
@@ -421,20 +583,89 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
             onCompositionEnd={handleCompositionEnd}
             onPaste={handlePaste}
             placeholder={placeholder || '描述你要做的事…'}
-            rows={1}
-            className="w-full bg-transparent resize-none outline-none py-1 text-sm leading-relaxed min-h-[36px] max-h-[160px]"
+            rows={2}
+            className={`w-full bg-transparent resize-none outline-none py-1 text-sm leading-[22px] max-h-[180px] ${showProjectPicker ? 'min-h-[46px]' : 'min-h-[52px]'}`}
           />
         </div>
 
         {/* 底部行：左下 + 号，右下 模型选择 + 发送 */}
-        <div className="flex items-center justify-between px-2.5 pb-2 pt-1">
-          <button
-            onClick={handleFileSelect}
-            className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[var(--ink-soft)] hover:bg-black/[0.06] hover:text-[var(--ink)] transition"
-            title="添加文件"
-          >
-            <Plus size={18} />
-          </button>
+        <div className={`flex items-center justify-between px-3 ${showProjectPicker ? 'pb-1.5 pt-0' : 'pb-3 pt-1'}`}>
+          <div className="flex items-center gap-1">
+            <div className="relative">
+              <WhaleTooltip label="添加上下文">
+                <button
+                  ref={addButtonRef}
+                  onClick={() => setAddMenuOpen((v) => !v)}
+                  className={`flex-shrink-0 rounded-lg flex items-center justify-center text-[var(--ink-soft)] hover:bg-black/[0.06] hover:text-[var(--ink)] transition ${showProjectPicker ? 'w-7 h-7' : 'w-8 h-8'}`}
+                >
+                  <Plus size={showProjectPicker ? 17 : 18} />
+                </button>
+              </WhaleTooltip>
+              {addMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setAddMenuOpen(false)} />
+                  <div ref={addMenuRef} className="absolute left-0 bottom-10 z-40 w-64 floating-surface rounded-xl p-1.5">
+                    <AddMenuItem icon={<FileText size={14} />} label="添加本地文件" desc="图片、文档、文本都可以" onClick={handleFileSelect} />
+                    <AddMenuItem icon={<AtSign size={14} />} label="引用项目文件" desc="从当前项目里选择文件" onClick={openMentionPicker} />
+                    <AddMenuItem icon={<FolderOpen size={14} />} label="添加本地文件夹" desc="作为新的项目上下文" onClick={handlePickFolderAsProject} />
+                    <AddMenuItem icon={<History size={14} />} label="引用当前对话" desc={activeSessionId ? '让小蓝鲸延续已有上下文' : '当前还没有可引用的对话'} disabled={!activeSessionId} onClick={() => appendQuickContext('请参考当前对话历史继续处理：')} />
+                    <AddMenuItem icon={<Target size={14} />} label="补充目标" desc="把验收标准写进输入框" onClick={() => appendQuickContext('补充目标：')} />
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="relative">
+              <button
+                ref={approvalButtonRef}
+                onClick={() => {
+                  setAddMenuOpen(false)
+                  setApprovalMenuOpen((v) => !v)
+                }}
+                className={`flex items-center gap-1.5 px-1.5 rounded-lg text-[13px] font-medium hover:bg-black/[0.04] transition ${showProjectPicker ? 'py-1' : 'py-1.5'} ${activeApprovalMode.activeClass}`}
+              >
+                <span className={activeApprovalMode.iconClass}>{activeApprovalMode.icon}</span>
+                <span className="truncate max-w-[96px]">{activeApprovalMode.label}</span>
+                <ChevronDown size={13} />
+              </button>
+
+              {approvalMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setApprovalMenuOpen(false)} />
+                  <div ref={approvalMenuRef} className="absolute left-0 bottom-10 z-40 w-[23rem] max-w-[calc(100vw-2rem)] floating-surface rounded-2xl p-2">
+                    <div className="px-2.5 pb-1.5 pt-1 text-[12px] text-[var(--ink-soft)]">
+                      选择小蓝鲸什么时候需要问你
+                    </div>
+                    {APPROVAL_MODE_OPTIONS.map((option) => {
+                      const selected = option.id === approvalMode
+                      return (
+                        <button
+                          key={option.id}
+                          type="button"
+                          onClick={() => {
+                            saveGeneral({ maxIterations, approvalMode: option.id, showThinking })
+                            setApprovalMenuOpen(false)
+                          }}
+                          className={`w-full flex items-center gap-3 px-2.5 py-2.5 rounded-xl text-left transition ${
+                            selected ? 'bg-black/[0.04]' : 'hover:bg-black/[0.04]'
+                          }`}
+                        >
+                          <span className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 bg-black/[0.04] ${option.iconClass}`}>
+                            {option.icon}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-semibold text-[var(--ink)]">{option.label}</span>
+                            <span className="block text-xs text-[var(--ink-soft)] mt-0.5">{option.desc}</span>
+                          </span>
+                          {selected && <Check size={16} className="text-[var(--ink-soft)] flex-shrink-0" />}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
 
           <div className="flex items-center gap-2">
             <div className="relative">
@@ -442,7 +673,12 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
                 onClick={() => {
                   if (!modelMenuOpen && modelBtnRef.current) {
                     const rect = modelBtnRef.current.getBoundingClientRect()
-                    setMenuPos({ left: rect.left, bottom: window.innerHeight - rect.top + 4 })
+                    const menuWidth = Math.min(288, window.innerWidth - 24)
+                    const left = Math.min(
+                      window.innerWidth - menuWidth - 12,
+                      Math.max(12, rect.right - menuWidth)
+                    )
+                    setMenuPos({ left, bottom: window.innerHeight - rect.top + 8 })
                   }
                   setModelMenuOpen(!modelMenuOpen)
                 }}
@@ -457,16 +693,17 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
                 <>
                   <div className="fixed inset-0 z-[9998]" onClick={() => setModelMenuOpen(false)} />
                   <div
-                    className="fixed z-[9999] w-72 rounded-xl p-2 shadow-xl border border-white/50"
+                    className="fixed z-[9999] w-72 max-w-[calc(100vw-24px)] rounded-xl p-2 floating-surface overflow-hidden"
                     style={{
                       left: menuPos.left,
                       bottom: menuPos.bottom,
-                      background: 'rgba(255,255,255,0.92)',
-                      backdropFilter: 'blur(40px) saturate(180%)',
-                      WebkitBackdropFilter: 'blur(40px) saturate(180%)'
+                      background: 'var(--floating-bg)'
                     }}
                   >
-                    <div className="max-h-80 overflow-y-auto space-y-0.5">
+                    <div
+                      className="overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden space-y-0.5"
+                      style={{ maxHeight: 'min(20rem, calc(100vh - 7rem))' }}
+                    >
                       {BUILTIN_PROVIDER_ORDER.map((id) => {
                         const preset = PROVIDER_PRESETS[id]
                         const isActive = config?.providerId === id
@@ -474,16 +711,18 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
                           <button
                             key={id}
                             onClick={() => { setModelMenuOpen(false); openSettings('model') }}
-                            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition ${
+                            className={`w-full min-w-0 flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition ${
                               isActive ? 'bg-sky-50 text-sky-600' : 'hover:bg-black/[0.06] text-[var(--ink)]'
                             }`}
                           >
-                            <span className="flex-1 text-left">{preset.label}</span>
+                            <span className="flex-1 min-w-0 text-left truncate">{preset.label}</span>
                             {preset.supportsVision && (
-                              <span className="text-[10px] text-sky-500" title="支持图片输入">👁</span>
+                              <WhaleTooltip label="支持图片输入">
+                                <span className="text-[10px] text-sky-500 flex-shrink-0">👁</span>
+                              </WhaleTooltip>
                             )}
-                            {preset.builtinApiKey && <span className="text-[10px] text-green-500">内置</span>}
-                            {isActive && <Check size={13} className="text-sky-500" />}
+                            {preset.builtinApiKey && <span className="text-[10px] text-green-500 flex-shrink-0">内置</span>}
+                            {isActive && <Check size={13} className="text-sky-500 flex-shrink-0" />}
                           </button>
                         )
                       })}
@@ -494,30 +733,34 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
               )}
             </div>
 
-            <button
-              onClick={() => hasContent && onSend()}
-              disabled={!hasContent}
-              className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition ${
-                hasContent
-                  ? 'bg-[#0071e3] text-white hover:brightness-110'
-                  : 'bg-black/[0.06] text-[var(--ink-soft)]/40 cursor-not-allowed'
-              }`}
-            >
-              <ArrowUp size={16} />
-            </button>
+            <WhaleTooltip label={shouldStop ? '停止任务' : sendLabel}>
+              <button
+                onClick={() => {
+                  if (shouldStop) {
+                    onStop?.()
+                    return
+                  }
+                  if (hasContent) onSend()
+                }}
+                disabled={!hasContent && !shouldStop}
+                className={`flex-shrink-0 rounded-lg flex items-center justify-center transition ${showProjectPicker ? 'w-7 h-7' : 'w-8 h-8'} ${
+                  hasContent || shouldStop
+                    ? shouldStop
+                      ? 'bg-red-500 text-white hover:brightness-110'
+                      : 'bg-[#0071e3] text-white hover:brightness-110'
+                    : 'bg-black/[0.06] text-[var(--ink-soft)]/40 cursor-not-allowed'
+                }`}
+              >
+                {shouldStop ? <StopCircle size={showProjectPicker ? 17 : 18} /> : <ArrowUp size={showProjectPicker ? 15 : 16} />}
+              </button>
+            </WhaleTooltip>
           </div>
         </div>
       </div>
 
       {/* @文件引用菜单 */}
       {mentionOpen && (
-        <div className="absolute bottom-full left-3 mb-1 z-20 w-72 rounded-xl p-1.5 shadow-xl border border-white/50 max-h-64 overflow-y-auto"
-          style={{
-            background: 'rgba(255,255,255,0.95)',
-            backdropFilter: 'blur(40px) saturate(180%)',
-            WebkitBackdropFilter: 'blur(40px) saturate(180%)'
-          }}
-        >
+        <div className="absolute bottom-full left-3 mb-1 z-20 w-72 rounded-xl p-1.5 floating-surface max-h-64 overflow-y-auto">
           {mentionLoading ? (
             <div className="px-2 py-3 text-xs text-[var(--ink-soft)] text-center">加载中…</div>
           ) : mentionItems.length === 0 ? (
@@ -539,6 +782,7 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
           )}
         </div>
       )}
+      </div>
 
       {previewAttachment && (
         <AttachmentPreview
@@ -546,7 +790,32 @@ export function ChatInput({ value, onChange, onSend, placeholder }: Props) {
           onClose={() => setPreviewAttachment(null)}
         />
       )}
+
     </>
+  )
+}
+
+
+function AddMenuItem({ icon, label, desc, onClick, disabled = false }: {
+  icon: React.ReactNode
+  label: string
+  desc: string
+  onClick: () => void
+  disabled?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="w-full flex items-start gap-2 px-2.5 py-2 rounded-lg text-left hover:bg-black/[0.05] transition disabled:opacity-40 disabled:cursor-not-allowed"
+    >
+      <span className="mt-0.5 text-[var(--ink-soft)] flex-shrink-0">{icon}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm text-[var(--ink)]">{label}</span>
+        <span className="block text-xs text-[var(--ink-soft)] mt-0.5">{desc}</span>
+      </span>
+    </button>
   )
 }
 
@@ -570,11 +839,13 @@ function readFileAsText(file: File): Promise<string> {
 }
 
 // ============ 附件缩略图 ============
-function AttachmentThumb({ attachment, onRemove, onPreview }: {
+function AttachmentThumb({ attachment, onRemove, onPreview, onRetry }: {
   attachment: Attachment
   onRemove: () => void
   onPreview: () => void
+  onRetry: () => void
 }) {
+  const status = attachmentStatusOf(attachment)
   const sizeLabel = attachment.size < 1024
     ? `${attachment.size}B`
     : attachment.size < 1024 * 1024
@@ -582,10 +853,20 @@ function AttachmentThumb({ attachment, onRemove, onPreview }: {
     : `${(attachment.size / 1024 / 1024).toFixed(1)}MB`
 
   return (
-    <div className="relative group w-20 h-20 rounded-lg overflow-hidden glass-soft border border-black/[0.08]">
-      <button onClick={onPreview} className="w-full h-full flex items-center justify-center">
+    <div className={`relative group w-20 h-20 rounded-lg overflow-hidden glass-soft border ${status === 'failed' ? 'border-red-300 bg-red-50/70' : 'border-black/[0.08]'}`}>
+      <button type="button" onClick={onPreview} className="w-full h-full flex items-center justify-center">
         {attachment.type === 'image' && (attachment.dataUrl || attachment.objectUrl) ? (
-          <img src={attachment.objectUrl || attachment.dataUrl} alt={attachment.name} className="w-full h-full object-cover" />
+          <img src={attachment.objectUrl || attachment.dataUrl} alt={attachment.name} className={`w-full h-full object-cover ${status !== 'ready' ? 'opacity-45' : ''}`} />
+        ) : status === 'failed' ? (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-1 p-1">
+            <AlertCircle size={20} className="text-red-500" />
+            <span className="text-[9px] text-red-500 truncate w-full text-center">{attachment.name}</span>
+          </div>
+        ) : status === 'uploading' ? (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-1 p-1">
+            <Loader2 size={20} className="text-[var(--whale-blue)] animate-spin" />
+            <span className="text-[9px] text-[var(--ink-soft)] truncate w-full text-center">{attachment.name}</span>
+          </div>
         ) : attachment.type === 'text' ? (
           <div className="w-full h-full flex flex-col items-center justify-center gap-1 p-1">
             <FileText size={20} className="text-[var(--ink-soft)]" />
@@ -599,25 +880,46 @@ function AttachmentThumb({ attachment, onRemove, onPreview }: {
         )}
       </button>
 
-      <button
-        onClick={onPreview}
-        className="absolute top-1 left-1 w-5 h-5 rounded bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
-        title="预览"
-      >
-        <Eye size={11} />
-      </button>
+      {status === 'ready' && (
+      <WhaleTooltip label="预览" className="absolute top-1 left-1 opacity-0 group-hover:opacity-100 transition">
+        <button
+          type="button"
+          onClick={onPreview}
+          className="w-5 h-5 rounded bg-[var(--whale-blue)]/90 text-white flex items-center justify-center"
+        >
+          <Eye size={11} />
+        </button>
+      </WhaleTooltip>
+      )}
 
-      <button
-        onClick={onRemove}
-        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition hover:bg-red-500"
-        title="移除"
-      >
-        <X size={11} />
-      </button>
+      <WhaleTooltip label="移除" className="absolute top-1 right-1">
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onRemove() }}
+          className="w-5 h-5 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-red-500"
+        >
+          <X size={11} />
+        </button>
+      </WhaleTooltip>
 
-      <div className="absolute bottom-0 left-0 right-0 bg-black/40 text-white text-[8px] text-center py-0.5 opacity-0 group-hover:opacity-100 transition">
-        {sizeLabel}
-      </div>
+      {status === 'failed' && (
+        <WhaleTooltip label={attachment.error || '上传失败'} className="absolute bottom-1 left-1 right-1">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onRetry() }}
+            className="w-full h-5 rounded bg-red-500 text-white text-[9px] flex items-center justify-center gap-1 hover:bg-red-600"
+          >
+            <RefreshCw size={10} />
+            重试
+          </button>
+        </WhaleTooltip>
+      )}
+
+      {status !== 'failed' && (
+        <div className={`absolute bottom-0 left-0 right-0 ${status === 'uploading' ? 'bg-[var(--whale-blue)]' : 'bg-[var(--whale-blue)]/90'} text-white text-[8px] text-center py-0.5 ${status === 'uploading' ? '' : 'opacity-0 group-hover:opacity-100'} transition`}>
+          {status === 'uploading' ? '上传中' : sizeLabel}
+        </div>
+      )}
     </div>
   )
 }
@@ -629,12 +931,12 @@ function AttachmentPreview({ attachment, onClose }: {
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <div className="absolute inset-0 floating-screen" />
       <div
-        className="relative glass rounded-2xl overflow-hidden shadow-2xl max-w-3xl max-h-[80vh] flex flex-col"
+        className="relative floating-surface rounded-2xl overflow-hidden max-w-3xl max-h-[80vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/40 flex-shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-black/[0.08] flex-shrink-0">
           <div className="min-w-0">
             <div className="text-sm font-medium text-[var(--ink)] truncate">{attachment.name}</div>
             <div className="text-xs text-[var(--ink-soft)]">{attachment.mime}</div>
@@ -648,7 +950,11 @@ function AttachmentPreview({ attachment, onClose }: {
         </div>
 
         <div className="flex-1 overflow-auto p-4">
-          {attachment.type === 'image' && (attachment.dataUrl || attachment.objectUrl) ? (
+          {attachmentStatusOf(attachment) === 'failed' ? (
+            <div className="text-center text-sm text-red-500 py-8">
+              上传失败：{attachment.error || '请重试上传'}
+            </div>
+          ) : attachment.type === 'image' && (attachment.dataUrl || attachment.objectUrl) ? (
             <img src={attachment.objectUrl || attachment.dataUrl} alt={attachment.name} className="max-w-full max-h-[60vh] mx-auto rounded-lg" />
           ) : attachment.textContent ? (
             <pre className="text-xs text-[var(--ink)] whitespace-pre-wrap break-all font-mono leading-relaxed">
@@ -668,102 +974,200 @@ function AttachmentPreview({ attachment, onClose }: {
 
 /* ---- 输入框上方：项目归属选择器 ---- */
 function ProjectPicker({
-  projects, activeProjectId, onPick, onCreateFromScratch, onPickFolder, open, setOpen
+  projects, activeProjectId, onPick, onClearProject, onLoadExistingProject, onCreateBlankProject, open, setOpen
 }: {
   projects: Project[]
   activeProjectId: string
   onPick: (id: string) => void
-  onCreateFromScratch: (name: string) => void
-  onPickFolder: () => void
+  onClearProject: () => void
+  onLoadExistingProject: () => Promise<void>
+  onCreateBlankProject: (name: string) => Promise<void>
   open: boolean
   setOpen: (v: boolean | ((p: boolean) => boolean)) => void
 }) {
-  const [name, setName] = useState('')
-  const [mode, setMode] = useState<'list' | 'create'>('list')
-  const [creating, setCreating] = useState(false)
   const active = projects.find((p) => p.id === activeProjectId)
+  const isNoProject = activeProjectId === DEFAULT_PROJECT_ID
   const sorted = [...projects].sort(
     (a, b) => Number(b.pinned) - Number(a.pinned) || (b.pinnedAt ?? 0) - (a.pinnedAt ?? 0) || a.order - b.order
   )
   const ref = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const nameRef = useRef<HTMLInputElement>(null)
+  const [blankOpen, setBlankOpen] = useState(false)
+  const [blankName, setBlankName] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [menuStyle, setMenuStyle] = useState<{ left: number; top: number; maxHeight: number } | null>(null)
 
-  const close = () => { setOpen(false); setMode('list'); setName('') }
+  const close = () => setOpen(false)
+  const updateMenuPosition = useCallback(() => {
+    const rect = buttonRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const width = 320
+    const gap = 8
+    const margin = 12
+    const listRows = sorted.length > 0 ? Math.min(sorted.length, 5) : 1
+    const expectedHeight = 88 + listRows * 36 + 142 + (blankOpen ? 76 : 0)
+    const availableHeight = window.innerHeight - margin * 2
+    const height = Math.min(expectedHeight, availableHeight)
+    const left = Math.min(window.innerWidth - width - margin, Math.max(margin, rect.left))
+    const belowTop = rect.bottom + gap
+    const aboveTop = rect.top - height - gap
+    const hasRoomBelow = belowTop + height <= window.innerHeight - margin
+    const top = hasRoomBelow ? belowTop : Math.max(margin, aboveTop)
+    setMenuStyle({ left, top, maxHeight: Math.min(height, window.innerHeight - top - margin) })
+  }, [blankOpen, sorted.length])
+
+  useEffect(() => {
+    if (blankOpen) setTimeout(() => nameRef.current?.focus(), 0)
+  }, [blankOpen])
+  useEffect(() => {
+    if (open) updateMenuPosition()
+  }, [open, updateMenuPosition])
+  useEffect(() => {
+    if (open) return
+    setBlankOpen(false)
+    setBlankName('')
+    setError('')
+    setBusy(false)
+  }, [open])
+
+  const submitBlankProject = async () => {
+    const name = blankName.trim()
+    if (!name || busy) return
+    setBusy(true)
+    setError('')
+    try {
+      await onCreateBlankProject(name)
+      setBlankName('')
+      setBlankOpen(false)
+    } catch {
+      setError('创建失败，请换个名称再试')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
-    <div className="relative px-3 pt-2.5">
-      <button
-        onClick={() => { setOpen(!open); setMode('list') }}
-        className="no-drag flex items-center gap-1.5 h-7 px-2 rounded-lg hover:bg-black/[0.05] transition text-left max-w-full"
-      >
-        <span className="text-sm leading-none flex-shrink-0">{active?.icon ?? '📁'}</span>
-        <span className="text-xs text-[var(--ink-soft)] truncate max-w-[140px]">{active?.name ?? '选择项目'}</span>
-        <ChevronDown size={12} className="text-[var(--ink-soft)] flex-shrink-0" />
-      </button>
+    <div className="relative z-[1] mx-auto w-[calc(100%-28px)] rounded-t-[24px] border border-b-0 border-black/[0.04] bg-[var(--composer-project-bg)] px-5 pb-1.5 pt-2">
+      <div className="flex min-w-0 items-center overflow-hidden">
+        <button
+          ref={buttonRef}
+          onClick={() => {
+            if (!open) updateMenuPosition()
+            setOpen(!open)
+          }}
+          className="no-drag flex h-7 min-w-0 max-w-full items-center gap-2 rounded-xl px-2.5 text-left text-[var(--ink)] transition hover:bg-black/[0.05]"
+        >
+          {isNoProject ? (
+            <X size={16} className="flex-shrink-0 text-[var(--ink-soft)]" />
+          ) : (
+            <Folder size={16} className="flex-shrink-0 text-[var(--ink-soft)]" />
+          )}
+          <span className="min-w-0 truncate text-sm font-medium">
+            {isNoProject ? '不加载任何项目' : (active?.name ?? '选择项目')}
+          </span>
+          <ChevronDown size={14} className="flex-shrink-0 text-[var(--ink-soft)]" />
+        </button>
+      </div>
 
       {open && (
-        <>
+        createPortal(
+          <>
           <div className="fixed inset-0 z-40" onClick={close} />
-          <div ref={ref} className="absolute left-3 top-9 z-50 w-56 glass rounded-lg shadow-lg py-1 max-h-72 overflow-y-auto">
-            {mode === 'list' ? (
-              <>
+          <div
+            ref={ref}
+            className="fixed z-50 w-80 max-w-[calc(100vw-24px)] floating-surface rounded-2xl p-2 overflow-hidden flex flex-col"
+            style={menuStyle ? { left: menuStyle.left, top: menuStyle.top, maxHeight: menuStyle.maxHeight } : undefined}
+          >
+            <div className="px-2.5 pt-2 pb-1.5">
+              <div className="text-sm font-semibold text-[var(--ink)]">请选择或新建一个项目</div>
+            </div>
+            {sorted.length > 0 && (
+              <div
+                className="mt-1 min-h-0 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                style={{ maxHeight: Math.max(72, Math.min(160, (menuStyle?.maxHeight ?? 420) - (blankOpen ? 240 : 166))) }}
+              >
                 {sorted.map((p) => (
                   <button
                     key={p.id}
                     onClick={() => onPick(p.id)}
-                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-black/[0.05] transition mx-0.5 rounded-md ${
+                    className={`w-full h-8 min-w-0 flex items-center gap-2.5 px-2.5 rounded-xl text-left hover:bg-black/[0.05] transition ${
                       p.id === activeProjectId ? 'text-[var(--ink)]' : 'text-[var(--ink-soft)]'
                     }`}
                   >
-                    <span className="text-sm leading-none flex-shrink-0">{p.icon}</span>
-                    <span className="flex-1 text-xs truncate">{p.name}</span>
+                    <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+                      <Folder size={15} className="text-[var(--ink-soft)]" />
+                    </span>
+                    <span className="flex-1 min-w-0 text-sm truncate">{p.name}</span>
                     {p.id === activeProjectId && <Check size={12} className="text-[#0071e3] flex-shrink-0" />}
                   </button>
                 ))}
-                <div className="border-t border-white/40 mt-1 pt-1">
-                  <button
-                    onClick={() => { setMode('create'); setName('') }}
-                    className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs text-[var(--ink-soft)] hover:text-[var(--ink)] transition"
-                  >
-                    <FolderPlus size={13} /> 新建项目
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div className="py-1">
-                <div className="px-2.5 pb-1.5">
-                  <button onClick={() => setMode('list')} className="text-[11px] text-[var(--ink-soft)] hover:text-[var(--ink)]">← 返回</button>
-                </div>
-                <div className="p-2">
-                  <input
-                    autoFocus
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="项目名称"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && name.trim()) { onCreateFromScratch(name.trim()); close() }
-                      if (e.key === 'Escape') close()
-                    }}
-                    className="w-full h-7 px-2 text-xs rounded bg-white border border-black/10 outline-none focus:border-blue-400"
-                  />
-                  <button
-                    disabled={!name.trim() || creating}
-                    onClick={() => { if (name.trim()) { setCreating(true); onCreateFromScratch(name.trim()); close() } }}
-                    className="w-full mt-2 h-7 text-xs rounded bg-[var(--ink)] text-white hover:opacity-90 disabled:opacity-50"
-                  >从零新建</button>
-                </div>
-                <div className="border-t border-white/40 mt-1 pt-1 px-2.5">
-                  <button
-                    disabled={creating}
-                    onClick={() => { onPickFolder(); close() }}
-                    className="w-full flex items-center gap-2 py-1.5 text-xs text-[var(--ink-soft)] hover:text-[var(--ink)] transition disabled:opacity-50"
-                  >
-                    <FolderInput size={13} /> 选择已有文件夹
-                  </button>
-                </div>
               </div>
             )}
+            {sorted.length === 0 && (
+              <div className="mx-2 mt-2 rounded-xl bg-black/[0.03] px-3 py-4 text-center text-xs text-[var(--ink-soft)]">
+                左侧还没有加载项目
+              </div>
+            )}
+            <div className="border-t border-black/[0.08] mt-2 pt-2">
+              <button
+                onClick={() => { setError(''); void onLoadExistingProject() }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-sm text-[var(--ink-soft)] hover:bg-black/[0.05] hover:text-[var(--ink)] transition"
+              >
+                <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+                  <FolderOpen size={15} className="text-[var(--ink-soft)]" />
+                </span>
+                加载已有项目
+              </button>
+              <button
+                onClick={() => { setBlankOpen((v) => !v); setError('') }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-sm text-[var(--ink-soft)] hover:bg-black/[0.05] hover:text-[var(--ink)] transition"
+              >
+                <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+                  <FolderPlus size={15} className="text-[var(--ink-soft)]" />
+                </span>
+                新建空白项目
+              </button>
+              {blankOpen && (
+                <div className="mx-2 mb-1 rounded-xl bg-black/[0.03] p-2">
+                  <input
+                    ref={nameRef}
+                    value={blankName}
+                    onChange={(e) => setBlankName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') void submitBlankProject(); if (e.key === 'Escape') setBlankOpen(false) }}
+                    placeholder="输入项目名称"
+                    className="w-full h-8 px-2.5 rounded-lg bg-white/80 border border-black/10 outline-none text-sm focus:border-[#0071e3]"
+                  />
+                  <div className="flex items-center justify-between gap-2 mt-2">
+                    <span className="min-w-0 text-[11px] text-red-500 truncate">{error}</span>
+                    <button
+                      onClick={() => void submitBlankProject()}
+                      disabled={!blankName.trim() || busy}
+                      className="h-7 px-3 rounded-lg bg-[var(--ink)] text-white text-xs disabled:opacity-40 transition"
+                    >
+                      {busy ? '创建中' : '创建'}
+                    </button>
+                  </div>
+                </div>
+              )}
+              <button
+                onClick={() => onClearProject()}
+                className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-sm transition ${
+                  isNoProject ? 'text-[var(--ink)] bg-black/[0.04]' : 'text-[var(--ink-soft)] hover:bg-black/[0.05] hover:text-[var(--ink)]'
+                }`}
+              >
+                <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+                  <X size={15} className="text-[var(--ink-soft)]" />
+                </span>
+                <span className="flex-1 text-left">不加载任何项目</span>
+                {isNoProject && <Check size={12} className="text-[#0071e3] flex-shrink-0" />}
+              </button>
+            </div>
           </div>
-        </>
+          </>,
+          document.body
+        )
       )}
     </div>
   )

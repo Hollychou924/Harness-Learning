@@ -1,24 +1,10 @@
-import { memo, useEffect, useRef, useState } from 'react'
+import { memo } from 'react'
 import { MarkdownEngine } from './markdown/MarkdownEngine'
 import './markdown/markdown.css'
 
 // 最终回复展示：扁平占满宽度，不带卡片外壳(复刻 Codex 的"文档流"风格，而非聊天气泡)
+// 去掉自身 max-h + overflow-y-auto：回复自然撑开，滚动交给外层对话区统一管理，避免双滚动条
 export const ResultView = memo(function ResultView({ content }: { content: string }) {
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const [autoScroll, setAutoScroll] = useState(true)
-
-  useEffect(() => {
-    if (autoScroll && scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
-  }, [content, autoScroll])
-
-  const handleScroll = () => {
-    if (!scrollRef.current) return
-    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current
-    setAutoScroll(scrollHeight - scrollTop - clientHeight < 80)
-  }
-
   if (!content) {
     return (
       <div className="text-sm text-[var(--ink-soft)] px-1 py-1">
@@ -28,11 +14,7 @@ export const ResultView = memo(function ResultView({ content }: { content: strin
   }
 
   return (
-    <div
-      ref={scrollRef}
-      onScroll={handleScroll}
-      className="w-full px-1 py-1 max-h-[70vh] overflow-y-auto"
-    >
+    <div className="w-full px-1 py-1">
       <MarkdownEngine content={content} streaming={true} />
     </div>
   )

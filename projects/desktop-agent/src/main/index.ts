@@ -1,28 +1,57 @@
 import { app, BrowserWindow, ipcMain, shell, nativeTheme, dialog } from 'electron'
-import { join, resolve, relative } from 'node:path'
+import { isAbsolute, join, resolve, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
 import { readdir as readdirAsync, stat as statAsync } from 'node:fs/promises'
 import { agentBridge } from './agent-bridge.js'
-import { startTrace, logAgentEvent, logUserAction, listTraces, getTrace } from './trace-logger.js'
+import { startTrace, logAgentEvent, logUserAction, listTraces, getTrace, exportTracePackage, createFeedbackTicket, listFeedbackTickets, getDiagnosticsOverview, getReplayBundle, exportReplayPackage } from './trace-logger.js'
 import type { StdoutMessage, AgentConfig, MessageAttachment } from '../agent/src/protocol.js'
+import { getModelThinkingConfig } from '../renderer/src/components/providerPresets.js'
+import {
+  resolveModelConfigForSave,
+  sameModelSlot,
+  sanitizeModelConfigForRenderer,
+  sanitizeModelConfigStoreForRenderer,
+  validateModelConfig,
+  type ModelConfig,
+  type ModelConfigStore
+} from './model-config.js'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 
-interface ModelConfig {
-  providerId: string
-  model: string
-  apiKey: string
-  apiBaseUrl: string
-  apiFormat: 'openai' | 'anthropic'
-  contextLimit: number
-  customProviderId?: string
-  autoApproveLow?: boolean
-}
-
 function getConfigPath(): string {
   return join(app.getPath('userData'), 'model-config.json')
+}
+
+type ThemeMode = 'system' | 'light' | 'dark'
+
+function getAppearanceConfigPath(): string {
+  return join(app.getPath('userData'), 'appearance-config.json')
+}
+
+function normalizeThemeMode(value: unknown): ThemeMode {
+  return value === 'light' || value === 'dark' || value === 'system' ? value : 'system'
+}
+
+function loadThemeMode(): ThemeMode {
+  try {
+    const p = getAppearanceConfigPath()
+    if (!existsSync(p)) return 'system'
+    const raw = readFileSync(p, 'utf-8')
+    return normalizeThemeMode(JSON.parse(raw)?.themeMode)
+  } catch {
+    return 'system'
+  }
+}
+
+function saveThemeMode(themeMode: ThemeMode): void {
+  writeFileSync(getAppearanceConfigPath(), JSON.stringify({ themeMode }, null, 2), 'utf-8')
+}
+
+function applyThemeMode(themeMode: ThemeMode): void {
+  nativeTheme.themeSource = themeMode
 }
 
 // 会话消息持久化目录：~/Library/Application Support/小蓝鲸/sessions/<id>.json
@@ -53,9 +82,149 @@ function saveConfigFile(cfg: ModelConfig): void {
   writeFileSync(getConfigPath(), JSON.stringify(cfg, null, 2), 'utf-8')
 }
 
+// ── 多模型并存存储 ──────────────────────────────────────────────
+// 存储"已配置模型列表" + 当前激活 id，为输入框快速切换和会话级绑定留基础
+function getModelsStorePath(): string {
+  return join(app.getPath('userData'), 'model-configs.json')
+}
+
+function generateModelId(cfg: ModelConfig): string {
+  const sub = cfg.customProviderId ? `-${cfg.customProviderId}` : ''
+  const custom = cfg.customModelId ? `-${cfg.customModelId}` : ''
+  return `${cfg.providerId}${sub}${custom}-${cfg.model}-${Date.now().toString(36)}`
+}
+
+function loadModelsStore(): ModelConfigStore {
+  const storePath = getModelsStorePath()
+  // 新文件存在 → 直接读
+  if (existsSync(storePath)) {
+    try {
+      const raw = readFileSync(storePath, 'utf-8')
+      return JSON.parse(raw) as ModelConfigStore
+    } catch { /* 损坏则走迁移 */ }
+  }
+  // 迁移：旧的单配置文件 → 列表第一项
+  const oldCfg = loadConfig()
+  if (oldCfg && oldCfg.apiKey) {
+    const migrated: ModelConfigStore = {
+      configs: [{ ...oldCfg }],
+      activeId: null
+    }
+    migrated.activeId = generateModelId(oldCfg)
+    ;(migrated.configs[0] as ModelConfig & { _id?: string })._id = migrated.activeId
+    saveModelsStore(migrated)
+    return migrated
+  }
+  return { configs: [], activeId: null }
+}
+
+function saveModelsStore(store: ModelConfigStore): void {
+  writeFileSync(getModelsStorePath(), JSON.stringify(store, null, 2), 'utf-8')
+}
+
+function resolveModelConfigWithSavedKey(cfg: ModelConfig): ModelConfig {
+  const store = loadModelsStore()
+  const legacyConfig = loadConfig()
+  const envConfig: ModelConfig | null = process.env.ANTHROPIC_API_KEY && cfg.providerId === 'anthropic'
+    ? {
+        providerId: 'anthropic',
+        model: process.env.XLJ_MODEL || cfg.model,
+        apiKey: process.env.ANTHROPIC_API_KEY,
+        apiBaseUrl: process.env.ANTHROPIC_BASE_URL || '',
+        apiFormat: 'anthropic',
+        contextLimit: 200000,
+        autoApproveLow: false
+      }
+    : null
+  return resolveModelConfigForSave(cfg, [
+    ...store.configs,
+    ...(legacyConfig ? [legacyConfig] : []),
+    ...(envConfig ? [envConfig] : [])
+  ])
+}
+
+function joinEndpoint(baseUrl: string, path: string): string {
+  const base = baseUrl.replace(/\/+$/, '')
+  return `${base}${path}`
+}
+
+async function testModelConnection(cfg: ModelConfig): Promise<{ success: boolean; message?: string; error?: string; latencyMs?: number }> {
+  const resolvedCfg = resolveModelConfigWithSavedKey(cfg)
+  const configError = validateModelConfig(resolvedCfg)
+  if (configError) return { success: false, error: configError }
+  if (!resolvedCfg.model.trim()) return { success: false, error: '请先填写模型 ID' }
+  if (!resolvedCfg.apiBaseUrl.trim()) return { success: false, error: '请先填写连接地址' }
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 15000)
+  const started = Date.now()
+  try {
+    const headers: Record<string, string> = { 'content-type': 'application/json' }
+    let url = ''
+    let body: Record<string, unknown>
+    if (resolvedCfg.apiFormat === 'anthropic') {
+      url = joinEndpoint(resolvedCfg.apiBaseUrl, '/v1/messages')
+      headers['x-api-key'] = resolvedCfg.apiKey
+      headers['anthropic-version'] = '2023-06-01'
+      body = {
+        model: resolvedCfg.model,
+        max_tokens: 16,
+        messages: [{ role: 'user', content: 'ping' }]
+      }
+    } else {
+      url = joinEndpoint(resolvedCfg.apiBaseUrl, '/chat/completions')
+      headers.authorization = `Bearer ${resolvedCfg.apiKey}`
+      if (resolvedCfg.providerId === 'mify' && resolvedCfg.customProviderId) {
+        headers['x-model-provider-id'] = resolvedCfg.customProviderId
+      }
+      body = {
+        model: resolvedCfg.model,
+        messages: [{ role: 'user', content: 'ping' }],
+        max_tokens: 16,
+        stream: false
+      }
+    }
+    const res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal
+    })
+    const text = await res.text()
+    const latencyMs = Date.now() - started
+    if (!res.ok) {
+      const detail = text.replace(/\s+/g, ' ').slice(0, 180)
+      return { success: false, error: detail || `连接失败：${res.status}`, latencyMs }
+    }
+    return { success: true, message: `连接成功，用时 ${latencyMs}ms`, latencyMs }
+  } catch (e) {
+    const message = e instanceof Error && e.name === 'AbortError'
+      ? '连接超时，请检查网络或连接地址'
+      : e instanceof Error ? e.message : '连接失败，请检查配置'
+    return { success: false, error: message, latencyMs: Date.now() - started }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+function getActiveModelConfig(): ModelConfig | null {
+  const store = loadModelsStore()
+  if (store.configs.length === 0) return loadConfig() // 兜底旧文件
+  const active = store.configs.find((c) => (c as ModelConfig & { _id?: string })._id === store.activeId)
+  return active || store.configs[0] || null
+}
+
 function buildAgentConfig(): AgentConfig {
-  const saved = loadConfig()
-  if (saved && saved.apiKey) {
+  const saved = getActiveModelConfig() || loadConfig()
+  if (saved && saved.apiKey && !validateModelConfig(saved)) {
+    const isMify = saved.providerId === 'mify'
+    const preset = getModelThinkingConfig(
+      saved.providerId,
+      saved.model,
+      isMify,
+      isMify ? saved.customProviderId : undefined
+    )
+    const supportsThinking = preset?.supportsThinking === true
     return {
       provider: saved.apiFormat === 'anthropic' ? 'anthropic' : 'openai',
       model: saved.model,
@@ -67,7 +236,9 @@ function buildAgentConfig(): AgentConfig {
       apiFormat: saved.apiFormat,
       contextLimit: saved.contextLimit,
       customProviderId: saved.customProviderId,
-      autoApproveLow: saved.autoApproveLow ?? false
+      autoApproveLow: saved.autoApproveLow ?? false,
+      thinkingLevel: supportsThinking ? 'auto' : 'off',
+      thinkingConfig: supportsThinking ? preset!.thinkingConfig : undefined
     }
   }
   // 兜底：环境变量
@@ -83,7 +254,20 @@ function buildAgentConfig(): AgentConfig {
 }
 
 let mainWindow: BrowserWindow | null = null
+let activeTaskId: string | null = null
 let activeTraceId: string | null = null
+
+function getWindowIconPath(): string {
+  const packagedIconPath = join(process.resourcesPath, 'build', 'icon.png')
+  const localIconPath = join(__dirname, '../../build/icon.png')
+  return existsSync(packagedIconPath) ? packagedIconPath : localIconPath
+}
+
+function activeTraceForTask(taskId?: string): string | null {
+  if (!activeTraceId) return null
+  if (!taskId) return activeTraceId
+  return activeTaskId === taskId ? activeTraceId : null
+}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -92,6 +276,7 @@ function createWindow(): void {
     minWidth: 1080,
     minHeight: 640,
     show: false,
+    icon: getWindowIconPath(),
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 13 },
     // Mac 液态玻璃：原生 vibrancy + 透明背景
@@ -102,16 +287,19 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false
+      sandbox: false,
+      scrollBounce: false
     }
   })
 
   // 把 Agent 子进程消息转发给渲染进程，并注入 taskId（流式事件本身不带，补上以便前端按任务隔离）
   agentBridge.onMessage((msg: StdoutMessage) => {
-    const taskId = activeTraceId
-    if (taskId) {
-      logAgentEvent(taskId, msg)
-      if (msg.type === 'completed' || msg.type === 'error') {
+    const taskId = activeTaskId
+    const traceId = activeTraceId
+    if (traceId) {
+      logAgentEvent(traceId, msg)
+      if (msg.type === 'completed' || msg.type === 'error' || (msg.type === 'turn_completed' && msg.status === 'cancelled')) {
+        activeTaskId = null
         activeTraceId = null
       }
     }
@@ -125,7 +313,7 @@ function createWindow(): void {
   })
 
   // 开发期加载 vite dev server，生产期加载打包文件
-  if (process.env.ELECTRON_RENDERER_URL) {
+if (process.env.ELECTRON_RENDERER_URL) {
     void mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
   } else {
     void mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
@@ -133,7 +321,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
-  nativeTheme.themeSource = 'light'
+  applyThemeMode(loadThemeMode())
   agentBridge.start()
   createWindow()
 
@@ -148,46 +336,69 @@ app.on('window-all-closed', () => {
 })
 
 // IPC 通道（依据 docs/09 第二章）
-ipcMain.handle('agent:startTask', async (_e, args: { mode: 'work' | 'code'; message: string; workspaceDir?: string; maxIterations?: number; autoApproveLow?: boolean; sessionId?: string; history?: unknown[]; attachments?: unknown[] }) => {
+ipcMain.handle('agent:startTask', async (_e, args: { mode: 'work' | 'code'; message: string; workspaceDir?: string; maxIterations?: number; approvalMode?: 'always_ask' | 'risk_only' | 'auto'; autoApproveLow?: boolean; sessionId?: string; history?: unknown[]; attachments?: unknown[] }) => {
   const sessionId = args.sessionId || randomUUID()
+  const traceId = randomUUID()
+  const savedConfig = getActiveModelConfig() || loadConfig()
+  const configError = savedConfig ? validateModelConfig(savedConfig) : null
+  if (configError) {
+    return { taskId: sessionId, traceId, error: configError }
+  }
   const config = buildAgentConfig()
   if (!config.apiKey) {
-    return { taskId: sessionId, error: '未检测到模型凭证，请在环境变量配置 ANTHROPIC_API_KEY' }
+    return { taskId: sessionId, traceId, error: '未检测到模型访问配置，请在模型设置里重新选择或配置模型' }
   }
   if (args.maxIterations) config.maxIterations = args.maxIterations
+  if (args.approvalMode) config.approvalMode = args.approvalMode
   if (args.autoApproveLow !== undefined) config.autoApproveLow = args.autoApproveLow
-  activeTraceId = sessionId
-  startTrace(sessionId, {
+  activeTaskId = sessionId
+  activeTraceId = traceId
+  // 输出目录：优先用用户指定，否则用系统文档目录下的「小蓝鲸产出」
+  const outputDir = args.workspaceDir || join(app.getPath('documents'), '小蓝鲸产出')
+  startTrace(traceId, {
+    taskId: sessionId,
+    sessionId,
+    conversationId: sessionId,
+    runId: traceId,
     message: args.message,
     mode: args.mode,
     model: config.model,
     provider: config.provider,
     maxIterations: config.maxIterations,
+    approvalMode: config.approvalMode,
     autoApproveLow: config.autoApproveLow ?? false,
     apiKey: config.apiKey,
     apiBaseUrl: config.apiBaseUrl,
     providerId: config.providerId,
-    customProviderId: config.customProviderId
+    customProviderId: config.customProviderId,
+    attachmentCount: Array.isArray(args.attachments) ? args.attachments.length : 0,
+    historyCount: Array.isArray(args.history) ? args.history.length : 0,
+    workspaceDir: outputDir
   })
-  // 输出目录：优先用用户指定，否则用系统文档目录下的「小蓝鲸产出」
-  const outputDir = args.workspaceDir || join(app.getPath('documents'), '小蓝鲸产出')
   if (!existsSync(outputDir)) mkdirSync(outputDir, { recursive: true })
   agentBridge.startTask(sessionId, args.message, config, outputDir, args.history, args.attachments as MessageAttachment[] | undefined)
-  return { taskId: sessionId }
+  return { taskId: sessionId, traceId }
 })
 
 ipcMain.handle('config:get', async (_e, key: string) => {
-  const cfg = loadConfig()
-  if (key === 'hasApiKey') return Boolean(cfg?.apiKey || process.env.ANTHROPIC_API_KEY)
+  const cfg = getActiveModelConfig() || loadConfig()
+  if (key === 'hasApiKey') {
+    const active = getActiveModelConfig()
+    return Boolean((active && !validateModelConfig(active)) || process.env.ANTHROPIC_API_KEY)
+  }
   if (key === 'model') return cfg?.model || process.env.XLJ_MODEL || 'claude-sonnet-4-5-20250929'
   if (key === 'modelConfig') {
-    if (cfg) return cfg
+    const active = sanitizeModelConfigForRenderer(getActiveModelConfig())
+    if (active) return active
+    const legacy = sanitizeModelConfigForRenderer(loadConfig())
+    if (legacy) return legacy
     const envKey = process.env.ANTHROPIC_API_KEY
     if (envKey) {
       return {
         providerId: 'anthropic',
         model: process.env.XLJ_MODEL || 'claude-sonnet-4-5-20250929',
-        apiKey: envKey,
+        apiKey: '',
+        hasSavedApiKey: true,
         apiBaseUrl: process.env.ANTHROPIC_BASE_URL || '',
         apiFormat: 'anthropic',
         contextLimit: 200000,
@@ -200,11 +411,73 @@ ipcMain.handle('config:get', async (_e, key: string) => {
   if (key === 'customProviderId') return cfg?.customProviderId || null
   if (key === 'autoApproveLow') return cfg?.autoApproveLow ?? false
   if (key === 'maxIterations') return (cfg as Record<string, unknown> | null)?.maxIterations ?? null
+  if (key === 'themeMode') return loadThemeMode()
   return null
 })
 
-ipcMain.handle('config:saveModel', async (_e, cfg: ModelConfig) => {
-  saveConfigFile(cfg)
+ipcMain.handle('appearance:setThemeMode', async (_e, themeMode: ThemeMode) => {
+  const normalized = normalizeThemeMode(themeMode)
+  saveThemeMode(normalized)
+  applyThemeMode(normalized)
+  return { success: true, themeMode: normalized }
+})
+
+ipcMain.handle('config:saveModel', async (_e, input: ModelConfig | { cfg: ModelConfig; activate?: boolean }) => {
+  const cfg = 'cfg' in input ? input.cfg : input
+  const activate = 'cfg' in input ? input.activate !== false : true
+  const store = loadModelsStore()
+  const resolvedCfg = resolveModelConfigWithSavedKey(cfg)
+  const configError = validateModelConfig(resolvedCfg)
+  if (configError) return { success: false, error: configError }
+  const id = generateModelId(resolvedCfg)
+  const newEntry = { ...resolvedCfg, _id: id } as ModelConfig & { _id: string }
+  // 同一个模型配置位直接覆盖更新，避免保存后重复出现。
+  const idx = store.configs.findIndex((c) => sameModelSlot(c, resolvedCfg))
+  if (idx >= 0) {
+    newEntry._id = (store.configs[idx] as ModelConfig & { _id?: string })._id || id
+    store.configs[idx] = newEntry
+  } else {
+    store.configs.push(newEntry)
+  }
+  if (activate) {
+    store.activeId = newEntry._id
+    saveConfigFile(resolvedCfg)
+  }
+  saveModelsStore(store)
+  return { success: true, modelId: newEntry._id }
+})
+
+ipcMain.handle('config:testModel', async (_e, cfg: ModelConfig) => {
+  return testModelConnection(cfg)
+})
+
+// 获取已配置模型列表
+ipcMain.handle('config:getModelList', async () => {
+  const store = loadModelsStore()
+  return sanitizeModelConfigStoreForRenderer(store)
+})
+
+// 切换激活模型（输入框快速切换，不进设置页）
+ipcMain.handle('config:setActiveModel', async (_e, modelId: string) => {
+  const store = loadModelsStore()
+  if (store.configs.some((c) => (c as ModelConfig & { _id?: string })._id === modelId)) {
+    store.activeId = modelId
+    saveModelsStore(store)
+    const active = store.configs.find((c) => (c as ModelConfig & { _id?: string })._id === modelId)
+    if (active) saveConfigFile(active) // 同步旧文件
+    return { success: true }
+  }
+  return { success: false }
+})
+
+// 删除已配置模型
+ipcMain.handle('config:deleteModel', async (_e, modelId: string) => {
+  const store = loadModelsStore()
+  store.configs = store.configs.filter((c) => (c as ModelConfig & { _id?: string })._id !== modelId)
+  if (store.activeId === modelId) {
+    store.activeId = store.configs[0] ? (store.configs[0] as ModelConfig & { _id?: string })._id || null : null
+  }
+  saveModelsStore(store)
   return { success: true }
 })
 
@@ -222,38 +495,64 @@ ipcMain.handle('shell:openPath', async (_e, filePath: string) => {
 
 // 任务控制通道（依据 docs/09 第二章，转发为 stdin task_control）
 ipcMain.handle('agent:pause', async (_e, args: { taskId: string }) => {
+  const traceId = activeTraceForTask(args.taskId)
+  if (traceId) logUserAction(traceId, 'task_paused', { taskId: args.taskId })
   agentBridge.send({ type: 'task_control', task_id: args.taskId, action: 'pause' })
 })
 
 ipcMain.handle('agent:resume', async (_e, args: { taskId: string }) => {
+  const traceId = activeTraceForTask(args.taskId)
+  if (traceId) logUserAction(traceId, 'task_resumed', { taskId: args.taskId })
   agentBridge.send({ type: 'task_control', task_id: args.taskId, action: 'resume' })
 })
 
 ipcMain.handle('agent:cancel', async (_e, args: { taskId: string }) => {
-  if (activeTraceId) logUserAction(activeTraceId, 'task_cancelled', { taskId: args.taskId })
+  const traceId = activeTraceForTask(args.taskId)
+  if (traceId) logUserAction(traceId, 'task_cancelled', { taskId: args.taskId })
+  // 先尝试优雅取消（发 task_control），再补发 stopped 状态让 UI 立即反映
   agentBridge.send({ type: 'task_control', task_id: args.taskId, action: 'cancel' })
+  agentBridge.cancelAndNotify()
 })
 
 ipcMain.handle('agent:rollback', async (_e, args: { taskId: string }) => {
+  const traceId = activeTraceForTask(args.taskId)
+  if (traceId) logUserAction(traceId, 'task_rollback', { taskId: args.taskId })
   agentBridge.send({ type: 'task_control', task_id: args.taskId, action: 'rollback' })
   return { success: true }
 })
 
 // 权限审批通道（转发为 stdin approval_response）
-ipcMain.handle('agent:approval', async (_e, args: { requestId: string; approved: boolean }) => {
-  if (activeTraceId) logUserAction(activeTraceId, 'approval_response', { requestId: args.requestId, approved: args.approved })
-  agentBridge.send({ type: 'approval_response', request_id: args.requestId, approved: args.approved })
+ipcMain.handle('agent:approval', async (_e, args: { requestId: string; approved: boolean; scope?: 'once' | 'task' | 'always' }) => {
+  const traceId = activeTraceForTask()
+  if (traceId) logUserAction(traceId, 'approval_response', { requestId: args.requestId, approved: args.approved, scope: args.scope })
+  agentBridge.send({ type: 'approval_response', request_id: args.requestId, approved: args.approved, scope: args.scope })
+})
+
+// 反问响应通道（转发为 stdin question_response）
+ipcMain.handle('agent:questionResponse', async (_e, args: { requestId: string; selectedOptionIds?: string[]; customAnswer?: string; skipped?: boolean }) => {
+  const traceId = activeTraceForTask()
+  if (traceId) logUserAction(traceId, 'question_response', { requestId: args.requestId, selectedOptionIds: args.selectedOptionIds, customAnswer: args.customAnswer, skipped: args.skipped })
+  agentBridge.send({ type: 'question_response', request_id: args.requestId, selected_option_ids: args.selectedOptionIds, custom_answer: args.customAnswer, skipped: args.skipped })
 })
 
 // 计划响应通道（转发为 stdin plan_response）
 ipcMain.handle('agent:planResponse', async (_e, args: { requestId: string; decision: 'approve' | 'reject_stop' | 'reject_revise'; feedback?: string }) => {
-  if (activeTraceId) logUserAction(activeTraceId, 'plan_response', { requestId: args.requestId, decision: args.decision, feedback: args.feedback })
+  const traceId = activeTraceForTask()
+  if (traceId) logUserAction(traceId, 'plan_response', { requestId: args.requestId, decision: args.decision, feedback: args.feedback })
   agentBridge.send({ type: 'plan_response', request_id: args.requestId, decision: args.decision, feedback: args.feedback })
+})
+
+// 续跑决策响应通道（转发为 stdin continuation_response）
+ipcMain.handle('agent:continuationResponse', async (_e, args: { taskId: string; decision: 'continue' | 'stop' | 'split' }) => {
+  const traceId = activeTraceForTask(args.taskId)
+  if (traceId) logUserAction(traceId, 'continuation_response', { taskId: args.taskId, decision: args.decision })
+  agentBridge.send({ type: 'continuation_response', task_id: args.taskId, decision: args.decision })
 })
 
 // 追加指令通道（转发为 stdin append_input）
 ipcMain.handle('agent:appendInput', async (_e, args: { taskId: string; message: string; mode?: 'inject' | 'queue' }) => {
-  if (activeTraceId) logUserAction(activeTraceId, 'append_input', { taskId: args.taskId, message: args.message, mode: args.mode })
+  const traceId = activeTraceForTask(args.taskId)
+  if (traceId) logUserAction(traceId, 'append_input', { taskId: args.taskId, message: args.message, mode: args.mode })
   agentBridge.send({ type: 'append_input', task_id: args.taskId, message: args.message, mode: args.mode })
 })
 
@@ -323,11 +622,33 @@ ipcMain.handle('session:loadTurns', async (_e, sessionId: string) => {
   }
 })
 
+function decodeXml(input: string): string {
+  return input
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+}
+
+function resolveWorkspaceRoot(workspaceDir?: string): string {
+  const fallback = join(app.getPath('documents'), '小蓝鲸产出')
+  if (!workspaceDir || typeof workspaceDir !== 'string') return fallback
+  return resolve(workspaceDir)
+}
+
+function isInsideRoot(root: string, target: string): boolean {
+  const rel = relative(root, target)
+  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))
+}
+
 // 列出工作区目录文件(供输入框 @文件引用)
-ipcMain.handle('workspace:listFiles', async (_e, subDir?: string) => {
-  const root = join(app.getPath('documents'), '小蓝鲸产出')
+ipcMain.handle('workspace:listFiles', async (_e, args?: { workspaceDir?: string; subDir?: string } | string) => {
+  const workspaceDir = typeof args === 'string' ? undefined : args?.workspaceDir
+  const subDir = typeof args === 'string' ? args : args?.subDir
+  const root = resolveWorkspaceRoot(workspaceDir)
   const target = subDir ? resolve(root, subDir) : root
-  if (!target.startsWith(root)) return { error: '越界', items: [] }
+  if (!isInsideRoot(root, target)) return { error: '不能读取工作区外的文件', items: [] }
   try {
     const entries = await readdirAsync(target, { withFileTypes: true })
     const items = await Promise.all(
@@ -341,7 +662,7 @@ ipcMain.handle('workspace:listFiles', async (_e, subDir?: string) => {
             path: relative(root, join(target, e.name))
           }
         } catch {
-          return { name: e.name, type: e.isDirectory() ? 'dir' : 'file', path: e.name }
+          return { name: e.name, type: e.isDirectory() ? 'dir' : 'file', size: 0, path: e.name }
         }
       })
     )
@@ -357,13 +678,44 @@ ipcMain.handle('workspace:listFiles', async (_e, subDir?: string) => {
 })
 
 // 读取工作区文件文本内容(供 @文件引用注入上下文)
-ipcMain.handle('workspace:readFile', async (_e, relPath: string) => {
-  const root = join(app.getPath('documents'), '小蓝鲸产出')
-  const abs = resolve(root, relPath)
-  if (!abs.startsWith(root)) return { error: '越界' }
+ipcMain.handle('workspace:readFile', async (_e, args: { relPath: string; workspaceDir?: string } | string) => {
+  const relPath = typeof args === 'string' ? args : args?.relPath
+  const workspaceDir = typeof args === 'string' ? undefined : args?.workspaceDir
+  const root = resolveWorkspaceRoot(workspaceDir)
+  const abs = resolve(root, relPath || '')
+  if (!isInsideRoot(root, abs)) return { error: '不能读取工作区外的文件' }
   try {
     const content = readFileSync(abs, 'utf-8')
     return { content: content.slice(0, 50000), truncated: content.length > 50000 }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) }
+  }
+})
+
+
+// 预览工作区产物：文本直接读，图片返回可展示内容，Office/PDF 提取文字用于预览
+ipcMain.handle('workspace:previewFile', async (_e, args: { filePath: string; workspaceDir?: string }) => {
+  const filePath = args?.filePath
+  const workspaceDir = args?.workspaceDir
+  if (!filePath || typeof filePath !== 'string') return { error: '文件路径为空' }
+  const root = resolveWorkspaceRoot(workspaceDir)
+  const abs = filePath.startsWith('/') ? resolve(filePath) : resolve(root, filePath)
+  if (!isInsideRoot(root, abs)) return { error: '不能预览工作区外的文件' }
+  try {
+    const ext = abs.split('.').pop()?.toLowerCase() || ''
+    const buf = readFileSync(abs)
+    const imageMime: Record<string, string> = {
+      png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', bmp: 'image/bmp'
+    }
+    if (imageMime[ext]) {
+      return { kind: 'image', dataUrl: `data:${imageMime[ext]};base64,${buf.toString('base64')}`, size: buf.length }
+    }
+    if (['docx', 'xlsx', 'pdf', 'doc', 'pptx'].includes(ext)) {
+      const content = await extractDocumentText(abs, ext)
+      return { kind: ext === 'xlsx' ? 'table' : 'document', content: content.slice(0, 50000), truncated: content.length > 50000, size: buf.length }
+    }
+    const content = buf.toString('utf-8')
+    return { kind: 'text', content: content.slice(0, 50000), truncated: content.length > 50000, size: buf.length }
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) }
   }
@@ -375,6 +727,39 @@ ipcMain.handle('trace:list', async (_e, limit?: number) => {
 
 ipcMain.handle('trace:get', async (_e, traceId: string) => {
   return getTrace(traceId)
+})
+
+ipcMain.handle('trace:export', async (_e, traceId?: string) => {
+  return exportTracePackage(traceId)
+})
+
+ipcMain.handle('feedback:create', async (_e, input: {
+  traceId?: string
+  category: string
+  description: string
+  contact?: string
+  packageLevel?: 'basic' | 'enhanced' | 'full'
+  includeConversation?: boolean
+  includeFileSummary?: boolean
+  allowDiagnosticPackage?: boolean
+}) => {
+  return createFeedbackTicket(input)
+})
+
+ipcMain.handle('feedback:list', async (_e, limit?: number) => {
+  return listFeedbackTickets(limit ?? 50)
+})
+
+ipcMain.handle('diagnostics:overview', async (_e, limit?: number) => {
+  return getDiagnosticsOverview(limit ?? 200)
+})
+
+ipcMain.handle('replay:get', async (_e, input: { traceId: string; includeConversation?: boolean; includeFileSummary?: boolean }) => {
+  return getReplayBundle(input)
+})
+
+ipcMain.handle('replay:export', async (_e, input: { traceId: string; includeConversation?: boolean; includeFileSummary?: boolean }) => {
+  return exportReplayPackage(input)
 })
 
 // 从 Office/PDF 文档中提取纯文本内容（供模型理解文档）
@@ -409,13 +794,67 @@ async function extractDocumentText(filePath: string, ext: string): Promise<strin
       await parser.destroy()
       return textResult.text || ''
     }
-    // .doc / .pptx 等暂不支持解析，返回提示
+    // .doc 暂不支持解析；.pptx 用系统 unzip 读取幻灯片文字，不额外引入依赖。
     if (ext === 'doc') return '[旧版 .doc 格式暂不支持解析，建议转为 .docx]'
-    if (ext === 'pptx') return '[.pptx 解析暂未实现，建议复制文字内容后发送]'
+    if (ext === 'pptx') {
+      const xml = execFileSync('unzip', ['-p', filePath, 'ppt/slides/slide*.xml'], { encoding: 'utf8', maxBuffer: 1024 * 1024 * 20 })
+      const text = Array.from(xml.matchAll(/<a:t>(.*?)<\/a:t>/g))
+        .map((m) => decodeXml(m[1]))
+        .filter(Boolean)
+      return text.join('\n') || '[未提取到演示稿文字]'
+    }
   } catch (e) {
     return `[文档解析失败: ${e instanceof Error ? e.message : String(e)}]`
   }
   return ''
+}
+
+async function buildAttachmentFile(filePath: string) {
+  const fileName = filePath.split('/').pop() || filePath
+  const ext = fileName.split('.').pop()?.toLowerCase() || ''
+  const isImage = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(ext)
+  const isText = ['txt', 'md', 'json', 'csv', 'log', 'ts', 'js', 'tsx', 'jsx', 'py', 'go', 'rs', 'java', 'html', 'css', 'xml', 'yaml', 'yml', 'sh', 'sql'].includes(ext)
+  const isDoc = ['docx', 'xlsx', 'pdf', 'doc', 'pptx'].includes(ext)
+  const mime = isImage
+    ? (ext === 'jpg' ? 'image/jpeg' : ext === 'svg' ? 'image/svg+xml' : `image/${ext}`)
+    : isText ? 'text/plain'
+    : isDoc ? (ext === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      : ext === 'xlsx' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      : ext === 'pdf' ? 'application/pdf'
+      : ext === 'pptx' ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      : 'application/msword')
+    : 'application/octet-stream'
+
+  let dataUrl: string | undefined
+  let textContent: string | undefined
+  let size = 0
+  let error: string | undefined
+
+  try {
+    const buf = readFileSync(filePath)
+    size = buf.length
+    if (isImage) {
+      dataUrl = `data:${mime};base64,${buf.toString('base64')}`
+    } else if (isText) {
+      textContent = buf.toString('utf-8')
+    } else if (isDoc) {
+      textContent = await extractDocumentText(filePath, ext)
+    }
+  } catch (e) {
+    error = e instanceof Error ? e.message : String(e)
+  }
+
+  const type = isImage ? 'image' : (isText || (isDoc && textContent)) ? 'text' : 'file'
+  return {
+    name: fileName,
+    type,
+    size,
+    mime,
+    dataUrl,
+    textContent,
+    sourcePath: filePath,
+    error
+  }
 }
 
 ipcMain.handle('dialog:openFiles', async () => {
@@ -427,54 +866,14 @@ ipcMain.handle('dialog:openFiles', async () => {
   })
   if (result.canceled || result.filePaths.length === 0) return []
 
-  const results = await Promise.all(result.filePaths.map(async (filePath) => {
-    const fileName = filePath.split('/').pop() || filePath
-    const ext = fileName.split('.').pop()?.toLowerCase() || ''
-    const isImage = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(ext)
-    const isText = ['txt', 'md', 'json', 'csv', 'log', 'ts', 'js', 'tsx', 'jsx', 'py', 'go', 'rs', 'java', 'html', 'css', 'xml', 'yaml', 'yml', 'sh', 'sql'].includes(ext)
-    const isDoc = ['docx', 'xlsx', 'pdf', 'doc', 'pptx'].includes(ext)
-    const mime = isImage
-      ? (ext === 'jpg' ? 'image/jpeg' : ext === 'svg' ? 'image/svg+xml' : `image/${ext}`)
-      : isText ? 'text/plain'
-      : isDoc ? (ext === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        : ext === 'xlsx' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        : ext === 'pdf' ? 'application/pdf'
-        : ext === 'pptx' ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-        : 'application/msword')
-      : 'application/octet-stream'
+  return Promise.all(result.filePaths.map((filePath) => buildAttachmentFile(filePath)))
+})
 
-    let dataUrl: string | undefined
-    let textContent: string | undefined
-    let size = 0
-
-    try {
-      const buf = readFileSync(filePath)
-      size = buf.length
-      if (isImage) {
-        dataUrl = `data:${mime};base64,${buf.toString('base64')}`
-      } else if (isText) {
-        textContent = buf.toString('utf-8')
-      } else if (isDoc) {
-        textContent = await extractDocumentText(filePath, ext)
-      }
-    } catch {
-      // 读取失败
-    }
-
-    // 文档类有提取到文本就归为 text，否则 file
-    const type = isImage ? 'image' : (isText || (isDoc && textContent)) ? 'text' : 'file'
-
-    return {
-      name: fileName,
-      type,
-      size,
-      mime,
-      dataUrl,
-      textContent
-    }
-  }))
-
-  return results
+ipcMain.handle('dialog:readAttachmentFile', async (_e, filePath: string) => {
+  if (typeof filePath !== 'string' || !filePath) {
+    return { name: '未知文件', type: 'file', size: 0, mime: 'application/octet-stream', error: '文件路径为空' }
+  }
+  return buildAttachmentFile(filePath)
 })
 
 // 选择已有文件夹作为项目根目录（参考 Codex pickLocalWorkspaceRoots）

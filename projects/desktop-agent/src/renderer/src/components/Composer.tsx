@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import { useTaskStore } from '../store/task'
 import { ChatInput } from './ChatInput'
+import { ComposerQuestionPanel } from './ComposerQuestionPanel'
+import { ContinuationCard } from './ContinuationCard'
+import { ProgressPill } from './ProgressPill'
 
 export function Composer() {
-  const { status, message, setMessage, startTask, appendInput, taskId, messages } = useTaskStore()
+  const { status, message, attachments, setMessage, startTask, appendInput, cancelTask, taskId, messages, currentTurn, approvalPending, pendingQuestion, respondQuestion, continuationPending, respondContinuation, todos } = useTaskStore()
   const [pending, setPending] = useState(false)
 
   // idle 状态不渲染底部 Composer（输入框在 HomeView 中间）
@@ -14,7 +17,10 @@ export function Composer() {
   const isFinished = status === 'completed' || status === 'failed'
 
   const handleSend = async () => {
-    if (!message.trim()) return
+    const hasBlockedAttachment = attachments.some((a) => a.status === 'failed' || a.status === 'uploading')
+    const readyAttachments = attachments.filter((a) => a.status !== 'failed' && a.status !== 'uploading')
+    if (hasBlockedAttachment) return
+    if (!message.trim() && readyAttachments.length === 0) return
     if (isExecuting && taskId) {
       setPending(true)
       try {
@@ -35,14 +41,25 @@ export function Composer() {
       : '输入新任务…'
 
   return (
-    <div className="flex-shrink-0 px-6 py-3 border-t border-black/[0.06]">
-      <div className="mx-auto">
-        <ChatInput
-          value={message}
-          onChange={setMessage}
-          onSend={handleSend}
-          placeholder={pending ? '发送中…' : placeholder}
-        />
+    <div className="flex-shrink-0 px-6 py-3">
+      <div className="mx-auto max-w-4xl">
+        <div className="mb-2 flex justify-center">
+          <ProgressPill status={status} currentTurn={currentTurn} todos={todos} hasApprovalPending={Boolean(approvalPending)} />
+        </div>
+        {continuationPending ? (
+          <ContinuationCard />
+        ) : pendingQuestion ? (
+          <ComposerQuestionPanel question={pendingQuestion} onAnswer={respondQuestion} />
+        ) : (
+          <ChatInput
+            value={message}
+            onChange={setMessage}
+            onSend={handleSend}
+            onStop={() => void cancelTask()}
+            isRunning={isExecuting}
+            placeholder={pending ? '发送中…' : placeholder}
+          />
+        )}
       </div>
     </div>
   )

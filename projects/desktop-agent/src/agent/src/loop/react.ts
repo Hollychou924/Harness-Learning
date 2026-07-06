@@ -1,9 +1,12 @@
 import type { AgentConfig, AgentMessage, StdoutMessage, MessageAttachment } from '../protocol.js'
 import type { Item, ItemStatus, ToolCallItem, ToolKind } from '../items.js'
 import { isSafe, isBlocked } from '../tools/index.js'
-import { parsePlanArgs, clearPendingPlanRequestId } from '../tools/plan.js'
+import { shellRiskLevel } from '../tools/shell.js'
+import { parsePlanArgs, clearPendingPlanRequestId, waitForPlanResponse } from '../tools/plan.js'
+import { parseQuestionArgs } from '../tools/question.js'
 import { makeTodoExecuteHandler } from '../tools/todo.js'
-import { waitForApproval } from '../approval.js'
+import { hasRememberedApproval, rememberApproval, waitForApproval } from '../approval.js'
+import { waitForQuestion, waitForContinuation, type ContinuationDecision } from '../question.js'
 import { randomUUID } from 'node:crypto'
 import { AnthropicProvider, type LlmProvider } from '../providers/anthropic.js'
 import { OpenAIProvider } from '../providers/openai.js'
@@ -11,7 +14,7 @@ import { buildSystemPrompt } from '../prompt/system.js'
 import { summarizeToolResult } from './tool-summary.js'
 
 // ReAct 引擎（依据 docs/01 第三章，参考已验证实现）
-// maxIterations 硬上限，到顶兜底收尾，禁止无限转
+// maxIterations 硬上限，到顶后先询问用户是否继续/停止/拆分，禁止无限转
 // 空回复重试一次，工具后报错合成收尾
 // 2026-07-02 起改为 Turn/Item 事件模型：本轮内每个思考/工具调用/审批都是独立条目，带 id 可追溯
 export interface ReactResult {
@@ -42,8 +45,49 @@ export async function runReact(
   workspaceDir?: string,
   mode: 'work' | 'code' = 'work',
   taskId?: string,
-  attachments?: MessageAttachment[]
+  attachments?: MessageAttachment[],
+  consumeAppendedInput?: () => string[]
 ): Promise<ReactResult> {
+  const configIssue = validateModelAccess(config.apiKey)
+  if (configIssue) {
+    const turnId = `turn-${randomUUID()}`
+    const userMessageItemId = `userMessage-${randomUUID()}`
+    const agentMessageItemId = `agentMessage-${randomUUID()}`
+    const failureText = `模型调用失败：${configIssue}`
+    onEvent({ type: 'turn_started', turn_id: turnId })
+    onEvent({
+      type: 'item_started',
+      turn_id: turnId,
+      item: {
+        type: 'userMessage',
+        id: userMessageItemId,
+        content: userMessage ? [{ type: 'text', text: userMessage }] : []
+      }
+    })
+    onEvent({
+      type: 'item_completed',
+      turn_id: turnId,
+      item: {
+        type: 'userMessage',
+        id: userMessageItemId,
+        content: userMessage ? [{ type: 'text', text: userMessage }] : []
+      }
+    })
+    onEvent({
+      type: 'item_started',
+      turn_id: turnId,
+      item: { type: 'agentMessage', id: agentMessageItemId, text: failureText, phase: 'final_answer' }
+    })
+    onEvent({
+      type: 'item_completed',
+      turn_id: turnId,
+      item: { type: 'agentMessage', id: agentMessageItemId, text: failureText, phase: 'final_answer' }
+    })
+    onEvent({ type: 'turn_completed', turn_id: turnId, status: 'failed' })
+    onEvent({ type: 'error', message: failureText })
+    return { messages: [], finalText: failureText }
+  }
+
   const provider: LlmProvider = config.apiFormat === 'openai'
     ? new OpenAIProvider(config)
     : new AnthropicProvider(config)
@@ -87,8 +131,15 @@ export async function runReact(
     type: 'userMessage',
     id: userMessageItemId,
     content: [
-      { type: 'text', text: userMessage },
-      ...imageAttachments.map((a) => ({ type: 'image' as const, url: a.dataUrl || '' }))
+      ...(userMessage ? [{ type: 'text' as const, text: userMessage }] : []),
+      ...(attachments || []).map((a) => ({
+        type: a.type === 'image' ? 'image' as const : 'file' as const,
+        name: a.name,
+        mime: a.mime,
+        size: a.size,
+        url: a.type === 'image' ? a.dataUrl || '' : undefined,
+        textContent: a.type !== 'image' ? a.textContent : undefined
+      }))
     ]
   }
   onEvent({ type: 'item_started', turn_id: turnId, item: userMessageItem })
@@ -103,33 +154,99 @@ export async function runReact(
   /** 上一个失败的工具调用条目 id，用于把下一次同名重试串成"失败→重试→成功"链条 */
   let lastFailedToolItemId: string | null = null
 
-  function emitReasoning(text: string): void {
-    const itemId = `reasoning-${randomUUID()}`
-    const now = Date.now()
-    const item: Item = {
-      type: 'reasoning',
-      id: itemId,
-      summary: [text],
-      content: [text],
-      status: 'completed',
-      startedAt: now,
-      finishedAt: now
+  function appendRuntimeInputs(appended: string[]): boolean {
+    const entries = appended.map((text) => text.trim()).filter(Boolean)
+    if (entries.length === 0) return false
+    const displayText = entries.length === 1
+      ? `\n\n补充要求：${entries[0]}`
+      : `\n\n补充要求：\n${entries.map((text, index) => `${index + 1}. ${text}`).join('\n')}`
+    const promptText = `用户在任务执行中补充了要求，请从现在开始遵守，并在后续动作和最终答复中体现：\n${entries.map((text, index) => `${index + 1}. ${text}`).join('\n')}`
+    messages.push({ role: 'user', content: promptText })
+
+    const appendedItem: Item = {
+      type: 'userMessage',
+      id: `userMessage-${randomUUID()}`,
+      content: [{ type: 'text', text: displayText }]
     }
-    onEvent({ type: 'item_started', turn_id: turnId, item })
-    onEvent({ type: 'item_completed', turn_id: turnId, item })
+    onEvent({ type: 'item_started', turn_id: turnId, item: appendedItem })
+    onEvent({ type: 'item_completed', turn_id: turnId, item: appendedItem })
+    onEvent({ type: 'status', status: 'INFO', message: '补充要求已并入当前任务' })
+    return true
   }
 
-  for (let iter = 0; iter < config.maxIterations; iter++) {
-    emitReasoning(`第 ${iter + 1} 轮思考`)
+  function takeAppendedInputs(): string[] {
+    return consumeAppendedInput ? consumeAppendedInput() : []
+  }
+
+  let maxIterations = config.maxIterations
+  let continuationCount = 0
+  let iter = 0
+  while (iter < maxIterations) {
+    appendRuntimeInputs(takeAppendedInputs())
 
     let assistantText = ''
     let toolUse: { id: string; name: string; args: Record<string, unknown> } | null = null
     let inputTokens = 0
     let outputTokens = 0
     let agentMessageItemId: string | null = null
+    let reasoningItemId: string | null = null
+    let reasoningStartedAt = 0
+    let reasoningCompleted = false
+    let reasoningContentIndex = 0
+    // 累积本轮思考内容 + signature，回传给下一轮 Anthropic 请求
+    let turnThinkingText = ''
+    let turnThinkingSignature = ''
 
     try {
       for await (const ev of provider.stream(messages, config, tools)) {
+        if (ev.type === 'thinking' && ev.thinking) {
+          if (!reasoningItemId) {
+            reasoningItemId = `reasoning-${randomUUID()}`
+            reasoningStartedAt = Date.now()
+            onEvent({
+              type: 'item_started',
+              turn_id: turnId,
+              item: {
+                type: 'reasoning',
+                id: reasoningItemId,
+                summary: [],
+                content: [],
+                status: 'running',
+                startedAt: reasoningStartedAt
+              }
+            })
+          }
+          turnThinkingText += ev.thinking
+          if (ev.thinkingSignature) turnThinkingSignature = ev.thinkingSignature
+          onEvent({
+            type: 'item_delta',
+            turn_id: turnId,
+            item_id: reasoningItemId,
+            target: { field: 'reasoningContent', index: reasoningContentIndex },
+            delta: ev.thinking
+          })
+          reasoningContentIndex++
+          continue
+        }
+        // 第一个 text/tool_use 到来时，把思考条目标记为完成
+        // summary = 截断版（前80字），content = 完整原文，保证点开有增量
+        if (reasoningItemId && !reasoningCompleted && (ev.type === 'text' || ev.type === 'tool_use')) {
+          reasoningCompleted = true
+          const summaryText = turnThinkingText.slice(0, 80) + (turnThinkingText.length > 80 ? '…' : '')
+          onEvent({
+            type: 'item_completed',
+            turn_id: turnId,
+            item: {
+              type: 'reasoning',
+              id: reasoningItemId,
+              summary: summaryText ? [summaryText] : [],
+              content: turnThinkingText ? [turnThinkingText] : [],
+              status: 'completed',
+              startedAt: reasoningStartedAt || Date.now(),
+              finishedAt: Date.now()
+            }
+          })
+        }
         if (ev.type === 'text' && ev.text) {
           if (!agentMessageItemId) {
             agentMessageItemId = `agentMessage-${randomUUID()}`
@@ -161,7 +278,7 @@ export async function runReact(
       // 图片兼容退回：模型不支持图片时，移除图片后重试一次本轮
       if (hasImages && !imagesDisabled && isImageUnsupportedError(msg)) {
         imagesDisabled = true
-        emitReasoning('当前模型不支持图片，已自动移除图片并用纯文字重试')
+        // 图片退回提示走系统消息，不用假思考占位
         const lastUser = messages.slice().reverse().find((m: AgentMessage) => m.role === 'user')
         if (lastUser) {
           lastUser.attachments = undefined
@@ -179,8 +296,33 @@ export async function runReact(
         onEvent({ type: 'completed', task_id: taskId || '', summary: finalText })
         return { messages, finalText }
       }
+      const failureText = `模型调用失败：${msg}`
+      const failureItemId = agentMessageItemId || `agentMessage-${randomUUID()}`
+      if (!agentMessageItemId) {
+        onEvent({
+          type: 'item_started',
+          turn_id: turnId,
+          item: { type: 'agentMessage', id: failureItemId, text: failureText, phase: 'final_answer' }
+        })
+      }
+      onEvent({
+        type: 'item_completed',
+        turn_id: turnId,
+        item: { type: 'agentMessage', id: failureItemId, text: failureText, phase: 'final_answer' }
+      })
       onEvent({ type: 'turn_completed', turn_id: turnId, status: 'failed' })
       throw e
+    }
+
+    // 兜底：若本轮有 reasoning item 但未在收到 text/tool_use 时完成（模型只输出思考无后续），在此完成
+    if (reasoningItemId && !reasoningCompleted) {
+      reasoningCompleted = true
+      const summaryText = turnThinkingText.slice(0, 80) + (turnThinkingText.length > 80 ? '…' : '')
+      onEvent({
+        type: 'item_completed',
+        turn_id: turnId,
+        item: { type: 'reasoning', id: reasoningItemId, summary: summaryText ? [summaryText] : [], content: turnThinkingText ? [turnThinkingText] : [], status: 'completed', startedAt: reasoningStartedAt || Date.now(), finishedAt: Date.now() }
+      })
     }
 
     if (agentMessageItemId) {
@@ -199,10 +341,10 @@ export async function runReact(
     if (!assistantText && !toolUse) {
       if (!emptyRetried) {
         emptyRetried = true
-        emitReasoning('模型返回空，重试一次')
+        // 空回复重试，不输出假思考
         continue
       }
-      emitReasoning('模型再次返回空，结束')
+      // 空回复二次失败，结束
       break
     }
 
@@ -214,11 +356,86 @@ export async function runReact(
 
     // 如果没有工具调用，说明模型给出最终回复，结束
     if (!toolUse) {
+      const appendedAfterAnswer = takeAppendedInputs()
+      if (appendedAfterAnswer.length > 0) {
+        messages.push({
+          role: 'assistant',
+          content: assistantText,
+          ...(turnThinkingText && turnThinkingSignature ? { thinkingBlocks: [{ type: 'thinking' as const, thinking: turnThinkingText, signature: turnThinkingSignature }] } : {})
+        })
+        appendRuntimeInputs(appendedAfterAnswer)
+        continue
+      }
+      if (assistantText) {
+        messages.push({
+          role: 'assistant',
+          content: assistantText,
+          ...(turnThinkingText && turnThinkingSignature ? { thinkingBlocks: [{ type: 'thinking' as const, thinking: turnThinkingText, signature: turnThinkingSignature }] } : {})
+        })
+      }
       break
     }
 
     // 有工具调用，执行工具
     const tool = tools.find((t) => t.name === toolUse.name)
+
+    if (toolUse.name === 'ask_question') {
+      const parsedQuestion = parseQuestionArgs(toolUse.args)
+      const questionRequestId = `question-${randomUUID()}`
+      const questionItemId = `questionItem-${randomUUID()}`
+      const questionItem: Item = {
+        type: 'question',
+        id: questionItemId,
+        requestId: questionRequestId,
+        question: parsedQuestion.question,
+        detail: parsedQuestion.detail,
+        options: parsedQuestion.options,
+        multiple: parsedQuestion.multiple,
+        allowCustom: parsedQuestion.allowCustom,
+        allowSkip: parsedQuestion.allowSkip,
+        prompts: parsedQuestion.prompts,
+        decision: 'pending'
+      }
+      onEvent({ type: 'item_started', turn_id: turnId, item: questionItem })
+      onEvent({
+        type: 'question_proposed',
+        request_id: questionRequestId,
+        question: parsedQuestion.question,
+        detail: parsedQuestion.detail,
+        options: parsedQuestion.options,
+        multiple: parsedQuestion.multiple,
+        allow_custom: parsedQuestion.allowCustom,
+        allow_skip: parsedQuestion.allowSkip,
+        prompts: parsedQuestion.prompts
+      })
+
+      const answer = await waitForQuestion(questionRequestId)
+      const completedQuestion: Item = {
+        ...questionItem,
+        decision: answer.skipped ? 'skipped' : 'answered',
+        selectedOptionIds: answer.selectedOptionIds,
+        customAnswer: answer.customAnswer
+      }
+      onEvent({ type: 'item_completed', turn_id: turnId, item: completedQuestion })
+
+      const selectedLabels = parsedQuestion.options
+        .filter((option) => answer.selectedOptionIds.includes(option.id))
+        .map((option) => option.label)
+      const result = JSON.stringify({
+        skipped: answer.skipped,
+        selected_option_ids: answer.selectedOptionIds,
+        selected_options: selectedLabels,
+        custom_answer: answer.customAnswer
+      })
+      messages.push({
+        role: 'assistant',
+        content: assistantText,
+        ...(turnThinkingText && turnThinkingSignature ? { thinkingBlocks: [{ type: 'thinking' as const, thinking: turnThinkingText, signature: turnThinkingSignature }] } : {}),
+        tool_calls: [{ id: toolUse.id, type: 'function', function: { name: toolUse.name, arguments: JSON.stringify(toolUse.args) } }]
+      })
+      messages.push({ role: 'tool', tool_call_id: toolUse.id, content: result })
+      continue
+    }
     const toolItemId = `toolCall-${randomUUID()}`
     const toolKind = toolKindOf(toolUse.name)
     const toolStartedAt = Date.now()
@@ -255,6 +472,7 @@ export async function runReact(
       messages.push({
         role: 'assistant',
         content: assistantText,
+        ...(turnThinkingText && turnThinkingSignature ? { thinkingBlocks: [{ type: 'thinking' as const, thinking: turnThinkingText, signature: turnThinkingSignature }] } : {}),
         tool_calls: [
           {
             id: toolUse.id,
@@ -271,11 +489,20 @@ export async function runReact(
       continue
     }
 
-    // 权限判定：根据 autoApproveLow 开关和工具风险等级决定是否需要审批
-    const autoApprove = config.autoApproveLow !== false
-    const needsApproval = !autoApprove
-      ? !isSafe(toolUse.name)
-      : tool.riskLevel === 'high' || tool.riskLevel === 'critical'
+    // 权限判定：根据用户在输入框选择的模式和工具风险等级决定是否需要审批
+    // shell 工具的风险按命令内容动态判定（只读查询=low，写操作=medium，高风险=high）
+    const effectiveRisk = toolUse.name === 'shell' && typeof toolUse.args.command === 'string'
+      ? shellRiskLevel(toolUse.args.command)
+      : tool.riskLevel
+    const approvalMode = config.approvalMode ?? (config.autoApproveLow === false ? 'always_ask' : 'risk_only')
+    const rememberedApproval = taskId ? hasRememberedApproval(taskId, toolUse.name, toolUse.args) : false
+    const needsApproval = !rememberedApproval && (
+      approvalMode === 'always_ask'
+        ? !isSafe(toolUse.name) && effectiveRisk !== 'low'
+        : approvalMode === 'risk_only'
+          ? effectiveRisk === 'high' || effectiveRisk === 'critical'
+          : false
+    )
 
     if (needsApproval) {
       const approvalId = `approval-${randomUUID()}`
@@ -286,9 +513,9 @@ export async function runReact(
         requestId: approvalId,
         toolName: toolUse.name,
         args: toolUse.args,
-        riskLevel: tool.riskLevel,
+        riskLevel: effectiveRisk,
         impact: tool.description.slice(0, 120),
-        canRollback: tool.riskLevel !== 'critical',
+        canRollback: effectiveRisk !== 'critical',
         decision: 'pending'
       }
       onEvent({ type: 'item_started', turn_id: turnId, item: approvalItem })
@@ -297,23 +524,25 @@ export async function runReact(
         request_id: approvalId,
         tool_name: toolUse.name,
         args: toolUse.args,
-        risk_level: tool.riskLevel,
+        risk_level: effectiveRisk,
         impact: tool.description.slice(0, 120),
-        can_rollback: tool.riskLevel !== 'critical'
+        can_rollback: effectiveRisk !== 'critical'
       })
 
-      const approved = await waitForApproval(approvalId)
+      const approval = await waitForApproval(approvalId)
+      if (approval.approved && taskId) rememberApproval(taskId, toolUse.name, toolUse.args, approval.scope)
       onEvent({
         type: 'item_completed',
         turn_id: turnId,
-        item: { ...approvalItem, decision: approved ? 'approved' : 'rejected' }
+        item: { ...approvalItem, decision: approval.approved ? 'approved' : 'rejected' }
       })
 
-      if (!approved) {
+      if (!approval.approved) {
         finishToolItem('failed', undefined, '用户拒绝执行此操作')
         messages.push({
           role: 'assistant',
           content: assistantText,
+          ...(turnThinkingText && turnThinkingSignature ? { thinkingBlocks: [{ type: 'thinking' as const, thinking: turnThinkingText, signature: turnThinkingSignature }] } : {}),
           tool_calls: [{ id: toolUse.id, type: 'function', function: { name: toolUse.name, arguments: JSON.stringify(toolUse.args) } }]
         })
         messages.push({ role: 'tool', tool_call_id: toolUse.id, content: JSON.stringify({ error: '用户拒绝执行此操作' }) })
@@ -330,13 +559,34 @@ export async function runReact(
       } else if (toolUse.name === 'propose_plan') {
         const { plan, steps, requestId } = parsePlanArgs(toolUse.args)
         const planItemId = `planItem-${randomUUID()}`
+        const planItem: Item = { type: 'plan', id: planItemId, plan, steps, decision: 'pending', requestId }
+        const planResponse = waitForPlanResponse(requestId)
         onEvent({
           type: 'item_started',
           turn_id: turnId,
-          item: { type: 'plan', id: planItemId, plan, steps, decision: 'pending', requestId }
+          item: planItem
         })
         onEvent({ type: 'plan_proposed', request_id: requestId, plan, steps })
-        result = JSON.stringify({ status: 'submitted', request_id: requestId })
+        const response = await planResponse
+        const decision = response.decision === 'approve'
+          ? 'approved'
+          : response.decision === 'reject_revise'
+            ? 'revise_requested'
+            : 'rejected'
+        onEvent({
+          type: 'item_completed',
+          turn_id: turnId,
+          item: { ...planItem, decision, feedback: response.feedback }
+        })
+        if (response.decision === 'reject_stop') {
+          result = JSON.stringify({ status: 'rejected', feedback: response.feedback })
+          finalText = response.feedback || '已按你的要求停止执行。'
+        } else {
+          result = JSON.stringify({
+            status: response.decision === 'approve' ? 'approved' : 'revise_requested',
+            feedback: response.feedback
+          })
+        }
       } else if (toolUse.name === 'update_todo') {
         result = todoExecute(toolUse.args)
       } else {
@@ -358,9 +608,20 @@ export async function runReact(
 
     finishToolItem(toolFailed ? 'failed' : 'completed', result)
 
+    let stopAfterTool = false
+    if (toolUse.name === 'propose_plan') {
+      try {
+        const parsed = JSON.parse(result)
+        stopAfterTool = parsed?.status === 'rejected'
+      } catch {
+        // 非 JSON 结果继续交给模型处理
+      }
+    }
+
     messages.push({
       role: 'assistant',
       content: assistantText,
+      ...(turnThinkingText && turnThinkingSignature ? { thinkingBlocks: [{ type: 'thinking' as const, thinking: turnThinkingText, signature: turnThinkingSignature }] } : {}),
       tool_calls: [
         {
           id: toolUse.id,
@@ -374,6 +635,39 @@ export async function runReact(
       tool_call_id: toolUse.id,
       content: result
     })
+
+    if (stopAfterTool) break
+
+    // 到达当前预算上限，且任务未自然结束：询问用户是否继续/停止/拆分
+    if (iter >= maxIterations - 1 && taskId) {
+      const hint =
+        continuationCount >= 2
+          ? '任务已连续续跑 2 次，建议拆分为更小的子任务继续。'
+          : '当前任务已执行到步数上限，是否继续执行、停止并查看结果，或拆成更小的子任务？'
+      onEvent({ type: 'continuation_request', task_id: taskId, current_step: iter + 1, hint })
+      const decision: ContinuationDecision = await waitForContinuation(taskId)
+      if (decision === 'continue') {
+        continuationCount += 1
+        maxIterations += 30
+        iter++
+        onEvent({
+          type: 'status',
+          status: 'INFO',
+          message: `已续跑第 ${continuationCount} 次，追加 30 步执行预算`
+        })
+        continue
+      } else if (decision === 'split') {
+        if (!finalText) {
+          finalText = '任务已达到复杂度上限，建议拆分为更明确、更小的子任务继续。'
+        }
+        break
+      } else {
+        // stop or timeout fallback: fall through to finalization
+        break
+      }
+    }
+
+    iter++
   }
 
   // 到达迭代上限，兜底收尾
@@ -384,6 +678,13 @@ export async function runReact(
   clearPendingPlanRequestId()
   onEvent({ type: 'turn_completed', turn_id: turnId, status: 'completed' })
   return { messages, finalText }
+}
+
+function validateModelAccess(value: string): string | null {
+  if (!value.trim()) return '未检测到模型访问配置，请在模型设置里重新选择或配置模型'
+  if (/[\u0100-\uFFFF]/.test(value)) return '模型访问配置里包含中文或特殊字符，请重新配置模型'
+  if (/[\r\n\t]/.test(value)) return '模型访问配置里包含换行，请重新配置模型'
+  return null
 }
 
 // 判断错误是否因为模型不支持图片输入
