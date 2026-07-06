@@ -27,6 +27,12 @@ const COMPOSE_GUARD_MS = 120
 const WEIRD_LINE_BREAKS = /\r\n?|[\u2028\u2029]/g
 const WEIRD_DETECT = /\r|[\u2028\u2029]/
 
+function getModelLabel(config: ModelConfig | null): string {
+  if (!config) return '未配置'
+  if (config.providerId === 'custom') return config.displayName || '自定义模型'
+  return PROVIDER_PRESETS[config.providerId]?.label || config.providerId
+}
+
 const APPROVAL_MODE_OPTIONS: Array<{
   id: ApprovalMode
   label: string
@@ -233,9 +239,7 @@ export function ChatInput({ value, onChange, onSend, onStop, isRunning = false, 
   const hasContent = !hasBlockedAttachment && (value.trim().length > 0 || readyAttachmentCount > 0)
   const shouldStop = isRunning && !hasContent && Boolean(onStop)
   const sendLabel = hasBlockedAttachment ? '请先删除或重试失败附件' : '发送'
-  const modelLabel = config
-    ? PROVIDER_PRESETS[config.providerId]?.label || config.providerId
-    : '未配置'
+  const modelLabel = getModelLabel(config)
   const activeApprovalMode = APPROVAL_MODE_OPTIONS.find((option) => option.id === approvalMode) || APPROVAL_MODE_OPTIONS[0]
 
   const currentModelSupportsVision = config
@@ -1045,7 +1049,7 @@ function ProjectPicker({
   }
 
   return (
-    <div className="relative z-[1] mx-auto w-[calc(100%-28px)] rounded-t-[24px] border border-b-0 border-black/[0.04] bg-[#eceef2] px-5 pb-1.5 pt-2">
+    <div className="relative z-[1] mx-auto w-[calc(100%-28px)] rounded-t-[24px] border border-b-0 border-black/[0.04] bg-[var(--composer-project-bg)] px-5 pb-1.5 pt-2">
       <div className="flex min-w-0 items-center overflow-hidden">
         <button
           ref={buttonRef}

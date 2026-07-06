@@ -11,7 +11,7 @@ const NAV_ITEMS: { id: SettingsTab; label: string }[] = [
   { id: 'general', label: '通用' },
   { id: 'model', label: '模型' },
   { id: 'archived', label: '已归档' },
-  { id: 'diagnostics', label: '日志' },
+  { id: 'diagnostics', label: '反馈' },
   { id: 'about', label: '关于' }
 ]
 

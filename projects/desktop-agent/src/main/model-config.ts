@@ -6,6 +6,8 @@ export interface ModelConfig {
   apiFormat: 'openai' | 'anthropic'
   contextLimit: number
   customProviderId?: string
+  customModelId?: string
+  displayName?: string
   autoApproveLow?: boolean
 }
 
@@ -34,29 +36,46 @@ export function normalizeModelConfig(cfg: ModelConfig): ModelConfig {
     model: cfg.model.trim(),
     apiKey: cfg.apiKey.trim(),
     apiBaseUrl: cfg.apiBaseUrl.trim(),
-    customProviderId: cfg.customProviderId?.trim() || undefined
+    customProviderId: cfg.customProviderId?.trim() || undefined,
+    customModelId: cfg.customModelId?.trim() || undefined,
+    displayName: cfg.displayName?.trim() || undefined
   }
 }
 
 export function validateModelConfig(cfg: Pick<ModelConfig, 'apiKey'>): string | null {
   const key = cfg.apiKey || ''
-  if (!key.trim()) return '模型访问配置为空，请重新配置模型'
-  if (/\s/.test(key)) return '模型访问配置里包含空格或换行，请重新配置模型'
-  if (/[\u0100-\uFFFF]/.test(key)) return '模型访问配置里包含中文或特殊字符，请重新配置模型'
+  if (!key.trim()) return '没有找到访问密钥，请在设置里填写访问密钥后再试'
+  if (/\s/.test(key)) return '访问密钥里有空格或换行，请重新粘贴一次'
+  if (/[\u0100-\uFFFF]/.test(key)) return '访问密钥里有中文或特殊字符，请重新粘贴一次'
   return null
 }
 
+function customSlotId(cfg: Pick<ModelConfig, 'customModelId'> & { _id?: string }): string {
+  return cfg.customModelId || cfg._id || ''
+}
+
 export function sameModelSlot(
-  a: Pick<ModelConfig, 'providerId' | 'model' | 'customProviderId'>,
-  b: Pick<ModelConfig, 'providerId' | 'model' | 'customProviderId'>
+  a: Pick<ModelConfig, 'providerId' | 'model' | 'customProviderId' | 'customModelId'> & { _id?: string },
+  b: Pick<ModelConfig, 'providerId' | 'model' | 'customProviderId' | 'customModelId'> & { _id?: string }
 ): boolean {
+  if (a.providerId === 'custom' || b.providerId === 'custom') {
+    const aId = customSlotId(a)
+    const bId = customSlotId(b)
+    if (aId || bId) return a.providerId === b.providerId && aId === bId
+  }
   return a.providerId === b.providerId && a.model === b.model && (a.customProviderId || '') === (b.customProviderId || '')
 }
 
 export function sameProviderSlot(
-  a: Pick<ModelConfig, 'providerId' | 'customProviderId'>,
-  b: Pick<ModelConfig, 'providerId' | 'customProviderId'>
+  a: Pick<ModelConfig, 'providerId' | 'customProviderId' | 'customModelId'> & { _id?: string },
+  b: Pick<ModelConfig, 'providerId' | 'customProviderId' | 'customModelId'> & { _id?: string }
 ): boolean {
+  if (a.providerId === 'custom' || b.providerId === 'custom') {
+    const aId = customSlotId(a)
+    const bId = customSlotId(b)
+    return a.providerId === b.providerId && Boolean(aId) && aId === bId
+  }
+  if (a.providerId === 'mify' && b.providerId === 'mify') return true
   return a.providerId === b.providerId && (a.customProviderId || '') === (b.customProviderId || '')
 }
 

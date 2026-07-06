@@ -9,6 +9,11 @@ interface StoredModel extends ModelConfig {
   _id?: string
 }
 
+function getModelLabel(cfg: ModelConfig): string {
+  if (cfg.providerId === 'custom') return cfg.displayName || '自定义模型'
+  return PROVIDER_PRESETS[cfg.providerId]?.label || cfg.providerId
+}
+
 export function ModelSelector() {
   const [configs, setConfigs] = useState<StoredModel[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -26,7 +31,7 @@ export function ModelSelector() {
 
   const active = configs.find((c) => c._id === activeId) || configs[0] || null
   const displayLabel = active
-    ? `${PROVIDER_PRESETS[active.providerId]?.label || active.providerId} / ${active.model}`
+    ? `${getModelLabel(active)} / ${active.model}`
     : '未配置模型'
 
   const handleSwitch = async (modelId: string) => {
@@ -59,7 +64,7 @@ export function ModelSelector() {
           <div className="absolute right-0 top-full mt-1 z-50 w-80 floating-surface rounded-xl p-3 space-y-2">
             {active && (
               <div className="text-xs text-[var(--ink-soft)] px-1 pb-1">
-                当前：{PROVIDER_PRESETS[active.providerId]?.label || active.providerId}
+                当前：{getModelLabel(active)}
                 <span className="text-[var(--ink-soft)]/60"> · {active.model}</span>
               </div>
             )}
@@ -69,7 +74,7 @@ export function ModelSelector() {
               )}
               {configs.map((c) => {
                 const isActive = c._id === activeId
-                const label = PROVIDER_PRESETS[c.providerId]?.label || c.providerId
+                const label = getModelLabel(c)
                 return (
                   <div
                     key={c._id}

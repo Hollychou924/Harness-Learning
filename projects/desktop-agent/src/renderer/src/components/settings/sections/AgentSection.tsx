@@ -11,26 +11,7 @@ export function AgentSection() {
       </header>
 
       <div className="space-y-6">
-        <div>
-          <label className="text-sm font-medium text-[var(--ink)]">最大执行步数</label>
-          <p className="text-xs text-[var(--ink-soft)] mt-0.5 mb-2">
-            单个任务最多执行的工具调用轮数，超出后自动停止。建议 8-15 步
-          </p>
-          <div className="flex items-center gap-3">
-            <input
-              type="range"
-              min={1}
-              max={30}
-              value={maxIterations}
-              onChange={(e) => saveGeneral({ maxIterations: Number(e.target.value), approvalMode, showThinking })}
-              className="flex-1 accent-[#0071e3]"
-            />
-            <span className="w-10 text-center text-sm font-medium text-[var(--ink)]">{maxIterations}</span>
-          </div>
-          <div className="flex justify-between text-[10px] text-[var(--ink-soft)]/60 mt-1">
-            <span>1</span><span>15</span><span>30</span>
-          </div>
-        </div>
+        {/* 最大执行步数已作为内部防跑飞上限，不再暴露给用户。默认 30，续跑机制处理超长任务。 */}
 
         <div className="floating-subsurface rounded-xl px-4 py-3.5 flex items-start justify-between gap-4">
           <div>

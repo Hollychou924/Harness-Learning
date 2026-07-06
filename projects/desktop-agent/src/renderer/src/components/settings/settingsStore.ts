@@ -34,7 +34,7 @@ interface SettingsState {
   closeSettings: () => void
   setActiveTab: (tab: SettingsTab) => void
   refreshModelConfig: () => Promise<void>
-  saveModelConfig: (cfg: ModelConfig) => Promise<void>
+  saveModelConfig: (cfg: ModelConfig, opts?: { activate?: boolean }) => Promise<void>
   saveGeneral: (opts: { maxIterations: number; autoApproveLow?: boolean; approvalMode?: ApprovalMode; showThinking: boolean; themeMode?: ThemeMode }) => void
   loadGeneral: () => void
 }
@@ -84,7 +84,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   activeTab: 'general',
   modelConfig: null,
   hasApiKey: false,
-  maxIterations: 8,
+  maxIterations: 30,
   autoApproveLow: false,
   approvalMode: 'always_ask',
   showThinking: true,
@@ -104,8 +104,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ modelConfig: cfg, hasApiKey: hasKey })
   },
 
-  saveModelConfig: async (cfg) => {
-    const result = await api.saveModelConfig(cfg)
+  saveModelConfig: async (cfg, opts) => {
+    const result = await api.saveModelConfig(cfg, opts)
     if (!result.success) throw new Error(result.error || '模型保存失败，请重试')
     await get().refreshModelConfig()
   },
@@ -116,7 +116,9 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
       const approvalMode = approvalModeFromSaved(saved)
       const themeMode = themeModeFromSaved(saved)
       set({
-        maxIterations: saved.maxIterations ?? 8,
+        // 旧版本保存了 8 等较小值，新版统一按 30 兜底，避免长任务被过早截停。
+        // 该值不再暴露给用户，仅作为内部防跑飞上限。
+        maxIterations: typeof saved.maxIterations === 'number' && saved.maxIterations > 0 ? 30 : 30,
         autoApproveLow: autoApproveLowFromMode(approvalMode),
         approvalMode,
         showThinking: saved.showThinking ?? true,

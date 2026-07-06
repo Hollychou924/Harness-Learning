@@ -11,22 +11,6 @@ export function GeneralSection() {
       </header>
 
       <div className="space-y-6">
-        <div>
-          <label className="text-sm font-medium text-[var(--ink)]">最大执行步数</label>
-          <p className="text-xs text-[var(--ink-soft)] mt-0.5 mb-2">单个任务最多执行的工具调用轮数，防止无限循环</p>
-          <div className="flex items-center gap-3">
-            <input
-              type="range"
-              min={1}
-              max={30}
-              value={maxIterations}
-              onChange={(e) => saveGeneral({ maxIterations: Number(e.target.value), approvalMode, showThinking })}
-              className="flex-1 accent-[#0071e3]"
-            />
-            <span className="w-10 text-center text-sm font-medium text-[var(--ink)]">{maxIterations}</span>
-          </div>
-        </div>
-
         <Toggle
           label="显示思考过程"
           desc="在任务执行界面实时展示 Agent 的推理步骤"
