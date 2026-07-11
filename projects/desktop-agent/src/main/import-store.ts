@@ -5,15 +5,95 @@ import type {
   ImportBatch,
   ImportCandidate,
   ImportCatalog,
+  ImportCategoryId,
   ImportResult,
   ImportSelection,
+  ImportedResource,
   ImportedResourceRecord,
   ImportedSession,
-  ImportedSessionRecord
+  ImportedSessionRecord,
+  ImportedAsset
 } from './import-types.js'
 import { normalizedProjectPath } from './import-project.js'
+import { buildCategoryCounts } from './import-sources.js'
+import { pickConflictAuthority } from '../import-conflict.js'
 
 const EMPTY_CATALOG: ImportCatalog = { version: 1, projects: [], sessions: [], resources: [], batches: [] }
+
+function resourceCategoryLocal(resource: ImportedResource): ImportCategoryId | undefined {
+  if (resource.kind === 'instruction') return resource.projectId ? 'project-rules' : 'global-rules'
+  if (resource.kind === 'memory' || resource.kind === 'history-summary') return resource.projectId ? 'project-memory' : 'global-memory'
+  if (resource.kind === 'mcp') return resource.projectId ? 'project-mcp' : 'global-mcp'
+  if (resource.kind === 'skill') return resource.projectId ? 'project-skills' : 'global-skills'
+  return undefined
+}
+
+export function resolveImportCategories(selection: ImportSelection): Set<ImportCategoryId> {
+  // 显式传了 categories（含空数组）就严格按它来，禁止再回退成「全选」
+  if (selection.categories) return new Set(selection.categories)
+  const categories = new Set<ImportCategoryId>()
+  if (selection.includeProjectsAndConversations) categories.add('project-chats')
+  if (selection.includeInstructionsAndMemory) {
+    categories.add('global-rules')
+    categories.add('global-memory')
+    categories.add('project-rules')
+    categories.add('project-memory')
+  }
+  if (selection.includeExtensions) {
+    categories.add('global-mcp')
+    categories.add('global-skills')
+    categories.add('project-mcp')
+    categories.add('project-skills')
+  }
+  return categories
+}
+
+export function resourceMatchesSelection(resource: ImportedResource, selection: ImportSelection): boolean {
+  const category = resourceCategoryLocal(resource)
+  if (!category) return false
+  return resolveImportCategories(selection).has(category)
+}
+
+/** MCP / Skills 同名冲突：保留 conflictAuthority 来源；同内容去重 */
+export function dedupeResourcesByAuthority(resources: ImportedResource[], selection: ImportSelection): ImportedResource[] {
+  const authority = selection.conflictAuthority
+  const byKey = new Map<string, ImportedResource>()
+  const rank = (source: string) => {
+    if (!authority) return 0
+    return source === authority ? 2 : 1
+  }
+  for (const resource of resources) {
+    if (resource.kind !== 'mcp' && resource.kind !== 'skill') {
+      byKey.set(`${resource.id}`, resource)
+      continue
+    }
+    const key = `${resource.kind}:${resource.projectId || 'global'}:${resource.name.toLowerCase()}`
+    const existing = byKey.get(key)
+    if (!existing) {
+      byKey.set(key, resource)
+      continue
+    }
+    if (existing.fingerprint === resource.fingerprint) continue
+    if (rank(resource.source) >= rank(existing.source)) byKey.set(key, resource)
+  }
+  // 非 mcp/skill 用 id 键；mcp/skill 用 name 键 — 统一输出
+  const seen = new Set<string>()
+  const result: ImportedResource[] = []
+  for (const resource of resources) {
+    if (resource.kind === 'mcp' || resource.kind === 'skill') {
+      const key = `${resource.kind}:${resource.projectId || 'global'}:${resource.name.toLowerCase()}`
+      const chosen = byKey.get(key)
+      if (!chosen || seen.has(key)) continue
+      seen.add(key)
+      result.push(chosen)
+      continue
+    }
+    if (seen.has(resource.id)) continue
+    seen.add(resource.id)
+    result.push(resource)
+  }
+  return result
+}
 
 export function stableId(prefix: string, value: string): string {
   return `${prefix}-${createHash('sha256').update(value).digest('hex').slice(0, 24)}`
@@ -171,13 +251,25 @@ export class ImportStore {
   async commit(candidates: ImportCandidate[], selection: ImportSelection): Promise<ImportResult> {
     if (this.busy) throw new Error('已有导入正在进行')
     if (selection.sources.length === 0) throw new Error('至少选择一个导入来源')
+    const resolvedCategories = resolveImportCategories(selection)
+    if (resolvedCategories.size === 0) throw new Error('请至少勾选一项导入内容')
+    const selected = candidates.filter((candidate) => selection.sources.includes(candidate.source))
+    const countsBySource = new Map(selected.map((candidate) => [candidate.source, buildCategoryCounts(candidate)]))
+    const conflictAuthority = selection.sources.length > 1
+      ? pickConflictAuthority(selection.sources, [...resolvedCategories], countsBySource)
+      : undefined
+    const normalizedSelection: ImportSelection = {
+      ...selection,
+      categories: [...resolvedCategories],
+      conflictAuthority: conflictAuthority || selection.sources[selection.sources.length - 1]
+    }
     this.busy = true
     let lockToken: string | undefined
     const batch: ImportBatch = {
       id: `import-${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`,
       createdAt: Date.now(),
       status: 'preparing',
-      sources: selection.sources,
+      sources: normalizedSelection.sources,
       createdProjectIds: [], createdSessionIds: [], updatedSessionIds: [], skippedSessionIds: [], resourceIds: [],
       sessionChanges: [], resourceChanges: [], failed: []
     }
@@ -187,7 +279,7 @@ export class ImportStore {
       lockToken = this.acquireLock()
       const catalog = this.loadCatalog()
       mkdirSync(staging, { recursive: true })
-      const selected = candidates.filter((candidate) => selection.sources.includes(candidate.source))
+      const selected = candidates.filter((candidate) => normalizedSelection.sources.includes(candidate.source))
       const incomingProjectIds = new Map<string, string>()
       const normalizedProjects = selected.flatMap((candidate) => candidate.projects).map((item) => {
         if (!item.folderPath) return item
@@ -196,10 +288,12 @@ export class ImportStore {
         incomingProjectIds.set(item.id, id)
         return { ...item, id, folderPath }
       })
-      const projects = selection.includeProjectsAndConversations
+      const categories = resolveImportCategories(normalizedSelection)
+      const includeChats = categories.has('project-chats')
+      const projects = includeChats
         ? [...new Map(normalizedProjects.map((item) => [item.id, item])).values()]
         : []
-      const sessions = selection.includeProjectsAndConversations ? selected.flatMap((candidate) => candidate.sessions).map((item) => {
+      const sessions = includeChats ? selected.flatMap((candidate) => candidate.sessions).map((item) => {
         const projectId = incomingProjectIds.get(item.projectId) || item.projectId
         return projectId === item.projectId ? item : {
           ...item,
@@ -207,13 +301,20 @@ export class ImportStore {
           fingerprint: contentFingerprint({ title: item.title, projectId, archived: item.archived, messages: item.messages, turns: item.turns })
         }
       }) : []
+      const resourceProjectIds = new Set(selected.flatMap((c) => c.resources).map((r) => r.projectId).filter(Boolean) as string[])
+      const projectsForCatalog = includeChats
+        ? projects
+        : [...new Map(normalizedProjects.filter((p) => resourceProjectIds.has(p.id) || resourceProjectIds.has(incomingProjectIds.get(p.id) || '')).map((item) => {
+            const id = incomingProjectIds.get(item.id) || item.id
+            return [id, { ...item, id }]
+          })).values()]
+      const catalogProjects = includeChats ? projects : projectsForCatalog
+
       const resources = selected.flatMap((candidate) => candidate.resources).map((item) => ({
         ...item,
         projectId: item.projectId ? incomingProjectIds.get(item.projectId) || item.projectId : undefined
-      })).filter((resource) =>
-        resource.kind === 'instruction' || resource.kind === 'memory' || resource.kind === 'history-summary'
-          ? selection.includeInstructionsAndMemory
-          : selection.includeExtensions)
+      })).filter((resource) => resourceMatchesSelection(resource, normalizedSelection))
+      const dedupedResources = dedupeResourcesByAuthority(resources, normalizedSelection)
       batch.failed.push(...selected.flatMap((candidate) => candidate.unavailable))
 
       const uniqueIncomingAssets = [...new Map(sessions.flatMap((session) => session.assets || []).map((asset) => [asset.id, asset])).values()]
@@ -222,7 +323,7 @@ export class ImportStore {
           ? Buffer.byteLength(asset.base64, 'base64') : 0), 0)
       const estimatedBytes = sessions.reduce((total, session) => total + Buffer.byteLength(JSON.stringify(session.messages)) + Buffer.byteLength(JSON.stringify(session.turns)), 0) +
         newAssetBytes +
-        resources.reduce((total, item) => total + Buffer.byteLength(item.content || ''), 0)
+        dedupedResources.reduce((total, item) => total + Buffer.byteLength(item.content || ''), 0)
       const filesystem = this.options.availableBytes ? undefined : statfsSync(this.rootDir, { bigint: true })
       const availableBytes = this.options.availableBytes
         ? this.options.availableBytes()
@@ -230,7 +331,7 @@ export class ImportStore {
       const requiredBytes = BigInt(Math.max(16 * 1024 * 1024, estimatedBytes * 2))
       if (availableBytes < requiredBytes) throw new Error('本机可用空间不足，无法安全完成导入')
 
-      for (const project of projects) {
+      for (const project of catalogProjects) {
         if (!catalog.projects.some((item) => item.id === project.id)) {
           catalog.projects.push(project)
           batch.createdProjectIds.push(project.id)
@@ -265,7 +366,7 @@ export class ImportStore {
           batch.createdSessionIds.push(session.id)
         }
       }
-      for (const resource of resources) {
+      for (const resource of dedupedResources) {
         const index = catalog.resources.findIndex((item) => item.id === resource.id)
         if (index >= 0 && catalog.resources[index].fingerprint === resource.fingerprint) continue
         const record: ImportedResourceRecord = { ...resource, enabled: false, importedBatchId: batch.id }
@@ -339,6 +440,37 @@ export class ImportStore {
     }
   }
 
+  /** 删除单个导入会话：从 catalog 移除该 session，并清理所有 batch 里对它的引用。
+   *  返回孤儿项目 id 列表（该 session 所属项目在 catalog 里已无其他会话时），
+   *  调用方可据此决定是否顺带删除空项目。非导入会话不在 catalog 里时返回 removed=false。
+   *  与 revert 的区别：revert 按 batch 整批回滚，removeSession 按单条精准移除，
+   *  用于用户在侧边栏直接删除某条导入对话时，避免重启后 mergeImportedData 又把它加回来。 */
+  removeSession(sessionId: string): { removed: boolean; orphanProjectIds: string[] } {
+    if (this.busy) throw new Error('已有导入正在进行')
+    this.busy = true
+    const lockToken = this.acquireLock()
+    try {
+      const catalog = this.loadCatalog()
+      const idx = catalog.sessions.findIndex((s) => s.id === sessionId)
+      if (idx < 0) return { removed: false, orphanProjectIds: [] }
+      const removed = catalog.sessions.splice(idx, 1)[0]
+      for (const batch of catalog.batches) {
+        if (Array.isArray(batch.sessionChanges)) batch.sessionChanges = batch.sessionChanges.filter((c) => c.id !== sessionId)
+        if (Array.isArray(batch.createdSessionIds)) batch.createdSessionIds = batch.createdSessionIds.filter((id) => id !== sessionId)
+        if (Array.isArray(batch.updatedSessionIds)) batch.updatedSessionIds = batch.updatedSessionIds.filter((id) => id !== sessionId)
+        if (Array.isArray(batch.skippedSessionIds)) batch.skippedSessionIds = batch.skippedSessionIds.filter((id) => id !== sessionId)
+      }
+      const orphanProjectIds = removed.projectId && !catalog.sessions.some((s) => s.projectId === removed.projectId)
+        ? [removed.projectId]
+        : []
+      this.writeJsonAtomic(this.catalogPath(), catalog)
+      return { removed: true, orphanProjectIds }
+    } finally {
+      this.releaseLock(lockToken)
+      this.busy = false
+    }
+  }
+
   copySessionTo(session: Pick<ImportedSession, 'id'>, destinationDir: string): void {
     const record = this.loadCatalog().sessions.find((item) => item.id === session.id)
     if (!record) return
@@ -346,6 +478,97 @@ export class ImportStore {
     for (const suffix of ['.json', '.turns.json']) {
       const source = join(this.versionDir(record.storageBatchId), `${session.id}${suffix}`)
       if (existsSync(source)) this.writeJsonAtomic(join(destinationDir, `${session.id}${suffix}`), JSON.parse(readFileSync(source, 'utf8')))
+    }
+  }
+
+  // 早期解析器遗留的脏数据修复：就地重洗已落盘的 messages/turns，剥除 <user_query> 等 UI 包裹标签、
+  // 补提图片资源并改写为 imported-asset://。幂等：已是干净内容时 changed=false 直接跳过。
+  // visibleSessionsDir 传当前侧边栏使用的 sessions 目录。
+  // 修复范围：
+  // - 版本目录里仍带 <user_query> 等包裹标签或漏提图片的会话 → 就地重洗并更新指纹/assetIds。
+  // - 可见副本里仍带包裹标签的会话 → 就地清理（只剥标签、补图片，不增删消息），保留用户在侧边栏里做过的一切其他改动。
+  // 幂等：已是干净内容时 changed=false 直接跳过。
+  repairLegacySessions(visibleSessionsDir: string): { repaired: number; assets: number; protectedVisible: number; skipped: number } {
+    if (this.busy) throw new Error('已有导入正在进行')
+    this.busy = true
+    const lockToken = this.acquireLock()
+    let repaired = 0, assetsCount = 0, protectedVisible = 0, skipped = 0
+    const writtenAssets = new Set<string>()
+    const writeAssets = (assets: ImportedAsset[]) => {
+      mkdirSync(this.assetsDir(), { recursive: true })
+      for (const asset of assets) {
+        if (asset.unavailableReason || !asset.base64 || writtenAssets.has(asset.id)) continue
+        const assetPath = join(this.assetsDir(), asset.id)
+        writtenAssets.add(asset.id)
+        if (existsSync(assetPath)) continue
+        const temporary = `${assetPath}.repair-${randomUUID().slice(0, 8)}.tmp`
+        writeFileSync(temporary, Buffer.from(asset.base64, 'base64'))
+        renameSync(temporary, assetPath)
+        assetsCount += 1
+      }
+    }
+    try {
+      const catalog = this.loadCatalog()
+      let catalogDirty = false
+      for (const record of catalog.sessions) {
+        const versionMessagesPath = join(this.versionDir(record.storageBatchId), `${record.id}.json`)
+        const versionTurnsPath = join(this.versionDir(record.storageBatchId), `${record.id}.turns.json`)
+        const visibleMessagesPath = join(visibleSessionsDir, `${record.id}.json`)
+        const visibleTurnsPath = join(visibleSessionsDir, `${record.id}.turns.json`)
+        const versionExists = existsSync(versionMessagesPath)
+        const visibleExists = existsSync(visibleMessagesPath)
+        if (!versionExists && !visibleExists) { skipped += 1; continue }
+
+        let versionRepaired = false
+        if (versionExists) {
+          try {
+            const messages = JSON.parse(readFileSync(versionMessagesPath, 'utf8'))
+            const turns = existsSync(versionTurnsPath) ? JSON.parse(readFileSync(versionTurnsPath, 'utf8')) : []
+            const result = repairStoredSession(record.source, messages, turns || [], record.sourceProjectId || '')
+            if (result.changed) {
+              writeAssets(result.assets)
+              this.writeJsonAtomic(versionMessagesPath, result.messages)
+              if (existsSync(versionTurnsPath)) this.writeJsonAtomic(versionTurnsPath, result.turns)
+              const assetIds = [...new Map((record.assetIds || []).map((id) => [id, id])).values()]
+              for (const asset of result.assets) if (!assetIds.includes(asset.id)) assetIds.push(asset.id)
+              record.assetIds = assetIds
+              record.fingerprint = contentFingerprint({ title: record.title, projectId: record.projectId, archived: record.archived, messages: result.messages, turns: result.turns, assets: assetIds })
+              versionRepaired = true
+              catalogDirty = true
+              repaired += 1
+            }
+          } catch { /* 版本副本读取失败不阻塞可见副本的清理 */ }
+        }
+
+        // 可见副本：只要仍带包裹标签就就地清理，保留用户的其他改动；不带标签但与版本不同 = 用户改过，保护。
+        if (visibleExists) {
+          try {
+            const vMessages = JSON.parse(readFileSync(visibleMessagesPath, 'utf8'))
+            const vTurns = existsSync(visibleTurnsPath) ? JSON.parse(readFileSync(visibleTurnsPath, 'utf8')) : []
+            const visibleResult = repairStoredSession(record.source, vMessages, vTurns || [], record.sourceProjectId || '')
+            if (visibleResult.changed) {
+              writeAssets(visibleResult.assets)
+              this.writeJsonAtomic(visibleMessagesPath, visibleResult.messages)
+              if (existsSync(visibleTurnsPath)) this.writeJsonAtomic(visibleTurnsPath, visibleResult.turns)
+              if (!versionRepaired) repaired += 1
+            } else if (!versionRepaired) {
+              // 版本和可见都已干净：如果可见与版本不一致，说明用户改过可见副本，统计为受保护。
+              if (this.hasVisibleSessionChanged(record.id, visibleSessionsDir)) protectedVisible += 1
+              else skipped += 1
+            }
+          } catch { /* 可见副本读取失败忽略 */ }
+        } else if (!versionRepaired) {
+          skipped += 1
+        }
+      }
+      if (catalogDirty) {
+        this.options.beforeCatalogWrite?.()
+        this.writeJsonAtomic(this.catalogPath(), catalog)
+      }
+      return { repaired, assets: assetsCount, protectedVisible, skipped }
+    } finally {
+      this.releaseLock(lockToken)
+      this.busy = false
     }
   }
 

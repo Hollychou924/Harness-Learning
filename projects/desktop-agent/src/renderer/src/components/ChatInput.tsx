@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Plus, ArrowUp, ChevronDown, Check, X, FileText, Image as ImageIcon, Eye, AlertCircle, FolderPlus, FolderOpen, Folder, History, AtSign, Target, StopCircle, RefreshCw, Loader2, Hand, ShieldCheck, ShieldAlert, GitBranch, Laptop, Search } from 'lucide-react'
 import { api, type ModelConfig, type AttachmentFile } from '../api'
 import { useSettingsStore, type ApprovalMode } from './settings/settingsStore'
 import { useTaskStore, type Attachment, type Project, DEFAULT_PROJECT_ID } from '../store/task'
-import { PROVIDER_PRESETS, BUILTIN_PROVIDER_ORDER, modelSupportsVision } from './providerPresets'
+import { PROVIDER_PRESETS, modelSupportsVision } from './providerPresets'
 import { WhaleTooltip } from './WhaleTooltip'
 import { CreateBranchDialog } from './Dialogs'
 import { CommitHistoryDialog } from './CommitHistoryDialog'
@@ -164,6 +164,8 @@ async function attachmentFromBrowserFile(file: File, id: string): Promise<Attach
 
 export function ChatInput({ value, onChange, onSend, onStop, isRunning = false, placeholder, showProjectPicker = false }: Props) {
   const [config, setConfig] = useState<ModelConfig | null>(null)
+  const [modelList, setModelList] = useState<Array<ModelConfig & { _id?: string }>>([])
+  const [activeModelId, setActiveModelId] = useState<string | null>(null)
   const [modelMenuOpen, setModelMenuOpen] = useState(false)
   const [addMenuOpen, setAddMenuOpen] = useState(false)
   const [approvalMenuOpen, setApprovalMenuOpen] = useState(false)
@@ -203,11 +205,34 @@ export function ChatInput({ value, onChange, onSend, onStop, isRunning = false, 
     api.configGet('modelConfig').then((c) => {
       if (c) setConfig(c as ModelConfig)
     })
+    void refreshModelList()
   }, [])
 
   useEffect(() => {
     if (storeConfig) setConfig(storeConfig)
   }, [storeConfig])
+
+  // 拉取已配置模型列表：右下角下拉只展示"已保存且带密钥、可直接切换使用"的模型
+  const refreshModelList = useCallback(async () => {
+    try {
+      const result = await api.getModelList()
+      setModelList(result.configs || [])
+      setActiveModelId(result.activeId ?? null)
+    } catch {
+      setModelList([])
+    }
+  }, [])
+
+  // 切换激活模型：成功后刷新当前模型展示与列表选中态
+  const switchModel = useCallback(async (modelId: string) => {
+    setModelMenuOpen(false)
+    const result = await api.setActiveModel(modelId)
+    if (result.success) {
+      await refreshModelList()
+      const next = modelList.find((c) => (c as ModelConfig & { _id?: string })._id === modelId)
+      if (next) setConfig(next)
+    }
+  }, [refreshModelList, modelList])
 
   useEffect(() => {
     if (!addMenuOpen) return
@@ -250,6 +275,11 @@ export function ChatInput({ value, onChange, onSend, onStop, isRunning = false, 
   const shouldStop = isRunning && !hasContent && Boolean(onStop)
   const sendLabel = hasBlockedAttachment ? '请先删除或重试失败附件' : '发送'
   const modelDisplay = getModelDisplay(config)
+  // 仅展示已保存且带有效密钥的模型，点击即可直接切换使用
+  const configuredModels = useMemo(
+    () => modelList.filter((c) => c.hasSavedApiKey === true),
+    [modelList]
+  )
   const activeApprovalMode = APPROVAL_MODE_OPTIONS.find((option) => option.id === approvalMode) || APPROVAL_MODE_OPTIONS[0]
 
   const currentModelSupportsVision = config
@@ -681,14 +711,17 @@ ${text}` : text
             <div className="relative">
               <button
                 onClick={() => {
-                  if (!modelMenuOpen && modelBtnRef.current) {
-                    const rect = modelBtnRef.current.getBoundingClientRect()
-                    const menuWidth = Math.min(288, window.innerWidth - 24)
-                    const left = Math.min(
-                      window.innerWidth - menuWidth - 12,
-                      Math.max(12, rect.right - menuWidth)
-                    )
-                    setMenuPos({ left, bottom: window.innerHeight - rect.top + 8 })
+                  if (!modelMenuOpen) {
+                    void refreshModelList()
+                    if (modelBtnRef.current) {
+                      const rect = modelBtnRef.current.getBoundingClientRect()
+                      const menuWidth = Math.min(288, window.innerWidth - 24)
+                      const left = Math.min(
+                        window.innerWidth - menuWidth - 12,
+                        Math.max(12, rect.right - menuWidth)
+                      )
+                      setMenuPos({ left, bottom: window.innerHeight - rect.top + 8 })
+                    }
                   }
                   setModelMenuOpen(!modelMenuOpen)
                 }}
@@ -721,28 +754,40 @@ ${text}` : text
                       className="overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden space-y-0.5"
                       style={{ maxHeight: 'min(20rem, calc(100vh - 7rem))' }}
                     >
-                      {BUILTIN_PROVIDER_ORDER.map((id) => {
-                        const preset = PROVIDER_PRESETS[id]
-                        const isActive = config?.providerId === id
-                        return (
-                          <button
-                            key={id}
-                            onClick={() => { setModelMenuOpen(false); openSettings('model') }}
-                            className={`w-full min-w-0 flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition ${
-                              isActive ? 'bg-sky-50 text-sky-600' : 'hover:bg-black/[0.06] text-[var(--ink)]'
-                            }`}
-                          >
-                            <span className="flex-1 min-w-0 text-left truncate">{preset.label}</span>
-                            {preset.supportsVision && (
-                              <WhaleTooltip label="支持图片输入">
-                                <span className="text-[10px] text-sky-500 flex-shrink-0">👁</span>
-                              </WhaleTooltip>
-                            )}
-                            {preset.builtinApiKey && <span className="text-[10px] text-green-500 flex-shrink-0">内置</span>}
-                            {isActive && <Check size={13} className="text-sky-500 flex-shrink-0" />}
-                          </button>
-                        )
-                      })}
+                      {configuredModels.length === 0 ? (
+                        <div className="px-2 py-3 text-center text-xs text-[var(--ink-soft)]">
+                          还没有已配置密钥的模型
+                        </div>
+                      ) : (
+                        configuredModels.map((cfg) => {
+                          const id = (cfg as ModelConfig & { _id?: string })._id || ''
+                          const isActive = id === activeModelId
+                          const disp = getModelDisplay(cfg)
+                          return (
+                            <button
+                              key={id || `${cfg.providerId}-${cfg.model}`}
+                              onClick={() => void switchModel(id)}
+                              className={`w-full min-w-0 flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition ${
+                                isActive ? 'bg-sky-50 text-sky-600' : 'hover:bg-black/[0.06] text-[var(--ink)]'
+                              }`}
+                              title={disp.full}
+                            >
+                              <span className="flex-1 min-w-0 text-left truncate">
+                                <span className="truncate">{disp.brand}</span>
+                                {disp.modelId && <span className="text-[var(--ink-soft)]/70"> · {disp.modelId}</span>}
+                              </span>
+                              {isActive && <Check size={13} className="text-sky-500 flex-shrink-0" />}
+                            </button>
+                          )
+                        })
+                      )}
+                      <button
+                        onClick={() => { setModelMenuOpen(false); openSettings('model') }}
+                        className="w-full flex items-center gap-2 px-2 py-1.5 mt-1 rounded-lg text-sm text-[var(--ink-soft)] hover:bg-black/[0.06] hover:text-[var(--ink)] transition border-t border-black/[0.06] pt-2"
+                      >
+                        <Plus size={13} />
+                        管理模型…
+                      </button>
                     </div>
                   </div>
                 </>,

@@ -496,7 +496,6 @@ const PENDING_ACTION_LABEL: Record<NonNullable<Session['pendingAction']>, string
 function isUnread(session: Session): boolean {
   const explicit = session.unread === true
   const timeBased = Boolean(session.lastMessageAt && (session.lastReadAt ?? 0) < session.lastMessageAt)
-  console.log('[isUnread]', session.id.slice(0, 12), session.title.slice(0, 12), { explicit, timeBased, unread: session.unread, lastReadAt: session.lastReadAt, lastMessageAt: session.lastMessageAt })
   return explicit || timeBased
 }
 function SessionRow({ session, active, onClick, onDragStart, onDragOver, onDrop, isDragging, isDragOver, showProject, compact, onRename }: {
@@ -521,7 +520,7 @@ function SessionRow({ session, active, onClick, onDragStart, onDragOver, onDrop,
 
   const actions: MenuAction[] = [
     { id: 'pin', label: session.pinned ? '取消置顶' : '置顶', icon: session.pinned ? <PinOff size={12} /> : <Pin size={12} />, onClick: () => store.togglePinSession(session.id) },
-    { id: 'read', label: unread ? '标记为已读' : '标记为未读', icon: unread ? <MailOpen size={12} /> : <Mail size={12} />, onClick: () => { console.log('[markSessionRead click]', session.id.slice(0, 12), !unread); store.markSessionRead(session.id, !unread) } },
+    { id: 'read', label: unread ? '标记为已读' : '标记为未读', icon: unread ? <MailOpen size={12} /> : <Mail size={12} />, onClick: () => store.markSessionRead(session.id, !unread) },
     { id: 'rename', label: '重命名', icon: <Pencil size={12} />, onClick: () => { onRename?.(); setMenuOpen(false) } },
     session.archived
       ? { id: 'unarchive', label: '取消归档', icon: <ArchiveRestore size={12} />, onClick: () => store.unarchiveSession(session.id) }

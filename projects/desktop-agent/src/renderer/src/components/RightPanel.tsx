@@ -96,7 +96,7 @@ export function RightPanel({
 
   return (
     <aside
-      className={`glass-soft min-w-0 flex-shrink-0 flex flex-col border-l border-white/40 transition-all duration-300 ease-in-out overflow-hidden ${
+      className={`glass-soft min-w-0 flex-shrink-0 flex flex-col border-l border-[var(--line)] transition-all duration-300 ease-in-out overflow-hidden ${
         collapsed ? 'w-0 border-l-0' : 'w-72'
       }`}
     >

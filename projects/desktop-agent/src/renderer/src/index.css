@@ -7,16 +7,17 @@
   --glass-border: rgba(255, 255, 255, 0.7);
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
   --glass-soft-bg: rgba(255, 255, 255, 0.4);
-  --floating-bg: #fbfdff;
+  --floating-bg: #f5f5f7;
   --floating-border: rgba(0, 0, 0, 0.08);
   --floating-shadow: 0 18px 48px rgba(15, 23, 42, 0.18);
-  --floating-sub-bg: #f4f8fc;
+  --floating-sub-bg: #ffffff;
   --floating-screen-bg: rgba(9, 13, 20, 0.46);
   --floating-tooltip-bg: #005fbf;
   --floating-toast-bg: #1d1d1f;
   --ink: #1d1d1f;
   --ink-soft: #6e6e73;
-  --paper: rgba(255, 255, 255, 0.84);
+  --ink-secondary: #8e8e93;
+  --paper: #ffffff;
   --line: rgba(0, 0, 0, 0.08);
   --line-strong: rgba(0, 0, 0, 0.14);
   --control-bg: rgba(0, 0, 0, 0.04);
@@ -28,35 +29,57 @@
   --warning-bg: rgba(255, 251, 235, 0.86);
   --success-bg: rgba(240, 253, 244, 0.86);
   --info-bg: rgba(240, 249, 255, 0.86);
+  /* 设置页：浅色 inset grouped */
+  --settings-group-bg: #ffffff;
+  --settings-sidebar-bg: rgba(0, 0, 0, 0.02);
+  --settings-sep: rgba(60, 60, 67, 0.12);
+  --settings-row-hover: rgba(0, 0, 0, 0.03);
+  --settings-input-bg: rgba(120, 120, 128, 0.12);
+  --settings-segment-bg: rgba(118, 118, 128, 0.12);
+  --settings-segment-thumb: #ffffff;
+  --settings-nav-active-bg: #0071e3;
+  --settings-nav-active-fg: #ffffff;
+  --settings-toggle-off: rgba(120, 120, 128, 0.32);
 }
 
 :root[data-theme="dark"] {
-  --glass-bg: rgba(16, 24, 39, 0.7);
-  --glass-border: rgba(148, 163, 184, 0.18);
-  --glass-shadow: 0 18px 54px rgba(0, 0, 0, 0.38);
-  --glass-soft-bg: rgba(15, 23, 42, 0.48);
-  --floating-bg: #101827;
-  --floating-border: rgba(148, 163, 184, 0.18);
-  --floating-shadow: 0 22px 64px rgba(0, 0, 0, 0.48);
-  --floating-sub-bg: #172033;
-  --floating-screen-bg: rgba(2, 6, 23, 0.68);
-  --floating-tooltip-bg: #0f63ce;
-  --floating-toast-bg: #e7eefb;
-  --ink: #f4f8ff;
-  --ink-soft: #a8b4c7;
-  --paper: rgba(15, 23, 42, 0.92);
-  --line: rgba(148, 163, 184, 0.16);
-  --line-strong: rgba(148, 163, 184, 0.26);
-  --control-bg: rgba(148, 163, 184, 0.1);
-  --control-hover: rgba(148, 163, 184, 0.16);
-  --control-active: rgba(56, 189, 248, 0.18);
-  --composer-rail-bg: rgba(15, 23, 42, 0.94);
-  --composer-project-bg: rgba(30, 41, 59, 0.96);
-  --danger-bg: rgba(127, 29, 29, 0.22);
-  --warning-bg: rgba(120, 53, 15, 0.24);
-  --success-bg: rgba(20, 83, 45, 0.24);
-  --info-bg: rgba(12, 74, 110, 0.24);
-  --whale-blue-soft: rgba(56, 189, 248, 0.18);
+  /* 轻量深色：弱分层，避免大块死黑卡片 */
+  --glass-bg: rgba(255, 255, 255, 0.07);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+  --glass-soft-bg: rgba(255, 255, 255, 0.035);
+  --floating-bg: #242426;
+  --floating-border: rgba(255, 255, 255, 0.08);
+  --floating-shadow: 0 18px 48px rgba(0, 0, 0, 0.4);
+  --floating-sub-bg: rgba(255, 255, 255, 0.06);
+  --floating-screen-bg: rgba(0, 0, 0, 0.42);
+  --floating-tooltip-bg: #0a84ff;
+  --floating-toast-bg: #f5f5f7;
+  --ink: #f2f2f7;
+  --ink-soft: #a1a1a6;
+  --ink-secondary: #c7c7cc;
+  --paper: rgba(255, 255, 255, 0.1);
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.14);
+  --control-bg: rgba(255, 255, 255, 0.07);
+  --control-hover: rgba(255, 255, 255, 0.11);
+  --control-active: rgba(10, 132, 255, 0.22);
+  --composer-rail-bg: rgba(255, 255, 255, 0.06);
+  --composer-project-bg: rgba(255, 255, 255, 0.09);
+  --danger-bg: rgba(255, 69, 58, 0.14);
+  --warning-bg: rgba(255, 159, 10, 0.14);
+  --success-bg: rgba(48, 209, 88, 0.14);
+  --info-bg: rgba(10, 132, 255, 0.14);
+  --settings-group-bg: rgba(255, 255, 255, 0.06);
+  --settings-sidebar-bg: transparent;
+  --settings-sep: rgba(255, 255, 255, 0.07);
+  --settings-row-hover: rgba(255, 255, 255, 0.05);
+  --settings-input-bg: rgba(255, 255, 255, 0.07);
+  --settings-segment-bg: rgba(255, 255, 255, 0.08);
+  --settings-segment-thumb: rgba(255, 255, 255, 0.16);
+  --settings-nav-active-bg: rgba(255, 255, 255, 0.1);
+  --settings-nav-active-fg: #f2f2f7;
+  --settings-toggle-off: rgba(255, 255, 255, 0.18);
 }
 
 html, body, #root {
@@ -95,6 +118,12 @@ body {
   background: var(--glass-soft-bg);
   backdrop-filter: blur(16px) saturate(150%);
   -webkit-backdrop-filter: blur(16px) saturate(150%);
+}
+
+:root[data-theme="dark"] .glass {
+  /* 深色下卡片用轻抬升，不要厚重投影 */
+  box-shadow: none;
+  border-color: rgba(255, 255, 255, 0.06);
 }
 
 /* 覆盖层规范：凡是盖在主界面上方的窗口、菜单、提示，都用不透明底色。 */
@@ -185,6 +214,11 @@ body {
   --whale-blue-soft: rgba(0, 113, 227, 0.12);
 }
 
+:root[data-theme="dark"] {
+  --whale-blue: #64b5ff;
+  --whale-blue-soft: rgba(100, 181, 255, 0.2);
+}
+
 .running-sweep-text {
   display: inline-block;
   color: var(--ink-soft);
@@ -212,7 +246,7 @@ body {
 :root[data-theme="dark"] :is([class^="hover:bg-black/["], [class*=" hover:bg-black/["]):hover { background-color: var(--control-hover) !important; }
 :root[data-theme="dark"] :is([class^="focus:bg-black/["], [class*=" focus:bg-black/["]):focus { background-color: var(--control-hover) !important; }
 :root[data-theme="dark"] :is([class^="border-black/"], [class*=" border-black/"], [class^="border-white/"], [class*=" border-white/"]) { border-color: var(--line) !important; }
-:root[data-theme="dark"] :is([class^="bg-white"], [class*=" bg-white"]) { background-color: rgba(15, 23, 42, 0.92) !important; }
+:root[data-theme="dark"] :is([class^="bg-white"], [class*=" bg-white"]) { background-color: var(--settings-group-bg) !important; }
 :root[data-theme="dark"] :is([class^="bg-[#eceef2]"], [class*=" bg-[#eceef2]"]) { background-color: var(--composer-rail-bg) !important; }
 :root[data-theme="dark"] :is([class^="bg-red-50"], [class*=" bg-red-50"]) { background-color: var(--danger-bg) !important; }
 :root[data-theme="dark"] :is([class^="hover:bg-red-50"], [class*=" hover:bg-red-50"]):hover { background-color: var(--danger-bg) !important; }
@@ -224,6 +258,9 @@ body {
 :root[data-theme="dark"] :is([class^="border-amber-200"], [class*=" border-amber-200"]) { border-color: rgba(251, 191, 36, 0.34) !important; }
 :root[data-theme="dark"] :is([class^="border-green-200"], [class*=" border-green-200"]) { border-color: rgba(74, 222, 128, 0.28) !important; }
 :root[data-theme="dark"] :is([class^="border-sky-200"], [class*=" border-sky-200"], [class^="border-blue-200"], [class*=" border-blue-200"]) { border-color: rgba(56, 189, 248, 0.32) !important; }
+/* 硬编码浅蓝/品牌蓝在深色底上对比不足 */
+:root[data-theme="dark"] :is([class^="text-[#0071e3]"], [class*=" text-[#0071e3]"], [class^="text-sky-600"], [class*=" text-sky-600"], [class^="text-sky-700"], [class*=" text-sky-700"], [class^="text-sky-500"], [class*=" text-sky-500"]) { color: var(--whale-blue) !important; }
+:root[data-theme="dark"] :is([class^="hover:text-[#0071e3]"], [class*=" hover:text-[#0071e3]"]):hover { color: #64b5ff !important; }
 
 @keyframes running-sweep {
   0% { background-position: 150% 0; }

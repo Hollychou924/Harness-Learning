@@ -15,11 +15,15 @@ const api = {
     ipcRenderer.invoke('session:saveTurns', { sessionId, turns }) as Promise<{ success: boolean; error?: string }>,
   loadSessionTurns: (sessionId: string) =>
     ipcRenderer.invoke('session:loadTurns', sessionId) as Promise<unknown[]>,
+  listSessionIds: () =>
+    ipcRenderer.invoke('session:listIds') as Promise<{ success: boolean; ids: string[]; error?: string }>,
   scanExternalImports: () => ipcRenderer.invoke('externalImport:scan') as Promise<unknown>,
   commitExternalImports: (selection: unknown) => ipcRenderer.invoke('externalImport:commit', selection) as Promise<unknown>,
   getExternalImportHistory: () => ipcRenderer.invoke('externalImport:history') as Promise<unknown>,
   revertExternalImport: (batchId: string, protectedSessionIds?: string[]) =>
     ipcRenderer.invoke('externalImport:revert', { batchId, protectedSessionIds }) as Promise<unknown>,
+  removeImportedSession: (sessionId: string) =>
+    ipcRenderer.invoke('externalImport:removeSession', sessionId) as Promise<{ success: boolean; removed: boolean; orphanProjectIds: string[]; error?: string }>,
   onAgentEvent: (fn: (msg: StdoutMessage) => void) => {
     const listener = (_e: unknown, msg: StdoutMessage) => fn(msg)
     ipcRenderer.on('agent:event', listener)
@@ -41,8 +45,6 @@ const api = {
     ipcRenderer.invoke('agent:planResponse', { requestId, decision, feedback }) as Promise<void>,
   sendContinuationResponse: (taskId: string, decision: 'continue' | 'stop' | 'split') =>
     ipcRenderer.invoke('agent:continuationResponse', { taskId, decision }) as Promise<void>,
-  appendInput: (taskId: string, message: string, mode?: 'inject' | 'queue') =>
-    ipcRenderer.invoke('agent:appendInput', { taskId, message, mode }) as Promise<void>,
   configGet: (key: string) => ipcRenderer.invoke('config:get', key) as Promise<unknown>,
   setThemeMode: (themeMode: 'system' | 'light' | 'dark') =>
     ipcRenderer.invoke('appearance:setThemeMode', themeMode) as Promise<{ success: boolean; themeMode: 'system' | 'light' | 'dark' }>,
@@ -52,6 +54,8 @@ const api = {
     ipcRenderer.invoke('config:saveModel', { cfg, activate: opts?.activate ?? true }) as Promise<{ success: boolean; error?: string; modelId?: string }>,
   testModelConfig: (cfg: { providerId: string; model: string; apiKey: string; apiBaseUrl: string; apiFormat: 'openai' | 'anthropic'; contextLimit: number; customProviderId?: string; customModelId?: string; displayName?: string; autoApproveLow?: boolean }) =>
     ipcRenderer.invoke('config:testModel', cfg) as Promise<{ success: boolean; error?: string; message?: string; latencyMs?: number }>,
+  summarizeTitle: (input: { userQuery: string; assistantReply: string }) =>
+    ipcRenderer.invoke('agent:summarizeTitle', input) as Promise<{ success: boolean; title?: string; error?: string }>,
   getModelList: () => ipcRenderer.invoke('config:getModelList') as Promise<{ configs: Array<Record<string, unknown>>; activeId: string | null }>,
   setActiveModel: (modelId: string) => ipcRenderer.invoke('config:setActiveModel', modelId) as Promise<{ success: boolean }>,
   deleteModel: (modelId: string) => ipcRenderer.invoke('config:deleteModel', modelId) as Promise<{ success: boolean }>,

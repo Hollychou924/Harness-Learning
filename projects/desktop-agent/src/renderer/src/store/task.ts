@@ -7,6 +7,17 @@ import type { StdoutMessage, AgentMessage, MessageAttachment } from '../../../ag
 import type { Turn } from '../../../agent/src/items'
 import { reduceTurnsEvent, getFinalAnswerOfTurn, deriveAgentMessages, type TurnsReducerState } from './turns'
 import { buildCompletedSessionMessages, sanitizeContinuationMessages } from './sessionHistory'
+import {
+  createQueuedMessage,
+  enqueueQueuedMessage,
+  parsePersistedQueues,
+  requeueAtHead,
+  removeQueuedMessage as removeMessageFromQueue,
+  takeQueuedMessage,
+  updateQueuedMessage as updateMessageInQueue,
+  type MessageQueues,
+  type QueuedMessage
+} from './messageQueue'
 
 // 从 turns 的工具调用里派生产物列表：write_file/create_docx/create_xlsx 等写文件工具的产物
 // 历史会话恢复时顶层 artifacts 已清空，靠这个从持久化的 turns 里重建，右栏"产物"区不再空白
@@ -119,6 +130,8 @@ export interface Session {
   unread?: boolean
   /** 待用户确认的动作类型：审批/提问/计划/续跑。切到别的项目时侧边栏据此显示醒目提示 */
   pendingAction?: 'approval' | 'question' | 'plan' | 'continuation' | null
+  /** 标题是否为自动派生（首条 query 或模型总结）。手动重命名后置 false，避免后续总结回填覆盖用户命名 */
+  titleAuto?: boolean
   importedSourceTitle?: string
   importedSourceProjectId?: string
   importedSourceArchived?: boolean
@@ -281,16 +294,22 @@ export interface TaskState {
   todos: TodoItem[]
   subtasks: SubtaskEntry[]
   attachments: Attachment[]
+  messageQueues: MessageQueues
   requestManualCompact: () => void
   clearCompactNotice: () => void
   setAttachments: (a: Attachment[]) => void
   setMode: (m: 'work' | 'code') => void
   setMessage: (s: string) => void
   setGoal: (s: string) => void
-  startTask: (draft?: StartTaskDraft) => Promise<void>
+  startTask: (draft?: StartTaskDraft) => Promise<boolean>
   continueSession: (sessionId: string) => Promise<void>
   cancelTask: () => Promise<void>
-  appendInput: (text: string) => Promise<void>
+  queueMessage: (text: string, attachments: Attachment[]) => Promise<void>
+  updateQueuedMessage: (messageId: string, text: string) => void
+  removeQueuedMessage: (messageId: string) => void
+  restoreQueuedMessageToInput: (messageId: string) => void
+  sendQueuedMessageNow: (messageId: string) => Promise<void>
+  dispatchQueuedMessage: (sessionId: string, messageId?: string, interruptCurrent?: boolean) => Promise<void>
   regenerateLatestTurn: () => Promise<void>
   forkFromTurn: (turnId: string) => Promise<void>
   respondApproval: (approved: boolean, scope?: 'once' | 'task' | 'always') => Promise<void>
@@ -327,6 +346,11 @@ export interface TaskState {
   /** 将外部导入的项目和对话可靠地合并到侧边栏清单。 */
   mergeImportedData: (projects: ImportedProjectSummary[], sessions: ImportedSessionSummary[]) => void
   removeImportedData: (projectIds: string[], sessionIds: string[]) => void
+  /** 统一一致性校验：对齐磁盘存在性 + import catalog，可选 title 校验与元数据重算。
+   *  full=true 时读磁盘消息，修复与首轮 query 脱节的标题（如 agent.md 残留）并重算 stepCount。
+   *  allTitles=true 时校验所有非手动命名的会话（仅建议在「修复历史标题」手动触发时使用）。
+   *  full=false（默认）只做存在性/catalog 对齐，不读消息正文，开销小。 */
+  reconcileSessions: (opts?: { full?: boolean; allTitles?: boolean }) => Promise<void>
 }
 
 // 各模式的状态快照，切换 Work/Code 时保存/恢复
@@ -337,6 +361,8 @@ const HISTORY_MAX = 20
 const PROJECTS_KEY = 'xld.projects.v1'
 const SESSIONS_KEY = 'xld.sessions.v1'
 const ACTIVE_PROJECT_KEY = 'xld.activeProject.v1'
+const MESSAGE_QUEUES_KEY = 'xld.messageQueues.v1'
+const dispatchingQueuedSessions = new Set<string>()
 
 /** 默认项目 id，旧历史与无项目归属的对话都放这里 */
 export const DEFAULT_PROJECT_ID = 'default'
@@ -466,6 +492,23 @@ function saveActiveProject(id: string) {
   }
 }
 
+function loadMessageQueues(): MessageQueues {
+  try {
+    return parsePersistedQueues(localStorage.getItem(MESSAGE_QUEUES_KEY))
+  } catch {
+    return {}
+  }
+}
+
+function saveMessageQueues(queues: MessageQueues): boolean {
+  try {
+    localStorage.setItem(MESSAGE_QUEUES_KEY, JSON.stringify(queues))
+    return true
+  } catch {
+    return false
+  }
+}
+
 const initial = {
   status: 'idle' as TaskStatus,
   taskId: null as string | null,
@@ -488,6 +531,7 @@ const initial = {
   todos: [] as TodoItem[],
   subtasks: [] as SubtaskEntry[],
   attachments: [] as Attachment[],
+  messageQueues: {} as MessageQueues,
   messages: [] as AgentMessage[]
 }
 
@@ -537,6 +581,27 @@ function messageAttachmentsOf(attachments: Attachment[]): MessageAttachment[] {
   }))
 }
 
+async function prepareAttachmentsForDispatch(attachments: Attachment[]): Promise<Attachment[]> {
+  return Promise.all(attachments.map(async (attachment) => {
+    if (!attachment.objectUrl || attachment.dataUrl || attachment.type !== 'image') return attachment
+    const response = await fetch(attachment.objectUrl)
+    const blob = await response.blob()
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = reject
+      reader.readAsDataURL(blob)
+    })
+    return { ...attachment, dataUrl }
+  }))
+}
+
+function releaseAttachmentObjectUrls(attachments: Attachment[]): void {
+  for (const attachment of attachments) {
+    if (attachment.objectUrl) URL.revokeObjectURL(attachment.objectUrl)
+  }
+}
+
 function draftFromTurn(turn: Turn | null): { message: string; attachments: Attachment[] } | null {
   const userItem = turn?.items.find((item) => item.type === 'userMessage')
   if (!userItem || userItem.type !== 'userMessage') return null
@@ -576,6 +641,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   ...initial,
   history: loadHistoryFromStorage(),
   messages: [],
+  messageQueues: loadMessageQueues(),
   runningTasks: {},
   projects: loadProjectsFromStorage(),
   sessions: loadSessionsFromStorage(),
@@ -634,7 +700,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         runningTasks: get().runningTasks
       })
     } else {
-      set({ ...initial, messages: [], mode: m, runningTasks: get().runningTasks, history: cur.history, projects: cur.projects, sessions: cur.sessions, activeProjectId: cur.activeProjectId, activeSessionId: cur.activeSessionId })
+      set({ ...initial, messages: [], messageQueues: cur.messageQueues, mode: m, runningTasks: get().runningTasks, history: cur.history, projects: cur.projects, sessions: cur.sessions, activeProjectId: cur.activeProjectId, activeSessionId: cur.activeSessionId })
     }
   },
   setMessage: (s) => set({ message: s }),
@@ -662,7 +728,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const next = [...get().projects, project]
     saveProjectsToStorage(next)
     saveActiveProject(project.id)
-    set({ projects: next, activeProjectId: project.id, activeSessionId: null, ...initial })
+    set({ ...initial, projects: next, messageQueues: get().messageQueues, activeProjectId: project.id, activeSessionId: null })
     return project.id
   },
   renameProject: (id, name) => {
@@ -677,12 +743,17 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const nextProjects = get().projects.filter((p) => p.id !== id)
     const removedSessions = get().sessions.filter((s) => s.projectId === id)
     const nextSessions = get().sessions.filter((s) => s.projectId !== id)
+    const removedSessionIds = new Set(removedSessions.map((session) => session.id))
+    const nextQueues = Object.fromEntries(
+      Object.entries(get().messageQueues).filter(([sessionId]) => !removedSessionIds.has(sessionId))
+    )
     saveProjectsToStorage(nextProjects)
     saveSessionsToStorage(nextSessions)
+    saveMessageQueues(nextQueues)
     removedSessions.forEach((s) => void api.deleteSessionMessages(s.id))
     const active = get().activeProjectId === id ? DEFAULT_PROJECT_ID : get().activeProjectId
     saveActiveProject(active)
-    set({ projects: nextProjects, sessions: nextSessions, activeProjectId: active })
+    set({ projects: nextProjects, sessions: nextSessions, messageQueues: nextQueues, activeProjectId: active })
   },
   togglePinProject: (id) => {
     const now = Date.now()
@@ -729,16 +800,26 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   },
   renameSession: (id, title) => {
     const next = get().sessions.map((s) =>
-      s.id === id ? { ...s, title: title.trim() || s.title, updatedAt: Date.now() } : s
+      s.id === id ? { ...s, title: title.trim() || s.title, titleAuto: false, updatedAt: Date.now() } : s
     )
     saveSessionsToStorage(next)
     set({ sessions: next })
   },
   deleteSession: (id) => {
+    const target = get().sessions.find((s) => s.id === id)
     const next = get().sessions.filter((s) => s.id !== id)
+    const nextQueues = { ...get().messageQueues }
+    delete nextQueues[id]
     saveSessionsToStorage(next)
+    saveMessageQueues(nextQueues)
     void api.deleteSessionMessages(id)
-    set({ sessions: next, activeSessionId: get().activeSessionId === id ? null : get().activeSessionId })
+    // 若该会话来自外部导入，同步从 import catalog 移除，否则重启 App 时
+    // getExternalImportHistory → mergeImportedData 会把它再次加回侧边栏（磁盘正文已删，点开为空）
+    if (target && (target.importedSourceTitle !== undefined || target.importedSourceId !== undefined)) {
+      void api.removeImportedSession(id).catch(() => { /* catalog 清理失败不阻塞本地删除 */ })
+    }
+    set({ sessions: next, messageQueues: nextQueues, activeSessionId: get().activeSessionId === id ? null : get().activeSessionId })
+    void get().reconcileSessions()
   },
   togglePinSession: (id) => {
     const now = Date.now()
@@ -830,10 +911,61 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       activeSessionId: get().activeSessionId && removedSessions.has(get().activeSessionId as string) ? null : get().activeSessionId
     })
   },
+  reconcileSessions: async (opts) => {
+    const full = Boolean(opts?.full)
+    const [diskRes, catalogRes] = await Promise.all([
+      api.listSessionIds(),
+      api.getExternalImportHistory()
+    ])
+    const diskIds = new Set(diskRes.ids || [])
+    const catalog = catalogRes.success && catalogRes.catalog ? catalogRes.catalog : null
+
+    // 1. 存在性对齐：磁盘没有正文的会话从侧边栏移除；导入来源的同步清 catalog，避免重启复活
+    const toRemoveFromCatalog: string[] = []
+    let next = get().sessions.filter((s) => {
+      if (diskIds.has(s.id)) return true
+      if (s.importedSourceTitle !== undefined || s.importedSourceId !== undefined) toRemoveFromCatalog.push(s.id)
+      return false
+    })
+    for (const id of toRemoveFromCatalog) void api.removeImportedSession(id).catch(() => {})
+
+    // 2. catalog 补全：catalog 里有、当前 sessions 里没有的导入会话 → 合并回侧边栏
+    if (catalog && catalog.sessions.some((s) => !next.some((x) => x.id === s.id))) {
+      const merged = mergeImportedLists(get().projects, next, catalog.projects, catalog.sessions)
+      next = merged.sessions
+      saveImportedListsOrRestore(merged.projects, next)
+      set({ projects: merged.projects })
+    } else {
+      saveSessionsToStorage(next)
+    }
+    set({ sessions: next })
+
+    // 3. full 档：对标题疑似脱节（占位/附件名/文件名）且非手动命名的会话读盘校验 + 重算 stepCount
+    if (full) {
+      const targets = next.filter((s) =>
+        s.titleAuto !== false && (opts?.allTitles || titleLooksSuspect(s.title))
+      )
+      for (const s of targets) {
+        try {
+          const msgs = await api.loadSessionMessages(s.id) as AgentMessage[]
+          reconcileSessionTitleIfNeeded(set, get, s.id, msgs)
+          // 重算 stepCount（按 assistant 消息条数）；tokens 无来源不强写
+          const stepCount = msgs.filter((m) => m.role === 'assistant').length
+          const gs = get()
+          const cur = gs.sessions.find((x) => x.id === s.id)
+          if (cur && cur.stepCount !== stepCount) {
+            const nextSessions = gs.sessions.map((x) => x.id === s.id ? { ...x, stepCount } : x)
+            saveSessionsToStorage(nextSessions)
+            set({ sessions: nextSessions })
+          }
+        } catch { /* 读盘失败跳过该条 */ }
+      }
+    }
+  },
   reset: () => {
     // 释放附件的 Object URL，防止内存泄漏
     for (const a of get().attachments) { if (a.objectUrl) URL.revokeObjectURL(a.objectUrl) }
-    set({ ...initial, history: get().history, projects: get().projects, sessions: get().sessions, activeProjectId: get().activeProjectId, activeSessionId: get().activeSessionId, mode: get().mode, approvalPending: null, pendingPlan: null, pendingQuestion: null, continuationPending: null, compactNotice: null, todos: [], subtasks: [], attachments: [] })
+    set({ ...initial, history: get().history, projects: get().projects, sessions: get().sessions, messageQueues: get().messageQueues, activeProjectId: get().activeProjectId, activeSessionId: get().activeSessionId, mode: get().mode, approvalPending: null, pendingPlan: null, pendingQuestion: null, continuationPending: null, compactNotice: null, todos: [], subtasks: [], attachments: [] })
   },
   cancelTask: async () => {
     const { taskId, continuationPending } = get()
@@ -845,11 +977,100 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     if (taskId) delete rt[taskId]
     set({ status: 'idle', finishedAt: Date.now(), continuationPending: null, runningTasks: rt })
   },
-  appendInput: async (text: string, mode?: 'inject' | 'queue') => {
-    const { taskId } = get()
-    if (taskId && text.trim()) {
-      await api.appendInput(taskId, text, mode)
-      set({ message: '', attachments: [] })
+  queueMessage: async (text, attachments) => {
+    const sessionId = get().activeSessionId || get().taskId
+    const readyAttachments = attachments.filter((attachment) => attachment.status !== 'failed' && attachment.status !== 'uploading')
+    if (!sessionId || (!text.trim() && readyAttachments.length === 0)) return
+
+    let durableAttachments: Attachment[]
+    try {
+      durableAttachments = await prepareAttachmentsForDispatch(readyAttachments)
+    } catch {
+      set({ error: '图片读取失败，未加入队列，请重新添加后再试' })
+      return
+    }
+
+    const queuedMessage = createQueuedMessage({
+      id: uid('queue'),
+      sessionId,
+      text,
+      attachments: durableAttachments
+    })
+    const nextQueues = enqueueQueuedMessage(get().messageQueues, queuedMessage)
+    if (!saveMessageQueues(nextQueues)) {
+      set({ error: '本地存储空间不足，消息未加入队列，请减少附件后重试' })
+      return
+    }
+    releaseAttachmentObjectUrls(readyAttachments)
+    set({ messageQueues: nextQueues, message: '', attachments: [], error: null })
+  },
+  updateQueuedMessage: (messageId, text) => {
+    const sessionId = get().activeSessionId || get().taskId
+    if (!sessionId) return
+    const nextQueues = updateMessageInQueue(get().messageQueues, sessionId, messageId, text)
+    saveMessageQueues(nextQueues)
+    set({ messageQueues: nextQueues })
+  },
+  removeQueuedMessage: (messageId) => {
+    const sessionId = get().activeSessionId || get().taskId
+    if (!sessionId) return
+    const nextQueues = removeMessageFromQueue(get().messageQueues, sessionId, messageId)
+    saveMessageQueues(nextQueues)
+    set({ messageQueues: nextQueues })
+  },
+  restoreQueuedMessageToInput: (messageId) => {
+    const sessionId = get().activeSessionId || get().taskId
+    if (!sessionId) return
+    const item = (get().messageQueues[sessionId] || []).find((message) => message.id === messageId)
+    if (!item || item.status === 'dispatching') return
+    const nextQueues = removeMessageFromQueue(get().messageQueues, sessionId, messageId)
+    saveMessageQueues(nextQueues)
+    set({
+      messageQueues: nextQueues,
+      message: item.text,
+      attachments: item.attachments.map((attachment) => ({ ...attachment, status: 'ready' as const }))
+    })
+  },
+  sendQueuedMessageNow: async (messageId) => {
+    const sessionId = get().activeSessionId || get().taskId
+    if (sessionId) await get().dispatchQueuedMessage(sessionId, messageId, true)
+  },
+  dispatchQueuedMessage: async (sessionId, messageId, interruptCurrent = false) => {
+    const before = get()
+    if (before.activeSessionId !== sessionId) return
+    if (before.status === 'executing' && !interruptCurrent) return
+    if (dispatchingQueuedSessions.has(sessionId)) return
+    dispatchingQueuedSessions.add(sessionId)
+    const taken = takeQueuedMessage(before.messageQueues, sessionId, messageId)
+    if (!taken.item) {
+      dispatchingQueuedSessions.delete(sessionId)
+      return
+    }
+    saveMessageQueues(taken.queues)
+    set({ messageQueues: taken.queues })
+    try {
+      if (interruptCurrent && before.status === 'executing') await get().cancelTask()
+      const context = get()
+      const baseTurns = context.turns
+      const baseMessages = interruptCurrent && context.messages[context.messages.length - 1]?.role === 'user'
+        ? context.messages.slice(0, -1)
+        : context.messages
+      const started = await get().startTask({
+        message: taken.item.text,
+        attachments: taken.item.attachments,
+        baseTurns,
+        baseMessages
+      })
+      if (!started) throw new Error(get().error || '排队消息发送失败')
+    } catch (error) {
+      const restoredQueues = requeueAtHead(get().messageQueues, taken.item)
+      saveMessageQueues(restoredQueues)
+      set({
+        messageQueues: restoredQueues,
+        error: error instanceof Error ? error.message : '排队消息发送失败'
+      })
+    } finally {
+      dispatchingQueuedSessions.delete(sessionId)
     }
   },
   respondApproval: async (approved: boolean, scope: 'once' | 'task' | 'always' = 'once') => {
@@ -957,11 +1178,13 @@ export const useTaskStore = create<TaskState>((set, get) => ({
           const rtAfter = { ...get().runningTasks }
           delete rtAfter[evTaskId as string]
           set({ runningTasks: rtAfter })
+          scheduleQueueDispatch(evTaskId)
           return
         }
         default: break
       }
       set((st) => ({ runningTasks: { ...st.runningTasks, [evTaskId as string]: { ...base, ...patch } } }))
+      if (msg.type === 'error') scheduleQueueDispatch(evTaskId)
       if (pendingAction) setSessionPendingAction(set, get, evTaskId as string, pendingAction)
       return
     }
@@ -993,6 +1216,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         set({ error: msg.message, status: 'failed', finishedAt: Date.now(), continuationPending: null })
         setSessionPendingAction(set, get, evTaskId, null)
         { const rt = { ...get().runningTasks }; delete rt[evTaskId]; set({ runningTasks: rt }) }
+        scheduleQueueDispatch(evTaskId)
         break
       case 'completed': {
         const cur2 = get()
@@ -1000,6 +1224,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         const derivedTail = deriveAgentMessages(cur2.turns)
         const nextMessages = buildCompletedSessionMessages(cur2.messages, msg.messages, derivedTail)
         const finalStatus: TaskStatus = cur2.status === 'failed' ? 'failed' : 'completed'
+        const firstUserQuery = cur2.messages.find((m) => m.role === 'user')?.content || ''
         set({ status: finalStatus, summary: msg.summary, finishedAt: Date.now(), messages: nextMessages, continuationPending: null })
         setSessionPendingAction(set, get, evTaskId, null)
         pushHistory(set, get)
@@ -1008,6 +1233,11 @@ export const useTaskStore = create<TaskState>((set, get) => ({
           void api.saveSessionTurns(evTaskId, get().turns)
         }
         { const rt = { ...get().runningTasks }; delete rt[evTaskId]; set({ runningTasks: rt }) }
+        // 任务成功完成：异步总结 ≤10 字短标题回填侧边栏（失败时保留原标题）
+        if (finalStatus === 'completed' && evTaskId) {
+          summarizeAndUpdateTitle(set, get, evTaskId, firstUserQuery, assistantText)
+        }
+        scheduleQueueDispatch(evTaskId)
         break
       }
       case 'approval_request':
@@ -1056,27 +1286,18 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const mode = state.mode
     const message = draft?.message ?? state.message
     const draftAttachments = draft?.attachments ?? state.attachments
-    if (draftAttachments.some((a) => a.status === 'failed' || a.status === 'uploading')) return
+    if (draftAttachments.some((a) => a.status === 'failed' || a.status === 'uploading')) return false
     const readyDraftAttachments = draftAttachments.filter((a) => a.status !== 'failed' && a.status !== 'uploading')
-    if (!message.trim() && readyDraftAttachments.length === 0) return
+    if (!message.trim() && readyDraftAttachments.length === 0) return false
 
     const settingsState = useSettingsStore.getState()
-    const sendAttachments = await Promise.all(readyDraftAttachments.map(async (a) => {
-      if (a.objectUrl && !a.dataUrl && a.type === 'image') {
-        try {
-          const resp = await fetch(a.objectUrl)
-          const blob = await resp.blob()
-          const dataUrl = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader()
-            reader.onload = () => resolve(reader.result as string)
-            reader.onerror = reject
-            reader.readAsDataURL(blob)
-          })
-          return { ...a, dataUrl }
-        } catch { return a }
-      }
-      return a
-    }))
+    let sendAttachments: Attachment[]
+    try {
+      sendAttachments = await prepareAttachmentsForDispatch(readyDraftAttachments)
+    } catch {
+      set({ error: '图片读取失败，请重新添加后再发送' })
+      return false
+    }
 
     const baseTurns = draft?.baseTurns ?? state.turns
     const baseMessages = draft?.baseMessages ?? state.messages
@@ -1096,7 +1317,11 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     }
 
     const messageAttachments = messageAttachmentsOf(sendAttachments)
-    const visibleTitle = message.trim() || describeAttachments(sendAttachments) || '新任务'
+    // 标题只取用户文本，纯附件时用「新任务」占位，等任务完成 LLM 总结回填。
+    // 不再用附件名（agent.md 等）做标题——附件后续被移除后标题会与实际首轮 query 脱节。
+    // 标题只取用户文本，纯附件时用「新任务」占位，等任务完成 LLM 总结回填。
+    // 不再用附件名（agent.md 等）做标题——附件后续被移除后标题会与实际首轮 query 脱节。
+    const visibleTitle = message.trim() || '新任务'
     const userMsg: AgentMessage = {
       role: 'user',
       content: message,
@@ -1128,7 +1353,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     set((st) => ({ runningTasks: { ...st.runningTasks, [get().taskId as string]: { status: 'executing', turns: get().turns, currentTurn: null, summary: '', artifacts: [], usage: { inputTokens: 0, outputTokens: 0 }, error: null, startedAt: Date.now(), finishedAt: null, approvalPending: null, pendingPlan: null, pendingQuestion: null, continuationPending: null, compactNotice: null, todos: [], subtasks: [] } } }))
 
     // 释放附件 Object URL
-    for (const a of draftAttachments) { if (a.objectUrl) URL.revokeObjectURL(a.objectUrl) }
+    releaseAttachmentObjectUrls(draftAttachments)
 
     // 取当前项目绑定的文件夹作为工作区目录；无绑定则走主进程默认产出目录
     const curProject = get().projects.find((p) => p.id === get().activeProjectId)
@@ -1188,7 +1413,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
           order: 0,
           lastReadAt: startNow,
           unread: false,
-          startedAt: startNow
+          startedAt: startNow,
+          titleAuto: true
         }
         const nextSessions = [newSess, ...cur2.sessions]
         saveSessionsToStorage(nextSessions)
@@ -1197,6 +1423,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         void api.saveSessionMessages(res.taskId, [userMsg])
       }
     }
+    return !res.error
   },
   regenerateLatestTurn: async () => {
     const cur = get()
@@ -1247,6 +1474,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     set({
       ...initial,
       status: 'completed',
+      messageQueues: cur.messageQueues,
       mode: cur.mode,
       messages: forkMessages,
       turns: forkTurns,
@@ -1283,7 +1511,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     const rt = get().runningTasks[sessionId]
     const sess = get().sessions.find((s) => s.id === sessionId)
     if (rt && rt.status === 'executing') {
-      set({ ...initial, ...rt, messages: cur.messages, mode: sess?.mode || cur.mode, activeSessionId: sessionId, activeProjectId: sess?.projectId || cur.activeProjectId, taskId: sessionId, goal: sess?.title || '', runningTasks: get().runningTasks, projects: get().projects, sessions: get().sessions, history: get().history })
+      set({ ...initial, ...rt, messages: cur.messages, messageQueues: get().messageQueues, mode: sess?.mode || cur.mode, activeSessionId: sessionId, activeProjectId: sess?.projectId || cur.activeProjectId, taskId: sessionId, goal: sess?.title || '', runningTasks: get().runningTasks, projects: get().projects, sessions: get().sessions, history: get().history })
     } else {
       // 切到这条会话即视为已读
       const now = Date.now()
@@ -1302,10 +1530,24 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       // - artifacts：从 turns 派生（write_file 等写文件工具的产物），顶层 artifacts 落盘未存
       const sessStatus = (sess?.status === 'completed' || sess?.status === 'failed') ? sess.status : 'completed'
       const sessTokens = sess?.tokens ?? 0
-      set({ ...initial, status: sessStatus, messages: stored || [], turns: restoredTurns, mode: sess?.mode || cur.mode, activeSessionId: sessionId, activeProjectId: sess?.projectId || cur.activeProjectId, taskId: sessionId, goal: sess?.title || '', usage: { inputTokens: sessTokens, outputTokens: 0 }, startedAt: sess?.startedAt ?? null, finishedAt: sess?.finishedAt ?? null, artifacts: deriveArtifactsFromTurns(restoredTurns), runningTasks: get().runningTasks, projects: get().projects, sessions: get().sessions, history: get().history })
+      set({ ...initial, status: sessStatus, messages: stored || [], messageQueues: get().messageQueues, turns: restoredTurns, mode: sess?.mode || cur.mode, activeSessionId: sessionId, activeProjectId: sess?.projectId || cur.activeProjectId, taskId: sessionId, goal: sess?.title || '', usage: { inputTokens: sessTokens, outputTokens: 0 }, startedAt: sess?.startedAt ?? null, finishedAt: sess?.finishedAt ?? null, artifacts: deriveArtifactsFromTurns(restoredTurns), runningTasks: get().runningTasks, projects: get().projects, sessions: get().sessions, history: get().history })
+      // 打开会话即校验标题是否与实际首轮 query 脱节（如 agent.md 这类被移除附件残留的标题），
+      // 异步修复，不影响会话加载体验
+      void reconcileSessionTitleIfNeeded(set, get, sessionId, stored || [])
+      scheduleQueueDispatch(sessionId)
     }
   }
 }))
+
+/** 当前 turn 结束后，若目标会话仍是前台且空闲，则自动出队首条。 */
+function scheduleQueueDispatch(sessionId: string): void {
+  queueMicrotask(() => {
+    const state = useTaskStore.getState()
+    if (state.activeSessionId !== sessionId) return
+    if (state.status === 'executing') return
+    void state.dispatchQueuedMessage(sessionId)
+  })
+}
 
 /** 更新某条会话的待确认状态，并落盘。action 传 null/undefined 表示清除。
  *  用于审批/提问/计划/续跑等待用户输入时，在侧边栏给出醒目提示（即便用户在别的项目）。 */
@@ -1324,6 +1566,149 @@ function setSessionPendingAction(
   )
   saveSessionsToStorage(next)
   set({ sessions: next })
+}
+
+/** 任务完成后异步调用模型，把首条 query + 助手回复总结成 ≤10 字短标题回填到侧边栏。
+ *  - 失败/超时/返回空：保留原标题，静默处理
+ *  - 用户已手动重命名（titleAuto === false）：不覆盖
+ *  - 用 userQuery（首条 query，取 session 当前标题作为输入）+ assistantReply（本轮最终回复） */
+function summarizeAndUpdateTitle(
+  set: (partial: Partial<TaskState> | ((s: TaskState) => Partial<TaskState>)) => void,
+  get: () => TaskState,
+  sessionId: string,
+  userQuery: string,
+  assistantReply: string
+): void {
+  if (!sessionId) return
+  if (!userQuery && !assistantReply) return
+  void api.summarizeTitle({ userQuery, assistantReply }).then((res) => {
+    if (!res.success || !res.title) return
+    const gs = get()
+    const sess = gs.sessions.find((s) => s.id === sessionId)
+    if (!sess) return
+    if (sess.titleAuto === false) return // 用户已手动命名，不覆盖
+    const next = gs.sessions.map((s) =>
+      s.id === sessionId ? { ...s, title: res.title as string, titleAuto: true, updatedAt: Date.now() } : s
+    )
+    saveSessionsToStorage(next)
+    set({ sessions: next })
+  }).catch(() => { /* 失败保留原标题 */ })
+}
+
+/** 判断当前标题是否与实际首轮 user query 脱节、需要重新生成。
+ *  触发条件（满足任一）：
+ *   - 标题是占位符（新对话/新任务）
+ *   - 标题来自附件描述（【图片 …】/【文档 …】或单个【…】包裹）
+ *   - 标题形如纯文件名（agent.md、xxx.pdf 等）
+ *   - 标题与首轮 user query 在字面上零交集（token 级别无任何重叠）
+ *  仅当 titleAuto !== false（非用户手动命名）且首轮 query 非空时才认为需要重生成。 */
+const FILENAME_LIKE_RE = /\.(md|txt|pdf|docx?|xlsx?|pptx?|json|ya?ml|csv|html?|css|js|jsx|ts|tsx|py|go|rs|java|c|cc|cpp|hh|hpp|sh|toml|ini|conf|log|bak)$/i
+
+/** 标题形态是否「疑似脱节」（不需要首轮 query 参照即可判断）。
+ *  占位符、附件描述包裹、纯文件名形态都算。用于决定是否值得读磁盘消息做完整校验。 */
+function titleLooksSuspect(title: string): boolean {
+  const t = String(title || '').trim()
+  if (!t) return true
+  if (t === '新对话' || t === '新任务' || t === '新路线') return true
+  if (/^【(图片|文档)\s/.test(t) || /^【[^】]+】$/.test(t)) return true
+  if (FILENAME_LIKE_RE.test(t) && !/[\u4e00-\u9fa5]/.test(t)) return true
+  return false
+}
+
+function tokenizeForOverlap(text: string): Set<string> {
+  return new Set(
+    String(text || '')
+      .toLowerCase()
+      .split(/[\s,，。.!！?？:;；"'`'()（）【】\[\]{}<>《》/\\|@#$%^&*+=\-—~·]+/)
+      .filter((t) => t.length >= 2)
+  )
+}
+
+function titleNeedsReconcile(title: string, firstUserText: string): boolean {
+  const t = String(title || '').trim()
+  if (!t) return true
+  if (titleLooksSuspect(t)) return true
+  // 与首轮 query 零交集
+  const fu = String(firstUserText || '').trim()
+  if (!fu) return false // 无首轮文本作为参照，不强行重生成
+  const tTokens = tokenizeForOverlap(t)
+  const fuTokens = tokenizeForOverlap(fu)
+  for (const tok of tTokens) if (fuTokens.has(tok)) return false
+  return true
+}
+
+/** 从单条 user 消息提取可用文本：正文优先，其次附件 textContent。 */
+function userTextFromMessage(m: AgentMessage): string {
+  const base = typeof m.content === 'string' ? m.content.trim() : ''
+  if (base) return base
+  const fromAttach = (m.attachments || [])
+    .map((a) => a.textContent?.trim())
+    .filter(Boolean)
+    .join(' ')
+  return fromAttach
+}
+
+/** 取磁盘消息里的首轮 user 文本与首轮 assistant 文本（均排除 system/tool）。
+ *  跳过空 user 消息，取第一条有正文的 user；纯附件时尝试 attachments.textContent。 */
+function firstUserAndAssistant(messages: AgentMessage[]): { userQuery: string; assistantReply: string } {
+  let userQuery = ''
+  let assistantReply = ''
+  for (const m of messages) {
+    if (m.role === 'system' || m.role === 'tool') continue
+    if (!userQuery && m.role === 'user') {
+      const text = userTextFromMessage(m)
+      if (text) userQuery = text
+    }
+    if (!assistantReply && m.role === 'assistant') {
+      assistantReply = typeof m.content === 'string' ? m.content.slice(0, 2000) : ''
+    }
+    if (userQuery && assistantReply) break
+  }
+  return { userQuery, assistantReply }
+}
+
+/** 打开会话或批量校验时调用：若标题与实际首轮 query 脱节，用 LLM 重总结；
+ *  LLM 失败/超时/返回空时降级为首轮 query 前 40 字，绝不保留 agent.md 这类脱节标题。
+ *  用户手动命名（titleAuto === false）永不覆盖。 */
+function reconcileSessionTitleIfNeeded(
+  set: (partial: Partial<TaskState> | ((s: TaskState) => Partial<TaskState>)) => void,
+  get: () => TaskState,
+  sessionId: string,
+  messages: AgentMessage[]
+): void {
+  if (!sessionId) return
+  const sess = get().sessions.find((s) => s.id === sessionId)
+  if (!sess) return
+  if (sess.titleAuto === false) return // 用户已手动命名
+  const { userQuery, assistantReply } = firstUserAndAssistant(messages)
+  const suspect = titleLooksSuspect(sess.title)
+  // 纯附件首轮且正文已清空（如 agent.md 被移除）：仍可用助手回复修复脱节标题
+  const effectiveQuery = userQuery || (suspect && assistantReply ? assistantReply.slice(0, 500) : '')
+  if (!effectiveQuery) return
+  if (!titleNeedsReconcile(sess.title, userQuery || effectiveQuery)) return
+  const fallbackTitle = (userQuery || assistantReply).slice(0, 40) || '新对话'
+  void api.summarizeTitle({ userQuery: userQuery || effectiveQuery, assistantReply }).then((res) => {
+    const gs = get()
+    const cur = gs.sessions.find((s) => s.id === sessionId)
+    if (!cur || cur.titleAuto === false) return
+    const newTitle = res.success && res.title ? res.title : fallbackTitle
+    if (cur.title === newTitle) return
+    const next = gs.sessions.map((s) =>
+      s.id === sessionId ? { ...s, title: newTitle, titleAuto: true, updatedAt: Date.now() } : s
+    )
+    saveSessionsToStorage(next)
+    set(gs.activeSessionId === sessionId ? { sessions: next, goal: newTitle } : { sessions: next })
+  }).catch(() => {
+    // LLM 调用本身失败：降级为截取，仍要修复脱节标题
+    const gs = get()
+    const cur = gs.sessions.find((s) => s.id === sessionId)
+    if (!cur || cur.titleAuto === false || cur.title === fallbackTitle) return
+    const next = gs.sessions.map((s) =>
+      s.id === sessionId ? { ...s, title: fallbackTitle, titleAuto: true, updatedAt: Date.now() } : s
+    )
+    saveSessionsToStorage(next)
+    set(gs.activeSessionId === sessionId ? { sessions: next, goal: fallbackTitle } : { sessions: next })
+  })
 }
 
 function pushHistory(

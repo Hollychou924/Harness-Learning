@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useTaskStore } from './store/task'
 import { Sidebar } from './components/Sidebar'
@@ -17,6 +17,8 @@ export default function App() {
   const preventSystemSleep = useSettingsStore((s) => s.preventSystemSleep)
   const loadGeneral = useSettingsStore((s) => s.loadGeneral)
   const mergeImportedData = useTaskStore((s) => s.mergeImportedData)
+  const reconcileSessions = useTaskStore((s) => s.reconcileSessions)
+  const startupSyncDone = useRef(false)
   const showRightToggle = status !== 'idle'
 
   useEffect(() => {
@@ -24,14 +26,28 @@ export default function App() {
   }, [loadGeneral])
 
   useEffect(() => {
-    void api.getExternalImportHistory().then((response) => {
-      if (response.success && response.catalog) {
-        mergeImportedData(response.catalog.projects, response.catalog.sessions)
+    if (startupSyncDone.current) return
+    startupSyncDone.current = true
+    console.log('[renderer] App startup sync begin')
+    void (async () => {
+      try {
+        const response = await api.getExternalImportHistory()
+        console.log('[renderer] import history', { success: response.success, projects: response.catalog?.projects.length, sessions: response.catalog?.sessions.length })
+        if (response.success && response.catalog) {
+          mergeImportedData(response.catalog.projects, response.catalog.sessions)
+        }
+        await reconcileSessions()
+        console.log('[renderer] startup reconcile light done')
+      } catch (error) {
+        console.error('[renderer] startup sync failed', error)
       }
-    }).catch(() => {
-      // Existing local projects remain available when import history cannot be read.
-    })
-  }, [mergeImportedData])
+      window.setTimeout(() => {
+        void reconcileSessions({ full: true })
+          .then(() => console.log('[renderer] startup reconcile full done'))
+          .catch((error) => console.error('[renderer] startup reconcile full failed', error))
+      }, 2500)
+    })()
+  }, [mergeImportedData, reconcileSessions])
 
   useEffect(() => {
     void api.setThemeMode(themeMode)

@@ -1,4 +1,4 @@
-import type { ImportedProjectSummary, ImportedSessionSummary } from './api'
+import type { ImportedProjectSummary, ImportedSessionSummary, ImportSourceId } from './api'
 
 export interface VisibleProject {
   id: string
@@ -12,6 +12,8 @@ export interface VisibleProject {
   folderPath?: string
   importedSourceName?: string
   importedSourceFolderPath?: string
+  /** 来源 IDE（codex/claude-code/cursor），用于按来源拆分/统计 */
+  importedSourceId?: ImportSourceId
 }
 
 export interface VisibleSession {
@@ -24,6 +26,8 @@ export interface VisibleSession {
   importedSourceTitle?: string
   importedSourceProjectId?: string
   importedSourceArchived?: boolean
+  /** 来源 IDE，用于按来源拆分/统计 */
+  importedSourceId?: ImportSourceId
 }
 
 function pathKey(path?: string): string | undefined {
@@ -77,7 +81,8 @@ export function mergeImportedLists<P extends VisibleProject, S extends VisibleSe
       order: collapsedProjects.length + index,
       folderPath: item.folderPath,
       importedSourceName: item.name,
-      importedSourceFolderPath: item.folderPath
+      importedSourceFolderPath: item.folderPath,
+      importedSourceId: item.source
     } as P))
 
   const incomingProjects = new Map(importedProjects.map((item) => [incomingProjectIds.get(item.id) || item.id, item]))
@@ -90,6 +95,7 @@ export function mergeImportedLists<P extends VisibleProject, S extends VisibleSe
       folderPath: item.folderPath === item.importedSourceFolderPath ? incoming.folderPath : item.folderPath,
       importedSourceName: incoming.name,
       importedSourceFolderPath: incoming.folderPath,
+      importedSourceId: incoming.source,
       updatedAt: Math.max(item.updatedAt, incoming.updatedAt)
     }
   })
@@ -121,9 +127,11 @@ export function mergeImportedLists<P extends VisibleProject, S extends VisibleSe
       order: remappedCurrentSessions.length + index,
       lastReadAt: item.updatedAt,
       unread: false,
+      titleAuto: true,
       importedSourceTitle: item.title,
       importedSourceProjectId: incomingProjectIds.get(item.projectId) || item.projectId,
-      importedSourceArchived: item.archived
+      importedSourceArchived: item.archived,
+      importedSourceId: item.source
     } as unknown as S))
   const incomingSessions = new Map(importedSessions.map((item) => [item.id, item]))
   const updatedSessions = remappedCurrentSessions.map((item) => {
@@ -138,6 +146,7 @@ export function mergeImportedLists<P extends VisibleProject, S extends VisibleSe
       importedSourceTitle: incoming.title,
       importedSourceProjectId: incomingProjectId,
       importedSourceArchived: incoming.archived,
+      importedSourceId: incoming.source,
       updatedAt: Math.max(item.updatedAt, incoming.updatedAt)
     }
   })

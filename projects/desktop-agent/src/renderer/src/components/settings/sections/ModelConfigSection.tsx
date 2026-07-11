@@ -67,102 +67,82 @@ export function ModelConfigSection() {
   }
 
   return (
-    <section className="flex h-full min-h-[520px] flex-col">
-      <header className="mb-5 flex items-start justify-between gap-4">
-        <div>
-          <h3 className="text-lg font-semibold text-[var(--ink)]">模型</h3>
-          <p className="mt-1 text-sm text-[var(--ink-soft)]">左边选来源，右边直接填模型、连接地址和密钥；Mify 通过下拉框选模型。</p>
-        </div>
-        {activeConfig && (
-          <div className="hidden rounded-2xl bg-sky-50 px-4 py-2 text-right text-xs text-sky-700 md:block">
-            <div className="font-medium">当前使用</div>
-            <div className="mt-0.5 max-w-[260px] truncate">
-              {getConfigLabel(activeConfig)} / {activeConfig.model}
-            </div>
-          </div>
-        )}
-      </header>
-
-      <div className="grid flex-1 min-h-0 grid-cols-1 gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
-        <aside className="floating-subsurface min-h-0 rounded-2xl p-3 lg:overflow-y-auto">
-          <div className="mb-3 px-2 text-xs font-medium text-[var(--ink-soft)]">模型来源</div>
-          <div className="space-y-1.5">
-            {providerIds.map((id) => {
-              const preset = PROVIDER_PRESETS[id]
-              const key = `provider:${id}`
-              const selected = selectedKey === key
-              const providerConfigs = configs.filter((cfg) => cfg.providerId === id)
-              const isActive = activeConfig?.providerId === id
-              const hasConfigured = providerConfigs.length > 0 || isActive
-              const firstModel = providerConfigs[0]?.model || (isActive ? activeConfig?.model : '')
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => selectKey(key)}
-                  className={`group w-full rounded-xl border px-3 py-3 text-left transition ${selected ? 'border-[#0071e3] bg-sky-50 text-sky-700' : 'border-transparent hover:border-black/[0.06] hover:bg-black/[0.035]'}`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{preset.label}</span>
-                    {isActive && <Check size={14} className="flex-shrink-0 text-[#0071e3]" />}
-                  </div>
-                  <div className="mt-1 flex items-center gap-1.5 text-[11px] text-[var(--ink-soft)]">
-                    {isActive ? (
-                      <span className="rounded-full bg-green-50 px-1.5 py-0.5 text-green-600">当前使用</span>
-                    ) : hasConfigured ? (
-                      <span className="rounded-full bg-black/[0.05] px-1.5 py-0.5">已保存</span>
-                    ) : (
-                      <span>未配置</span>
-                    )}
-                    {firstModel && <span className="min-w-0 flex-1 truncate">{firstModel}</span>}
-                  </div>
-                </button>
-              )
-            })}
+    <section className="flex h-full min-h-0 flex-col">
+      <div className="flex flex-1 min-h-0">
+        {/* 左侧：Apple 风格来源列表 */}
+        <aside className="flex w-[240px] flex-shrink-0 flex-col border-r border-[var(--settings-sep)] bg-[var(--settings-sidebar-bg)]">
+          <div className="px-4 pt-5 pb-3">
+            <h3 className="text-[15px] font-semibold text-[var(--ink)] tracking-tight">模型</h3>
+            {activeConfig ? (
+              <p className="mt-1 text-[11px] text-[var(--ink-soft)] leading-relaxed truncate">
+                正在使用 {getConfigLabel(activeConfig)}
+                {activeConfig.model ? ` · ${activeConfig.model}` : ''}
+              </p>
+            ) : (
+              <p className="mt-1 text-[11px] text-[var(--ink-soft)]">选择服务商并完成配置</p>
+            )}
           </div>
 
-          <div className="mt-4 border-t border-black/[0.06] pt-3">
-            <div className="mb-2 px-2 text-xs font-medium text-[var(--ink-soft)]">自定义模型</div>
-            <div className="space-y-1.5">
+          <div className="flex-1 min-h-0 overflow-y-auto px-2.5 pb-4">
+            <ListSection title="服务商">
+              {providerIds.map((id) => {
+                const preset = PROVIDER_PRESETS[id]
+                const key = `provider:${id}`
+                const selected = selectedKey === key
+                const providerConfigs = configs.filter((cfg) => cfg.providerId === id)
+                const isActive = activeConfig?.providerId === id
+                const hasConfigured = providerConfigs.length > 0 || isActive
+                const firstModel = providerConfigs[0]?.model || (isActive ? activeConfig?.model : '')
+                return (
+                  <ListRow
+                    key={id}
+                    selected={selected}
+                    onClick={() => selectKey(key)}
+                    title={preset.label}
+                    subtitle={isActive ? firstModel || '当前使用' : hasConfigured ? firstModel || '已配置' : '未配置'}
+                    active={isActive}
+                    muted={!hasConfigured && !isActive}
+                  />
+                )
+              })}
+            </ListSection>
+
+            <ListSection title="自定义">
               {customConfigs.map((cfg) => {
                 const key = getSelectionKey(cfg)
                 const selected = selectedKey === key
-                const isActive = activeModelId ? cfg._id === activeModelId : activeConfig?.providerId === 'custom' && activeConfig?.customModelId === cfg.customModelId
+                const isActive = activeModelId
+                  ? cfg._id === activeModelId
+                  : activeConfig?.providerId === 'custom' && activeConfig?.customModelId === cfg.customModelId
                 return (
-                  <button
+                  <ListRow
                     key={key}
-                    type="button"
+                    selected={selected}
                     onClick={() => selectKey(key)}
-                    className={`group w-full rounded-xl border px-3 py-3 text-left transition ${selected ? 'border-[#0071e3] bg-sky-50 text-sky-700' : 'border-transparent hover:border-black/[0.06] hover:bg-black/[0.035]'}`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium">{cfg.displayName || '自定义模型'}</span>
-                      {isActive && <Check size={14} className="flex-shrink-0 text-[#0071e3]" />}
-                    </div>
-                    <div className="mt-1 flex items-center gap-1.5 text-[11px] text-[var(--ink-soft)]">
-                      {isActive ? <span className="rounded-full bg-green-50 px-1.5 py-0.5 text-green-600">当前使用</span> : <span className="rounded-full bg-black/[0.05] px-1.5 py-0.5">已保存</span>}
-                      <span className="min-w-0 flex-1 truncate">{cfg.model}</span>
-                    </div>
-                  </button>
+                    title={cfg.displayName || '自定义模型'}
+                    subtitle={cfg.model || '已保存'}
+                    active={isActive}
+                  />
                 )
               })}
-
               <button
                 type="button"
                 onClick={handleAddCustom}
-                className={`group w-full rounded-xl border border-dashed px-3 py-3 text-left transition ${selectedKey.startsWith('custom:new-') ? 'border-[#0071e3] bg-sky-50 text-sky-700' : 'border-black/[0.12] text-[var(--ink-soft)] hover:border-black/[0.24] hover:bg-black/[0.035]'}`}
+                className={`flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-left text-[13px] transition ${
+                  selectedKey.startsWith('custom:new-')
+                    ? 'bg-[var(--settings-nav-active-bg)] text-[var(--settings-nav-active-fg)]'
+                    : 'text-[var(--whale-blue)] hover:bg-[var(--settings-row-hover)]'
+                }`}
               >
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  <Plus size={15} />
-                  新增自定义模型
-                </div>
-                <div className="mt-1 text-[11px] text-[var(--ink-soft)]">添加新的供应商名称、连接地址和模型 ID。</div>
+                <Plus size={15} strokeWidth={2.25} />
+                添加自定义模型
               </button>
-            </div>
+            </ListSection>
           </div>
         </aside>
 
-        <main className="min-h-0 overflow-hidden rounded-2xl border border-black/[0.06] bg-white/[0.48]">
+        {/* 右侧：编辑区 */}
+        <main className="min-h-0 min-w-0 flex-1 bg-[var(--floating-bg)]">
           {selectedPreset ? (
             <ProviderEditor
               key={`${selectedKey}:${selectedCustomConfig?._id || customDraftId || ''}`}
@@ -175,10 +155,73 @@ export function ModelConfigSection() {
               onSaved={loadConfiguredModels}
             />
           ) : (
-            <div className="p-5 text-sm text-[var(--ink-soft)]">请选择一个模型来源。</div>
+            <div className="flex h-full items-center justify-center p-8 text-sm text-[var(--ink-soft)]">
+              请选择一个服务商
+            </div>
           )}
         </main>
       </div>
     </section>
+  )
+}
+
+function ListSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="mb-4">
+      <div className="px-2.5 pb-1.5 text-[11px] font-medium uppercase tracking-[0.04em] text-[var(--ink-soft)]/80">
+        {title}
+      </div>
+      <div className="space-y-0.5">{children}</div>
+    </div>
+  )
+}
+
+function ListRow({
+  title,
+  subtitle,
+  selected,
+  active,
+  muted,
+  onClick
+}: {
+  title: string
+  subtitle?: string
+  selected: boolean
+  active?: boolean
+  muted?: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group flex w-full items-center gap-2 rounded-[10px] px-2.5 py-2 text-left transition ${
+        selected
+          ? 'bg-[var(--settings-nav-active-bg)] text-[var(--settings-nav-active-fg)]'
+          : 'hover:bg-[var(--settings-row-hover)] text-[var(--ink)]'
+      }`}
+    >
+      <div className="min-w-0 flex-1">
+        <div className={`truncate text-[13px] font-medium leading-tight ${muted && !selected ? 'text-[var(--ink-soft)]' : ''}`}>
+          {title}
+        </div>
+        {subtitle && (
+          <div
+            className={`mt-0.5 truncate text-[11px] leading-tight ${
+              selected ? 'text-[var(--settings-nav-active-fg)]/70' : 'text-[var(--ink-soft)]'
+            }`}
+          >
+            {subtitle}
+          </div>
+        )}
+      </div>
+      {active && (
+        <Check
+          size={14}
+          strokeWidth={2.5}
+          className={`flex-shrink-0 ${selected ? 'text-[var(--settings-nav-active-fg)]' : 'text-[var(--whale-blue)]'}`}
+        />
+      )}
+    </button>
   )
 }

@@ -20,6 +20,10 @@ export default defineConfig({
     root: 'src/renderer',
     resolve: { alias: { '@': resolve('src/renderer/src') } },
     plugins: [react()],
+    server: {
+      host: '127.0.0.1',
+      port: 5173
+    },
     build: {
       rollupOptions: { input: resolve('src/renderer/index.html') }
     }

@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { CheckCircle2, ChevronDown, CircleX, Eye, EyeOff, Loader2, Settings, Zap } from 'lucide-react'
+import { CheckCircle2, ChevronDown, CircleX, Eye, EyeOff, Loader2, Zap } from 'lucide-react'
 import { PROVIDER_PRESETS } from '../settingsStore'
 import {
   getModelContextLimit,
@@ -110,11 +110,11 @@ export function ProviderEditor({ providerId, current, configuredModels, editorCo
     const useBuiltInKey = hasBuiltinKey && !useCustomKey && !hasSavedKey
     const finalKey = reuseSavedKey ? '' : useBuiltInKey ? (preset.builtinApiKey || '') : apiKey.trim()
     if (isCustom && !displayName.trim()) {
-      setError('请先填写供应商名称')
+      setError('请先填写名称')
       return null
     }
     if (!model.trim()) {
-      setError('请先选择或填写模型 ID')
+      setError('请先选择或填写模型')
       return null
     }
     if (!apiBaseUrl.trim()) {
@@ -122,7 +122,7 @@ export function ProviderEditor({ providerId, current, configuredModels, editorCo
       return null
     }
     if (!reuseSavedKey && !finalKey.trim()) {
-      setError(isMify ? '请先填写你的 Mify 密钥' : '请先填写访问密钥')
+      setError(isMify ? '请先填写 Mify 密钥' : '请先填写访问密钥')
       return null
     }
     if (!reuseSavedKey && /[\u0100-\uFFFF]/.test(finalKey)) {
@@ -151,7 +151,7 @@ export function ProviderEditor({ providerId, current, configuredModels, editorCo
     if (!cfg) return
     try {
       await onSave(cfg, { activate })
-      const message = activate ? '已保存，并切换为当前使用' : '已保存'
+      const message = activate ? '已设为当前模型' : '已保存'
       setNotice(message)
       showToast(message)
       setError('')
@@ -192,215 +192,248 @@ export function ProviderEditor({ providerId, current, configuredModels, editorCo
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5">
-        <div className="floating-subsurface rounded-2xl p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <h4 className="text-base font-semibold text-[var(--ink)]">{titleLabel}</h4>
-                {isCurrentProvider && <span className="rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-medium text-green-600">当前使用</span>}
-                {hasSavedKey && !isCurrentProvider && <span className="rounded-full bg-black/[0.05] px-2 py-0.5 text-[11px] text-[var(--ink-soft)]">已保存</span>}
-              </div>
-              <p className="mt-1 text-xs text-[var(--ink-soft)]">
-                {isMify ? '选择模型、填写连接地址和你的 Mify 密钥，保存后即可使用。' : isCustom ? '给这组配置起一个供应商名称，后续可继续新增更多自定义模型。' : '填写模型、连接地址和访问密钥，保存后可在输入框旁快速切换。'}
-              </p>
-            </div>
-            {hasBuiltinKey && !useCustomKey && (
-              <button type="button" onClick={() => setUseCustomKey(true)} className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-600">
-                改用自己的密钥
-              </button>
-            )}
-          </div>
-        </div>
-
-        {isCustom && (
-          <Field label="供应商名称">
-            <input
-              value={displayName}
-              onChange={(e) => { setDisplayName(e.target.value); resetFeedback() }}
-              placeholder="例如：公司内网模型、我的中转服务"
-              className="w-full h-10 rounded-xl floating-subsurface px-3 text-sm outline-none"
-            />
-          </Field>
-        )}
-
-        {isCustom && (
-          <Field label="调用协议">
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => { setApiFormat('openai'); resetFeedback() }}
-                className={`flex-1 h-10 rounded-xl border px-3 text-sm transition ${apiFormat === 'openai' ? 'border-[#0071e3] bg-sky-50 text-[#0071e3]' : 'border-black/[0.06] text-[var(--ink-soft)] hover:bg-black/[0.04]'}`}
-              >
-                OpenAI 兼容
-              </button>
-              <button
-                type="button"
-                onClick={() => { setApiFormat('anthropic'); resetFeedback() }}
-                className={`flex-1 h-10 rounded-xl border px-3 text-sm transition ${apiFormat === 'anthropic' ? 'border-[#0071e3] bg-sky-50 text-[#0071e3]' : 'border-black/[0.06] text-[var(--ink-soft)] hover:bg-black/[0.04]'}`}
-              >
-                Anthropic 兼容
-              </button>
-            </div>
-            <p className="mt-1.5 text-[11px] text-[var(--ink-soft)]">
-              {apiFormat === 'openai'
-                ? '走 /chat/completions，Bearer 鉴权。适用于 OpenAI、DeepSeek、通义、Kimi、各种 one-api/new-api 中转及 Ollama 等。'
-                : '走 /v1/messages，x-api-key 鉴权。适用于 Anthropic 官方及 DeepSeek/Kimi/通义/智谱/火山/MiniMax 的 Anthropic 兼容端点。'}
-            </p>
-          </Field>
-        )}
-
-        {isMify ? (
-          <div className="space-y-3">
-            <Field label="选择模型">
-              <select
-                value={`${customProviderId}::${model}`}
-                onChange={(e) => handleMifyModelPick(e.target.value)}
-                className="w-full h-11 rounded-xl floating-subsurface px-3 text-sm outline-none"
-              >
-                {!selectedMifyRow && model && <option value={`${customProviderId}::${model}`}>{model} · 已保存配置</option>}
-                {mifyGroups.map((group) => (
-                  <optgroup key={group.label} label={group.label}>
-                    {group.rows.map((row) => (
-                      <option key={`${row.providerId}-${row.modelId}`} value={`${row.providerId}::${row.modelId}`}>
-                        {row.modelId} · {row.providerLabel} · {formatContextLimit(row.contextLimit)}{row.supportsVision ? '' : ' · 不支持图片'}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            </Field>
-            {selectedMifyRow && (
-              <div className="rounded-xl bg-sky-50 px-3 py-2 text-xs text-sky-700">
-                当前会通过 {selectedMifyRow.providerLabel} 调用 {selectedMifyRow.modelId}，上下文长度 {formatContextLimit(contextLimit)}。
-              </div>
-            )}
-          </div>
-        ) : (
-          <Field label="模型 ID">
-            <input
-              value={model}
-              onChange={(e) => handleModelPick(e.target.value)}
-              placeholder={modelCandidates[0] || '输入模型 ID'}
-              className="w-full h-10 rounded-xl floating-subsurface px-3 text-sm outline-none"
-            />
-            {modelCandidates.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {modelCandidates.map((id) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => handleModelPick(id)}
-                    className={`rounded-lg border px-2.5 py-1 text-xs transition ${model === id ? 'border-[#0071e3] bg-sky-50 text-[#0071e3]' : 'border-black/[0.06] text-[var(--ink-soft)] hover:bg-black/[0.04]'}`}
-                  >
-                    {id}
-                  </button>
-                ))}
-              </div>
-            )}
-            {!isCustom && <p className="mt-1.5 text-[11px] text-[var(--ink-soft)]">已按当前模型设为 {formatContextLimit(contextLimit)} 上下文。</p>}
-          </Field>
-        )}
-
-        <Field label="连接地址">
-          <input
-            value={apiBaseUrl}
-            onChange={(e) => { setApiBaseUrl(e.target.value); resetFeedback() }}
-            placeholder={preset.baseUrl || 'https://api.example.com/v1'}
-            className="w-full h-10 rounded-xl floating-subsurface px-3 text-sm outline-none"
-          />
-          <p className="mt-1 text-[11px] text-[var(--ink-soft)]">一般只需要填模型 ID、连接地址和访问密钥；调用格式默认处理，不需要你额外选择。</p>
-        </Field>
-
-        {showKeyInput ? (
-          <Field label={isMify ? 'Mify 密钥' : '访问密钥'}>
-            <div className="relative">
-              <input
-                type={showKey ? 'text' : 'password'}
-                value={apiKey}
-                onChange={(e) => { setApiKey(e.target.value); setError(''); resetFeedback() }}
-                placeholder={hasSavedKey ? '已保存，留空则继续使用' : preset.keyPlaceholder}
-                className="w-full h-10 rounded-xl floating-subsurface px-3 pr-10 text-sm outline-none"
-              />
-              <button
-                type="button"
-                onClick={() => setShowKey((v) => !v)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-[var(--ink-soft)] hover:bg-black/[0.05]"
-              >
-                {showKey ? <EyeOff size={15} /> : <Eye size={15} />}
-              </button>
-            </div>
-            {hasSavedKey && !apiKey.trim() && <p className="mt-1 text-[11px] text-[var(--ink-soft)]">不重新填写就继续使用已保存的密钥。</p>}
-            {isMify && <p className="mt-1 text-[11px] text-[var(--ink-soft)]">请填写你自己的 Mify 密钥。</p>}
-          </Field>
-        ) : (
-          <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-            当前无需填写密钥。<button type="button" onClick={() => setUseCustomKey(true)} className="ml-1 font-medium underline">改用自己的密钥</button>
-          </div>
-        )}
-
-        <div className="border-t border-black/[0.06] pt-3">
-          <button
-            type="button"
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className="flex items-center gap-1.5 text-xs text-[var(--ink-soft)] transition hover:text-[var(--ink)]"
-          >
-            <Settings size={12} /> 高级设置
-            <ChevronDown size={12} className={`transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
-          </button>
-          {showAdvanced && (
-            <div className="mt-3 space-y-3 rounded-xl bg-black/[0.025] p-3">
-              <Field label="上下文长度">
-                <input
-                  type="number"
-                  min={1000}
-                  step={1000}
-                  value={contextLimit}
-                  onChange={(e) => setContextLimit(Number(e.target.value) || getModelContextLimit(providerId, model, customProviderId))}
-                  className="w-full h-9 rounded-lg floating-subsurface px-3 text-sm outline-none"
-                />
-              </Field>
-              <p className="text-[11px] text-[var(--ink-soft)]">切换内置模型时会自动更新；只有接入特殊模型时才需要手动改。</p>
-            </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+        {/* 标题 */}
+        <div className="mb-5 flex items-center gap-2.5">
+          <h4 className="text-[17px] font-semibold tracking-tight text-[var(--ink)]">{titleLabel}</h4>
+          {isCurrentProvider && (
+            <span className="rounded-full bg-emerald-500/12 px-2 py-0.5 text-[11px] font-medium text-emerald-600">
+              当前使用
+            </span>
           )}
         </div>
 
+        <div className="space-y-5">
+          {/* 自定义：名称 + 协议 */}
+          {isCustom && (
+            <SettingsGroup
+              footer={
+                apiFormat === 'openai'
+                  ? 'OpenAI 兼容：适用于多数中转、Ollama 等本地服务。'
+                  : 'Anthropic 兼容：适用于 Claude 官方及兼容端点。'
+              }
+            >
+              <SettingsRow label="名称">
+                <input
+                  value={displayName}
+                  onChange={(e) => { setDisplayName(e.target.value); resetFeedback() }}
+                  placeholder="例如：公司内网、我的中转"
+                  className={rowInputClass}
+                />
+              </SettingsRow>
+              <SettingsRow label="协议" last>
+                <div className="flex justify-end">
+                  <Segmented
+                    value={apiFormat}
+                    options={[
+                      { id: 'openai', label: 'OpenAI' },
+                      { id: 'anthropic', label: 'Anthropic' }
+                    ]}
+                    onChange={(v) => { setApiFormat(v); resetFeedback() }}
+                  />
+                </div>
+              </SettingsRow>
+            </SettingsGroup>
+          )}
+
+          {/* 模型 */}
+          <SettingsGroup
+            footer={
+              isMify && selectedMifyRow
+                ? `通过 ${selectedMifyRow.providerLabel} 调用 · 上下文 ${formatContextLimit(contextLimit)}${selectedMifyRow.supportsVision ? '' : ' · 不支持图片'}`
+                : !isCustom && !isMify
+                  ? `上下文 ${formatContextLimit(contextLimit)}，可在下方高级设置中修改`
+                  : undefined
+            }
+          >
+            {isMify ? (
+              <SettingsRow label="模型" last stacked>
+                <select
+                  value={`${customProviderId}::${model}`}
+                  onChange={(e) => handleMifyModelPick(e.target.value)}
+                  className={`${rowInputClass} h-9`}
+                >
+                  {!selectedMifyRow && model && (
+                    <option value={`${customProviderId}::${model}`}>{model} · 已保存</option>
+                  )}
+                  {mifyGroups.map((group) => (
+                    <optgroup key={group.label} label={group.label}>
+                      {group.rows.map((row) => (
+                        <option key={`${row.providerId}-${row.modelId}`} value={`${row.providerId}::${row.modelId}`}>
+                          {row.modelId} · {row.providerLabel} · {formatContextLimit(row.contextLimit)}
+                          {row.supportsVision ? '' : ' · 无图片'}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </SettingsRow>
+            ) : (
+              <SettingsRow label="模型" last stacked>
+                <input
+                  value={model}
+                  onChange={(e) => handleModelPick(e.target.value)}
+                  placeholder={modelCandidates[0] || '输入模型名称'}
+                  className={rowInputClass}
+                />
+                {modelCandidates.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {modelCandidates.map((id) => (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => handleModelPick(id)}
+                        className={`rounded-full px-2.5 py-1 text-[11px] transition ${
+                          model === id
+                            ? 'bg-[var(--whale-blue)] text-white'
+                            : 'bg-[var(--settings-input-bg)] text-[var(--ink-soft)] hover:bg-[var(--control-hover)] hover:text-[var(--ink)]'
+                        }`}
+                      >
+                        {id}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </SettingsRow>
+            )}
+          </SettingsGroup>
+
+          {/* 连接 */}
+          <SettingsGroup
+            footer={
+              hasBuiltinKey && !useCustomKey
+                ? '已内置密钥，可直接使用。'
+                : hasSavedKey && !apiKey.trim()
+                  ? '密钥已保存，留空即可继续使用。'
+                  : isMify
+                    ? '填写你自己的 Mify 密钥。'
+                    : undefined
+            }
+          >
+            <SettingsRow label="地址">
+              <input
+                value={apiBaseUrl}
+                onChange={(e) => { setApiBaseUrl(e.target.value); resetFeedback() }}
+                placeholder={preset.baseUrl || 'https://api.example.com/v1'}
+                className={rowInputClass}
+              />
+            </SettingsRow>
+            {showKeyInput ? (
+              <SettingsRow label={isMify ? '密钥' : '密钥'} last>
+                <div className="relative">
+                  <input
+                    type={showKey ? 'text' : 'password'}
+                    value={apiKey}
+                    onChange={(e) => { setApiKey(e.target.value); setError(''); resetFeedback() }}
+                    placeholder={hasSavedKey ? '已保存，留空继续使用' : preset.keyPlaceholder}
+                    className={`${rowInputClass} pr-9`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowKey((v) => !v)}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-[var(--ink-soft)] hover:bg-black/[0.05]"
+                    aria-label={showKey ? '隐藏密钥' : '显示密钥'}
+                  >
+                    {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </SettingsRow>
+            ) : (
+              <SettingsRow label="密钥" last>
+                <div className="flex items-center justify-end gap-2 text-[13px]">
+                  <span className="text-emerald-600">无需填写</span>
+                  <button
+                    type="button"
+                    onClick={() => setUseCustomKey(true)}
+                    className="font-medium text-[var(--whale-blue)] hover:underline"
+                  >
+                    改用自己的
+                  </button>
+                </div>
+              </SettingsRow>
+            )}
+          </SettingsGroup>
+
+          {/* 高级 */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="flex w-full items-center justify-between rounded-xl px-1 py-1 text-[13px] text-[var(--ink-soft)] transition hover:text-[var(--ink)]"
+            >
+              <span>高级设置</span>
+              <ChevronDown size={14} className={`transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+            </button>
+            {showAdvanced && (
+              <div className="mt-2">
+                <SettingsGroup footer="切换推荐模型时会自动更新；只有特殊模型才需要手动改。">
+                  <SettingsRow label="上下文" last>
+                    <input
+                      type="number"
+                      min={1000}
+                      step={1000}
+                      value={contextLimit}
+                      onChange={(e) => setContextLimit(Number(e.target.value) || getModelContextLimit(providerId, model, customProviderId))}
+                      className={`${rowInputClass} text-right tabular-nums`}
+                    />
+                  </SettingsRow>
+                </SettingsGroup>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
-      <div className="shrink-0 border-t border-black/[0.06] bg-white/80 px-5 py-3 backdrop-blur">
-        <div className="flex flex-wrap gap-2">
+      {/* 底部操作：主操作清晰，测试弱化 */}
+      <div className="shrink-0 border-t border-[var(--settings-sep)] px-6 py-3.5">
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={handleTest}
             disabled={testState === 'testing'}
-            className="h-10 flex-1 min-w-[120px] rounded-xl bg-orange-500 px-4 text-sm font-medium text-white transition hover:brightness-105 disabled:opacity-50"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-[var(--ink-soft)] transition hover:bg-[var(--settings-row-hover)] hover:text-[var(--ink)] disabled:opacity-50"
           >
-            <span className="inline-flex items-center justify-center gap-1.5">
-              {testState === 'testing' ? <Loader2 size={14} className="animate-spin" /> : testState === 'success' ? <CheckCircle2 size={14} /> : testState === 'fail' ? <CircleX size={14} /> : <Zap size={14} />}
-              {testState === 'testing' ? '测试中...' : testState === 'success' ? '连接成功' : testState === 'fail' ? '重新测试' : '测试连接'}
-            </span>
+            {testState === 'testing' ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : testState === 'success' ? (
+              <CheckCircle2 size={14} className="text-emerald-500" />
+            ) : testState === 'fail' ? (
+              <CircleX size={14} className="text-red-500" />
+            ) : (
+              <Zap size={14} />
+            )}
+            {testState === 'testing' ? '测试中' : testState === 'success' ? '已连通' : testState === 'fail' ? '重试' : '测试'}
           </button>
+
+          <div className="flex-1" />
+
           <button
             type="button"
             onClick={() => handleSave(false)}
-            className="h-10 flex-1 min-w-[112px] rounded-xl floating-subsurface px-4 text-sm font-medium transition hover:brightness-105"
+            className="h-9 rounded-lg px-3.5 text-[13px] font-medium text-[var(--ink)] transition hover:bg-[var(--settings-row-hover)]"
           >
-            保存
+            仅保存
           </button>
           <button
             type="button"
             onClick={() => handleSave(true)}
-            className="h-10 flex-[1.4] min-w-[132px] rounded-xl bg-[#0071e3] px-4 text-sm font-medium text-white transition hover:brightness-110"
+            className="h-9 rounded-lg bg-[var(--whale-blue)] px-4 text-[13px] font-semibold text-white transition hover:brightness-110"
           >
             保存并使用
           </button>
         </div>
+
         {(error || notice || testMessage) && (
-          <div className={`mt-2 rounded-xl px-3 py-2 text-xs ${error || testState === 'fail' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+          <p
+            className={`mt-2.5 text-[12px] leading-snug ${
+              error || testState === 'fail' ? 'text-red-500' : 'text-emerald-600'
+            }`}
+          >
             {error || testMessage || notice}
-          </div>
+          </p>
         )}
       </div>
+
       {toast && (
         <div className="pointer-events-none fixed bottom-24 left-1/2 z-[80] -translate-x-1/2 rounded-full floating-toast px-3 py-1.5 text-xs text-white">
           {toast}
@@ -410,11 +443,78 @@ export function ProviderEditor({ providerId, current, configuredModels, editorCo
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+const rowInputClass =
+  'w-full h-8 rounded-lg bg-transparent px-0 text-[13px] text-[var(--ink)] outline-none placeholder:text-[var(--ink-soft)]/55'
+
+function SettingsGroup({ children, footer }: { children: React.ReactNode; footer?: string }) {
   return (
     <div>
-      <label className="text-[11px] font-medium uppercase tracking-wide text-[var(--ink-soft)]">{label}</label>
-      <div className="mt-1.5">{children}</div>
+      <div className="overflow-hidden rounded-xl bg-[var(--settings-group-bg)]">{children}</div>
+      {footer && <p className="mt-1.5 px-1 text-[11px] leading-relaxed text-[var(--ink-soft)]">{footer}</p>}
+    </div>
+  )
+}
+
+function SettingsRow({
+  label,
+  children,
+  last,
+  stacked
+}: {
+  label: string
+  children: React.ReactNode
+  last?: boolean
+  stacked?: boolean
+}) {
+  if (stacked) {
+    return (
+      <div className={`px-3.5 py-2.5 ${last ? '' : 'border-b border-[var(--settings-sep)]'}`}>
+        <div className="mb-1.5 text-[13px] text-[var(--ink-soft)]">{label}</div>
+        {children}
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className={`grid grid-cols-[72px_minmax(0,1fr)] items-center gap-3 px-3.5 py-2 ${
+        last ? '' : 'border-b border-[var(--settings-sep)]'
+      }`}
+    >
+      <div className="text-[13px] text-[var(--ink)]">{label}</div>
+      <div className="min-w-0">{children}</div>
+    </div>
+  )
+}
+
+function Segmented<T extends string>({
+  value,
+  options,
+  onChange
+}: {
+  value: T
+  options: Array<{ id: T; label: string }>
+  onChange: (v: T) => void
+}) {
+  return (
+    <div className="inline-flex rounded-lg bg-[var(--settings-segment-bg)] p-0.5">
+      {options.map((opt) => {
+        const active = value === opt.id
+        return (
+          <button
+            key={opt.id}
+            type="button"
+            onClick={() => onChange(opt.id)}
+            className={`h-7 rounded-md px-2.5 text-[12px] transition ${
+              active
+                ? 'bg-[var(--settings-segment-thumb)] text-[var(--ink)] font-medium shadow-sm'
+                : 'text-[var(--ink-soft)] hover:text-[var(--ink)]'
+            }`}
+          >
+            {opt.label}
+          </button>
+        )
+      })}
     </div>
   )
 }

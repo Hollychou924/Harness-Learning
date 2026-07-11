@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, nativeTheme, dialog, powerSaveBlocker, protocol } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, nativeTheme, dialog, powerSaveBlocker, protocol, net } from 'electron'
 import { isAbsolute, join, resolve, relative } from 'node:path'
 import { createReadStream } from 'node:fs'
 import { stat } from 'node:fs/promises'
@@ -318,6 +318,45 @@ let activeTaskId: string | null = null
 let activeTraceId: string | null = null
 const runtimeWakeLock = new RuntimeWakeLock(powerSaveBlocker)
 
+// 开发期：Network service 子进程 crash 时无法加载 dev server → 白屏；改回 in-process 网络栈
+if (process.env.NODE_ENV_ELECTRON_VITE === 'development') {
+  app.commandLine.appendSwitch('disable-features', 'NetworkService')
+}
+
+function bootLog(stage: string, detail?: Record<string, unknown>): void {
+  const payload = detail ? ` ${JSON.stringify(detail)}` : ''
+  console.log(`[boot] ${stage}${payload}`)
+}
+
+function probeDevServer(url: string): Promise<{ ok: boolean; status?: number; error?: string }> {
+  return new Promise((resolve) => {
+    const req = net.request({ method: 'HEAD', url })
+    req.on('response', (res) => {
+      const status = res.statusCode
+      resolve({ ok: status >= 200 && status < 400, status })
+    })
+    req.on('error', (error) => {
+      resolve({ ok: false, error: error instanceof Error ? error.message : String(error) })
+    })
+    req.end()
+  })
+}
+
+// 开发期：优先用 127.0.0.1 加载 Vite，规避部分 macOS 上 localhost/IPv6 异常
+function devRendererUrl(): string | undefined {
+  const raw = process.env.ELECTRON_RENDERER_URL
+  if (!raw) return undefined
+  return raw.replace('://localhost', '://127.0.0.1')
+}
+
+bootLog('main:init', {
+  isPackaged: app.isPackaged,
+  electron: process.versions.electron,
+  nodeEnv: process.env.NODE_ENV_ELECTRON_VITE || null,
+  rendererUrlEnv: process.env.ELECTRON_RENDERER_URL || null,
+  rendererUrlResolved: devRendererUrl() || null
+})
+
 function getWindowIconPath(): string {
   const packagedIconPath = join(process.resourcesPath, 'build', 'icon.png')
   const localIconPath = join(__dirname, '../../build/icon.png')
@@ -331,6 +370,16 @@ function activeTraceForTask(taskId?: string): string | null {
 }
 
 function createWindow(): void {
+  const preloadPath = join(__dirname, '../preload/index.cjs')
+  const rendererUrl = devRendererUrl()
+  bootLog('window:create:start', {
+    preloadPath,
+    preloadExists: existsSync(preloadPath),
+    rendererUrl: rendererUrl || null,
+    fallbackHtml: join(__dirname, '../renderer/index.html'),
+    fallbackExists: existsSync(join(__dirname, '../renderer/index.html'))
+  })
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -340,18 +389,70 @@ function createWindow(): void {
     icon: getWindowIconPath(),
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 13 },
-    // Mac 液态玻璃：原生 vibrancy + 透明背景
     vibrancy: 'under-window',
     visualEffectState: 'active',
     backgroundColor: '#00000000',
     webPreferences: {
-      preload: join(__dirname, '../preload/index.cjs'),
+      preload: preloadPath,
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
       scrollBounce: false
     }
   })
+
+  let loadRetries = 0
+  const wc = mainWindow.webContents
+
+  const windowSnapshot = () => ({
+    visible: mainWindow?.isVisible() ?? false,
+    loading: wc.isLoading(),
+    loadingMainFrame: wc.isLoadingMainFrame(),
+    url: wc.getURL(),
+    title: wc.getTitle(),
+    loadRetries
+  })
+
+  const shouldShow = () => {
+    const url = wc.getURL()
+    return Boolean(url && url !== 'about:blank')
+  }
+
+  const showWindow = (reason: string) => {
+    if (!shouldShow()) {
+      bootLog('window:show:skip', { reason, ...windowSnapshot() })
+      return
+    }
+    bootLog('window:show', { reason, ...windowSnapshot() })
+    mainWindow?.show()
+  }
+
+  const loadRenderer = async (reason: string) => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      bootLog('window:load:skip', { reason, destroyed: true })
+      return
+    }
+    if (rendererUrl) {
+      const probe = await probeDevServer(rendererUrl)
+      bootLog('window:probe', { reason, url: rendererUrl, ...probe })
+      bootLog('window:load:url', { reason, attempt: loadRetries + 1, url: rendererUrl })
+      void wc.loadURL(rendererUrl).catch((error: unknown) => {
+        bootLog('window:load:url:error', {
+          reason,
+          message: error instanceof Error ? error.message : String(error)
+        })
+      })
+    } else {
+      const htmlPath = join(__dirname, '../renderer/index.html')
+      bootLog('window:load:file', { reason, attempt: loadRetries + 1, path: htmlPath })
+      void wc.loadFile(htmlPath).catch((error: unknown) => {
+        bootLog('window:load:file:error', {
+          reason,
+          message: error instanceof Error ? error.message : String(error)
+        })
+      })
+    }
+  }
 
   // 把 Agent 子进程消息转发给渲染进程，并注入 taskId（流式事件本身不带，补上以便前端按任务隔离）
   agentBridge.onMessage((msg: StdoutMessage) => {
@@ -371,31 +472,66 @@ function createWindow(): void {
       mainWindow.webContents.send('agent:event', { ...msg, taskId })
     }
   })
-  mainWindow.on('ready-to-show', () => {
-    mainWindow?.show()
+  mainWindow.on('ready-to-show', () => bootLog('window:ready-to-show', windowSnapshot()))
+  wc.on('did-start-loading', () => bootLog('window:did-start-loading', windowSnapshot()))
+  wc.on('did-stop-loading', () => bootLog('window:did-stop-loading', windowSnapshot()))
+  wc.on('dom-ready', () => bootLog('window:dom-ready', windowSnapshot()))
+  wc.on('did-finish-load', () => showWindow('did-finish-load'))
+  wc.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    if (!isMainFrame) return
+    bootLog('window:did-fail-load', {
+      errorCode,
+      errorDescription,
+      validatedURL,
+      ...windowSnapshot()
+    })
+    if (rendererUrl && loadRetries < 4) {
+      loadRetries += 1
+      setTimeout(() => { void loadRenderer(`did-fail-load-retry-${loadRetries}`) }, 800 * loadRetries)
+    }
+  })
+  wc.on('render-process-gone', (_event, details) => {
+    bootLog('window:render-process-gone', { reason: details.reason, exitCode: details.exitCode })
+  })
+  wc.on('unresponsive', () => bootLog('window:unresponsive', windowSnapshot()))
+  wc.on('responsive', () => bootLog('window:responsive', windowSnapshot()))
+  wc.on('console-message', (_event, level, message, line, sourceId) => {
+    const tag = level === 3 ? 'error' : level === 2 ? 'warn' : 'log'
+    console.log(`[renderer:${tag}] ${message} (${sourceId}:${line})`)
+  })
+  wc.on('preload-error', (_event, preloadPath, error) => {
+    bootLog('window:preload-error', {
+      preloadPath,
+      message: error instanceof Error ? error.message : String(error)
+    })
   })
 
-  // 开发期加载 vite dev server，生产期加载打包文件
-if (process.env.ELECTRON_RENDERER_URL) {
-    void mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
-  } else {
-    void mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
-  }
+  setTimeout(() => {
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    if (shouldShow()) return
+    bootLog('window:load:timeout', windowSnapshot())
+    void loadRenderer('timeout-retry')
+  }, 5000)
+
+  void loadRenderer('initial')
+  bootLog('window:create:done', windowSnapshot())
 }
 
 app.whenReady().then(() => {
+  bootLog('app:ready')
   applyThemeMode(loadThemeMode())
   // 解析 imported-asset://<assetId> 到 external-imports/assets/<assetId> 文件。
   // assetId 形如 asset-<24位十六进制>，由导入流程稳定生成；非法的 id 直接返回 404，避免越权读取其他文件。
   protocol.handle('imported-asset', async (request) => {
-    const assetId = request.url.hostname || request.url.pathname.replace(/^\/+/, '')
+    const url = new URL(request.url)
+    const assetId = url.hostname || url.pathname.replace(/^\/+/, '')
     const store = getImportStore()
     const filePath = store.assetPath(assetId)
     if (!filePath) return new Response('资源不存在', { status: 404 })
     try {
       const info = await stat(filePath)
       const mime = inferAssetMime(filePath)
-      return new Response(createReadStream(filePath) as unknown as BodyInit, {
+      return new Response(createReadStream(filePath) as unknown as import('node:stream').Readable, {
         status: 200, headers: { 'Content-Type': mime, 'Content-Length': String(info.size), 'Cache-Control': 'immutable, max-age=31536000' }
       })
     } catch {
@@ -406,16 +542,43 @@ app.whenReady().then(() => {
     runtimeWakeLock.releaseAll()
     activeTaskId = null
     activeTraceId = null
+    bootLog('agent:exit')
   })
+  bootLog('agent:start')
   agentBridge.start()
   createWindow()
+  bootLog('app:startup:done')
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+
+  // 启动后异步修复早期导入遗留的脏数据（残留 <user_query> 等包裹标签、未提取的图片）。
+  // 幂等：已是干净内容会直接跳过；放在 setImmediate 里避免阻塞窗口首屏。
+  setImmediate(() => {
+    try {
+      const summary = getImportStore().repairLegacySessions(getSessionsDir())
+      if (summary.repaired || summary.assets) {
+        console.log(`[external-import] 修复历史导入：会话 ${summary.repaired} 条，图片 ${summary.assets} 个，保护用户改过的可见副本 ${summary.protectedVisible} 条`)
+      }
+    } catch (error) {
+      console.error('[external-import] 修复历史导入失败：', error instanceof Error ? error.message : error)
+    }
+  })
+})
+
+app.on('child-process-gone', (_event, details) => {
+  bootLog('app:child-process-gone', {
+    type: details.type,
+    reason: details.reason,
+    exitCode: details.exitCode,
+    serviceName: details.serviceName,
+    name: details.name
+  })
 })
 
 app.on('window-all-closed', () => {
+  bootLog('app:window-all-closed')
   runtimeWakeLock.releaseAll()
   agentBridge.stop()
   if (process.platform !== 'darwin') app.quit()
@@ -554,6 +717,23 @@ ipcMain.handle('config:testModel', async (_e, cfg: ModelConfig) => {
   return testModelConnection(cfg)
 })
 
+// 标题总结：用当前激活模型配置跑一次无工具一次性调用，把首条 query + 助手回复浓缩成 ≤10 字短标题
+ipcMain.handle('agent:summarizeTitle', async (_e, input: { userQuery: string; assistantReply: string }) => {
+  try {
+    const base = buildAgentConfig()
+    if (!base.apiKey) return { success: false, error: '未配置模型 API Key' }
+    const summaryConfig: AgentConfig = {
+      ...base,
+      thinkingLevel: 'off',
+      thinkingConfig: undefined,
+      maxIterations: 1
+    }
+    return await agentBridge.summarizeTitle(summaryConfig, input.userQuery, input.assistantReply)
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : String(e) }
+  }
+})
+
 // 获取已配置模型列表
 ipcMain.handle('config:getModelList', async () => {
   const store = loadModelsStore()
@@ -652,13 +832,6 @@ ipcMain.handle('agent:continuationResponse', async (_e, args: { taskId: string; 
   agentBridge.send({ type: 'continuation_response', task_id: args.taskId, decision: args.decision })
 })
 
-// 追加指令通道（转发为 stdin append_input）
-ipcMain.handle('agent:appendInput', async (_e, args: { taskId: string; message: string; mode?: 'inject' | 'queue' }) => {
-  const traceId = activeTraceForTask(args.taskId)
-  if (traceId) logUserAction(traceId, 'append_input', { taskId: args.taskId, message: args.message, mode: args.mode })
-  agentBridge.send({ type: 'append_input', task_id: args.taskId, message: args.message, mode: args.mode })
-})
-
 // 会话消息持久化：保存 / 读取 / 删除
 ipcMain.handle('session:saveMessages', async (_e, args: { sessionId: string; messages: unknown[] }) => {
   try {
@@ -701,6 +874,34 @@ ipcMain.handle('session:deleteMessages', async (_e, sessionId: string) => {
   }
 })
 
+// 列出磁盘 sessions 目录下实际存在的会话 id（排除 .turns.json），
+// 供渲染进程 reconcileSessions 校验侧边栏元数据与磁盘一致性
+ipcMain.handle('session:listIds', async () => {
+  try {
+    const dir = getSessionsDir()
+    if (!existsSync(dir)) return { success: true, ids: [] as string[] }
+    const { readdirSync } = await import('node:fs')
+    const names = readdirSync(dir)
+    const ids = names
+      .filter((n) => n.endsWith('.json') && !n.endsWith('.turns.json'))
+      .map((n) => n.slice(0, -'.json'.length))
+    return { success: true, ids }
+  } catch (e) {
+    return { success: false, ids: [] as string[], error: e instanceof Error ? e.message : String(e) }
+  }
+})
+
+// 删除单条导入会话：从 external-imports/catalog.json 移除该 session 及其在各 batch 里的引用，
+// 避免重启 App 时 getExternalImportHistory → mergeImportedData 把已删会话复活
+ipcMain.handle('externalImport:removeSession', async (_e, sessionId: string) => {
+  try {
+    const result = getImportStore().removeSession(sessionId)
+    return { success: true, ...result }
+  } catch (e) {
+    return { success: false, removed: false, orphanProjectIds: [] as string[], error: e instanceof Error ? e.message : String(e) }
+  }
+})
+
 // 轮次(Turn/Item)持久化：历史翻看每一步思考/工具调用细节靠这个，与 messages 分开存
 ipcMain.handle('session:saveTurns', async (_e, args: { sessionId: string; turns: unknown[] }) => {
   try {
@@ -731,8 +932,10 @@ ipcMain.handle('externalImport:scan', async () => {
     const catalog = getImportStore().loadCatalog()
     for (const source of result.preview.sources) {
       const candidate = result.candidates.find((item) => item.source === source.id)
-      if (!candidate) continue
-      source.pending = countPending(candidate, catalog)
+      if (candidate) source.pending = countPending(candidate, catalog)
+      // 统计该来源已导入的项目/会话数，让前端能区分"首次导入"与"增量更新"
+      source.importedConversations = catalog.sessions.filter((session) => session.source === source.id).length
+      source.importedProjects = catalog.projects.filter((project) => project.source === source.id).length
     }
     return { success: true, preview: result.preview }
   } catch (error) {

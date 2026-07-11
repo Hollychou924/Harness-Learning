@@ -367,11 +367,19 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.md-source-card .md-source-title:hover { color: #0071e3; }
+.md-source-card .md-source-title:hover { color: var(--whale-blue); }
 .md-source-card .md-source-domain {
   font-size: 11px;
   color: var(--ink-soft);
   flex-shrink: 0;
+}
+
+:root[data-theme="dark"] .md-engine a {
+  color: var(--whale-blue);
+}
+
+:root[data-theme="dark"] .md-engine a:hover {
+  color: #8ec8ff;
 }
 
 :root[data-theme="dark"] .md-engine :not(pre) > code {

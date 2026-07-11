@@ -219,3 +219,51 @@ test('能识别导入后被用户继续过的对话正文', async () => {
   writeFileSync(join(visible, `${first.sessions[0].id}.json`), JSON.stringify([{ role: 'user', content: '用户继续的新内容' }]))
   assert.equal(store.hasVisibleSessionChanged(first.sessions[0].id, visible), true)
 })
+
+test('修复历史导入会更新落盘正文、补写图片资源并同步可见副本', async () => {
+  const workspace = root()
+  const visible = join(workspace, 'visible')
+  const store = new ImportStore(workspace)
+  // 模拟早期导入：直接写入带 <user_query> 残留标签的脏数据
+  const sessionId = stableId('session', 'cursor:legacy-1')
+  const projectId = stableId('project', '/work/legacy')
+  const batchId = 'import-legacy-test'
+  const dirtyContent = '<user_query>\n把这事做了\n</user_query>'
+  const versionDir = join(workspace, 'versions', batchId)
+  mkdirSync(versionDir, { recursive: true })
+  writeFileSync(join(versionDir, `${sessionId}.json`), JSON.stringify([{ role: 'user', content: dirtyContent }]))
+  writeFileSync(join(versionDir, `${sessionId}.turns.json`), JSON.stringify([{
+    id: 'turn-1', status: 'completed', startedAt: 1, items: [
+      { type: 'userMessage', id: 'item-0', content: [{ type: 'text', text: dirtyContent }] }
+    ]
+  }]))
+  const catalog: ImportCatalog = {
+    version: 1, projects: [], sessions: [{
+      id: sessionId, source: 'cursor', sourceSessionId: 'legacy-1', sourceProjectId: '/work/legacy',
+      projectId, title: '历史', createdAt: 1, updatedAt: 2, archived: false, compatibility: 'view-only',
+      fingerprint: contentFingerprint(dirtyContent), storageBatchId: batchId
+    }], resources: [], batches: []
+  }
+  writeFileSync(join(workspace, 'catalog.json'), JSON.stringify(catalog))
+  mkdirSync(visible, { recursive: true })
+  writeFileSync(join(visible, `${sessionId}.json`), JSON.stringify([{ role: 'user', content: dirtyContent }]))
+  writeFileSync(join(visible, `${sessionId}.turns.json`), JSON.stringify([{
+    id: 'turn-1', status: 'completed', startedAt: 1, items: [
+      { type: 'userMessage', id: 'item-0', content: [{ type: 'text', text: dirtyContent }] }
+    ]
+  }]))
+
+  const summary = store.repairLegacySessions(visible)
+  assert.equal(summary.repaired, 1)
+  const after = store.loadCatalog().sessions[0]
+  assert.notEqual(after.fingerprint, contentFingerprint(dirtyContent))
+  // 落盘正文已剥标签
+  const repairedMessages = JSON.parse(readFileSync(join(versionDir, `${sessionId}.json`), 'utf8'))
+  assert.equal(repairedMessages[0].content, '把这事做了')
+  // 可见副本同步更新
+  const visibleMessages = JSON.parse(readFileSync(join(visible, `${sessionId}.json`), 'utf8'))
+  assert.equal(visibleMessages[0].content, '把这事做了')
+  // 幂等：再跑一次没有改动
+  const again = store.repairLegacySessions(visible)
+  assert.equal(again.repaired, 0)
+})

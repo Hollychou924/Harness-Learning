@@ -65,7 +65,6 @@ export type StdinMessage =
   | { type: 'task_control'; task_id: string; action: 'pause' | 'resume' | 'cancel' | 'rollback' }
   | { type: 'approval_response'; request_id: string; approved: boolean; scope?: 'once' | 'task' | 'always' }
   | { type: 'question_response'; request_id: string; selected_option_ids?: string[]; custom_answer?: string; skipped?: boolean }
-  | { type: 'append_input'; task_id: string; message: string; mode?: 'inject' | 'queue' }
   | { type: 'plan_response'; request_id: string; decision: 'approve' | 'reject_stop' | 'reject_revise'; feedback?: string }
   | { type: 'continuation_response'; task_id: string; decision: 'continue' | 'stop' | 'split' }
   // 测试连接：主进程把一份待测 AgentConfig 发给 agent，让 agent 用真实 provider 跑一次最小流式探测，

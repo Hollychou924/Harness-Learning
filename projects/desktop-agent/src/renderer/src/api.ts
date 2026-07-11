@@ -86,6 +86,31 @@ export interface ModelConfig {
 }
 
 export type ImportSourceId = 'codex' | 'claude-code' | 'cursor'
+export type ImportCompatibility = 'full' | 'view-only' | 'unsupported'
+
+export type ImportCategoryId =
+  | 'global-rules'
+  | 'global-memory'
+  | 'global-mcp'
+  | 'global-skills'
+  | 'project-rules'
+  | 'project-memory'
+  | 'project-chats'
+  | 'project-mcp'
+  | 'project-skills'
+
+export interface ImportCategoryCounts {
+  globalRules: number
+  globalMemory: number
+  globalMcp: number
+  globalSkills: number
+  projectRules: number
+  projectMemory: number
+  projectChatProjects: number
+  projectChatConversations: number
+  projectMcp: number
+  projectSkills: number
+}
 
 export interface ImportSourceSummary {
   id: ImportSourceId
@@ -103,14 +128,24 @@ export interface ImportSourceSummary {
   extensions: number
   unavailable: number
   pending: number
+  /** 该来源已导入的会话数（来自导入记录），用于区分"首次导入"与"增量更新" */
+  importedConversations: number
+  /** 该来源已导入的项目数 */
+  importedProjects: number
+  categories: ImportCategoryCounts
   note?: string
 }
 
 export interface ImportPreview { scannedAt: number; sources: ImportSourceSummary[] }
-export interface ImportedProjectSummary { id: string; name: string; folderPath?: string; createdAt: number; updatedAt: number }
-export interface ImportedSessionSummary { id: string; title: string; projectId: string; createdAt: number; updatedAt: number; archived: boolean }
+export interface ImportedProjectSummary { id: string; name: string; folderPath?: string; createdAt: number; updatedAt: number; source: ImportSourceId }
+export interface ImportedSessionSummary { id: string; title: string; projectId: string; createdAt: number; updatedAt: number; archived: boolean; source: ImportSourceId; compatibility: ImportCompatibility }
 export interface ImportBatchSummary { id: string; createdAt: number; completedAt?: number; status: string; sources: ImportSourceId[]; createdProjectIds: string[]; createdSessionIds: string[]; updatedSessionIds: string[]; skippedSessionIds: string[]; failed: Array<{ sourceId: string; reason: string; severity?: 'partial' | 'failed' }> }
 export interface ImportCommitResult { batch: ImportBatchSummary; projects: ImportedProjectSummary[]; sessions: ImportedSessionSummary[] }
+export interface ImportSelectionInput {
+  sources: ImportSourceId[]
+  categories: ImportCategoryId[]
+  conflictAuthority?: ImportSourceId
+}
 
 export interface TraceMeta {
   traceId: string
@@ -207,10 +242,12 @@ type Api = {
   deleteSessionMessages: (sessionId: string) => Promise<{ success: boolean; error?: string }>
   saveSessionTurns: (sessionId: string, turns: unknown[]) => Promise<{ success: boolean; error?: string }>
   loadSessionTurns: (sessionId: string) => Promise<unknown[]>
+  listSessionIds: () => Promise<{ success: boolean; ids: string[]; error?: string }>
   scanExternalImports: () => Promise<{ success: boolean; preview?: ImportPreview; error?: string }>
-  commitExternalImports: (selection: { sources: ImportSourceId[]; includeProjectsAndConversations: boolean; includeInstructionsAndMemory: boolean; includeExtensions: boolean }) => Promise<{ success: boolean; result?: ImportCommitResult; error?: string; warning?: string }>
+  commitExternalImports: (selection: ImportSelectionInput) => Promise<{ success: boolean; result?: ImportCommitResult; error?: string; warning?: string }>
   getExternalImportHistory: () => Promise<{ success: boolean; catalog?: { projects: ImportedProjectSummary[]; sessions: ImportedSessionSummary[]; batches: ImportBatchSummary[] }; error?: string }>
   revertExternalImport: (batchId: string, protectedSessionIds?: string[]) => Promise<{ success: boolean; result?: ImportCommitResult; error?: string }>
+  removeImportedSession: (sessionId: string) => Promise<{ success: boolean; removed: boolean; orphanProjectIds: string[]; error?: string }>
   onAgentEvent: (fn: (msg: StdoutMessage) => void) => () => void
   pauseTask: (taskId: string) => Promise<void>
   resumeTask: (taskId: string) => Promise<void>
@@ -220,12 +257,12 @@ type Api = {
   sendQuestionResponse: (requestId: string, selectedOptionIds?: string[], customAnswer?: string, skipped?: boolean) => Promise<void>
   sendPlanResponse: (requestId: string, decision: 'approve' | 'reject_stop' | 'reject_revise', feedback?: string) => Promise<void>
   sendContinuationResponse: (taskId: string, decision: 'continue' | 'stop' | 'split') => Promise<void>
-  appendInput: (taskId: string, message: string, mode?: 'inject' | 'queue') => Promise<void>
   configGet: (key: string) => Promise<unknown>
   setThemeMode: (themeMode: 'system' | 'light' | 'dark') => Promise<{ success: boolean; themeMode: 'system' | 'light' | 'dark' }>
   setPreventSleepEnabled: (enabled: boolean) => Promise<{ success: boolean; enabled: boolean }>
   saveModelConfig: (cfg: ModelConfig, opts?: { activate?: boolean }) => Promise<{ success: boolean; error?: string; modelId?: string }>
   testModelConfig: (cfg: ModelConfig) => Promise<{ success: boolean; error?: string; message?: string; latencyMs?: number }>
+  summarizeTitle: (input: { userQuery: string; assistantReply: string }) => Promise<{ success: boolean; title?: string; error?: string }>
   getModelList: () => Promise<{ configs: Array<ModelConfig & { _id?: string }>; activeId: string | null }>
   setActiveModel: (modelId: string) => Promise<{ success: boolean }>
   deleteModel: (modelId: string) => Promise<{ success: boolean }>
@@ -262,10 +299,12 @@ const empty: Api = {
   deleteSessionMessages: async () => ({ success: false }),
   saveSessionTurns: async () => ({ success: false }),
   loadSessionTurns: async () => [],
+  listSessionIds: async () => ({ success: false, ids: [] }),
   scanExternalImports: async () => ({ success: false, error: '客户端尚未准备好' }),
   commitExternalImports: async () => ({ success: false, error: '客户端尚未准备好' }),
   getExternalImportHistory: async () => ({ success: false, error: '客户端尚未准备好' }),
   revertExternalImport: async () => ({ success: false, error: '客户端尚未准备好' }),
+  removeImportedSession: async () => ({ success: false, removed: false, orphanProjectIds: [] }),
   onAgentEvent: () => noop,
   pauseTask: async () => {},
   resumeTask: async () => {},
@@ -275,12 +314,12 @@ const empty: Api = {
   sendQuestionResponse: async () => {},
   sendPlanResponse: async () => {},
   sendContinuationResponse: async () => {},
-  appendInput: async () => {},
   configGet: async () => null,
   setThemeMode: async (themeMode) => ({ success: false, themeMode }),
   setPreventSleepEnabled: async (enabled) => ({ success: false, enabled }),
   saveModelConfig: async () => ({ success: false }),
   testModelConfig: async () => ({ success: false, error: 'preload 未就绪' }),
+  summarizeTitle: async () => ({ success: false, error: 'preload 未就绪' }),
   getModelList: async () => ({ configs: [], activeId: null }),
   setActiveModel: async () => ({ success: false }),
   deleteModel: async () => ({ success: false }),

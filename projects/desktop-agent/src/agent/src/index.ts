@@ -14,21 +14,6 @@ import type { LlmProvider, StreamEvent } from './providers/anthropic.js'
 const rl = createInterface({ input: process.stdin })
 
 const sessionHistory = new Map<string, AgentMessage[]>()
-const appendInputQueues = new Map<string, string[]>()
-
-function enqueueAppendInput(taskId: string, message: string): void {
-  const text = message.trim()
-  if (!text) return
-  const queue = appendInputQueues.get(taskId) || []
-  queue.push(text)
-  appendInputQueues.set(taskId, queue)
-}
-
-function consumeAppendInputs(taskId: string): string[] {
-  const queue = appendInputQueues.get(taskId) || []
-  appendInputQueues.delete(taskId)
-  return queue
-}
 
 rl.on('line', (line) => {
   if (!line.trim()) return
@@ -60,11 +45,9 @@ async function handleStdin(msg: StdinMessage): Promise<void> {
         workspace_dir,
         'work',
         session_id,
-        attachments,
-        () => consumeAppendInputs(session_id)
+        attachments
       )
       sessionHistory.set(session_id, result.messages.slice(1))
-      appendInputQueues.delete(session_id)
       clearTaskApprovalMemory(session_id)
 
       // 产出报告产物
@@ -79,7 +62,6 @@ async function handleStdin(msg: StdinMessage): Promise<void> {
       const errMsg = e instanceof Error ? e.message : String(e)
       onEvent({ type: 'error', message: errMsg })
       onEvent({ type: 'completed', task_id: session_id, summary: `任务失败：${errMsg}` })
-      appendInputQueues.delete(session_id)
       clearTaskApprovalMemory(session_id)
     }
     return
@@ -107,12 +89,6 @@ async function handleStdin(msg: StdinMessage): Promise<void> {
 
   if (msg.type === 'plan_response') {
     resolvePlanResponse(msg.request_id, msg.decision, msg.feedback)
-    return
-  }
-
-  if (msg.type === 'append_input') {
-    enqueueAppendInput(msg.task_id, msg.message)
-    send({ type: 'status', status: 'INFO', message: '补充要求已收到，正在并入当前任务' })
     return
   }
 
@@ -238,6 +214,79 @@ function classifyConnectionError(e: unknown): string {
 
 function truncate(s: string): string {
   return s.replace(/\s+/g, ' ').trim().slice(0, 200)
+}
+
+// 标题总结：用真实 provider 跑一次无工具的一次性调用，把首条 query + 助手回复浓缩成 ≤10 字短标题。
+// 复用与正式对话同一条 provider 路径（client、鉴权、baseURL），失败时回传 error，调用方保留原标题。
+async function runTitleSummarize(requestId: string, config: AgentConfig, userQuery: string, assistantReply: string): Promise<void> {
+  const summaryConfig: AgentConfig = {
+    ...config,
+    thinkingLevel: 'off',
+    thinkingConfig: undefined,
+    maxIterations: 1
+  }
+
+  const timeoutMs = 20_000
+  let timedOut = false
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => {
+      timedOut = true
+      reject(new Error('__TIMEOUT__'))
+    }, timeoutMs)
+  })
+
+  try {
+    const provider: LlmProvider = summaryConfig.apiFormat === 'openai'
+      ? new OpenAIProvider(summaryConfig)
+      : new AnthropicProvider(summaryConfig)
+
+    const systemPrompt = '你是对话标题总结器。根据用户问题和助手回答，生成一个不超过10个汉字的简短标题，概括这次对话的核心主题。只输出标题纯文本，不要加引号、标点、前缀或任何解释。'
+    const messages: AgentMessage[] = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: `用户问题：${(userQuery || '').slice(0, 400)}\n\n助手回答：${(assistantReply || '').slice(0, 800)}` }
+    ]
+
+    let raw = ''
+    const collectPromise = (async () => {
+      for await (const ev of provider.stream(messages, summaryConfig, [])) {
+        if (ev.type === 'text' && ev.text) raw += ev.text
+        if (ev.type === 'message_stop') break
+      }
+      return raw
+    })()
+
+    const result = (await Promise.race([collectPromise, timeoutPromise])) as string
+    if (timedOut) {
+      send({ type: 'summarize_title_result', request_id: requestId, success: false, error: '标题总结超时' })
+      return
+    }
+
+    const title = cleanTitle(result)
+    if (!title) {
+      send({ type: 'summarize_title_result', request_id: requestId, success: false, error: '模型返回为空' })
+      return
+    }
+    send({ type: 'summarize_title_result', request_id: requestId, success: true, title })
+  } catch (e) {
+    if (timedOut) {
+      send({ type: 'summarize_title_result', request_id: requestId, success: false, error: '标题总结超时' })
+      return
+    }
+    send({ type: 'summarize_title_result', request_id: requestId, success: false, error: e instanceof Error ? e.message : String(e) })
+  }
+}
+
+// 清洗模型返回的标题：去引号/标点/首尾空白/前缀冒号，按 unicode 码点截到 10 字
+function cleanTitle(raw: string): string {
+  const stripped = raw
+    .replace(/^["'""''《【\[]+/, '')
+    .replace(/["'""''》】\]]+$/, '')
+    .replace(/^[标题：:]+\s*/, '')
+    .trim()
+  if (!stripped) return ''
+  // 按码点切片，避免把一个汉字切成乱码
+  const chars = Array.from(stripped)
+  return chars.slice(0, 10).join('')
 }
 
 process.stderr.write('小蓝鲸 Agent 子进程已启动\n')

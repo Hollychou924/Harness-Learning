@@ -1,54 +1,87 @@
-import { useSettingsStore } from '../settingsStore'
+import { useSettingsStore, type ThemeMode } from '../settingsStore'
+import {
+  SettingsGroup,
+  SettingsPageHeader,
+  SettingsRow,
+  SettingsSectionLabel,
+  SettingsSegmented,
+  SettingsToggle
+} from '../settingsUi'
+
+const THEME_OPTIONS: { id: ThemeMode; label: string }[] = [
+  { id: 'system', label: '自动' },
+  { id: 'light', label: '浅色' },
+  { id: 'dark', label: '深色' }
+]
 
 export function GeneralSection() {
-  const { maxIterations, approvalMode, showThinking, preventSystemSleep, saveGeneral } = useSettingsStore()
+  const { maxIterations, approvalMode, showThinking, preventSystemSleep, themeMode, saveGeneral } = useSettingsStore()
+
+  const persist = (patch: Partial<{ themeMode: ThemeMode; preventSystemSleep: boolean; showThinking: boolean }>) => {
+    saveGeneral({
+      maxIterations,
+      approvalMode,
+      showThinking: patch.showThinking ?? showThinking,
+      preventSystemSleep: patch.preventSystemSleep ?? preventSystemSleep,
+      themeMode: patch.themeMode ?? themeMode
+    })
+  }
 
   return (
     <section>
-      <header className="mb-5">
-        <h3 className="text-lg font-semibold text-[var(--ink)]">通用</h3>
-        <p className="text-sm text-[var(--ink-soft)] mt-1">控制任务执行的基本行为</p>
-      </header>
+      <SettingsPageHeader title="通用" subtitle="外观与任务相关的基本偏好" />
 
-      <div className="space-y-6">
-        <Toggle
-          label="运行任务时保持唤醒"
-          desc="任务运行期间防止电脑休眠，任务结束后恢复原有规则"
-          checked={preventSystemSleep}
-          onChange={(v) => saveGeneral({ maxIterations, approvalMode, showThinking, preventSystemSleep: v })}
-        />
-        <Toggle
-          label="显示思考过程"
-          desc="在任务执行界面实时展示 Agent 的推理步骤"
-          checked={showThinking}
-          onChange={(v) => saveGeneral({ maxIterations, approvalMode, showThinking: v })}
-        />
+      <div className="space-y-5">
+        <div>
+          <SettingsSectionLabel>外观</SettingsSectionLabel>
+          <SettingsGroup footer="选择「自动」时跟随系统浅色 / 深色。">
+            <SettingsRow label="主题" last>
+              <SettingsSegmented
+                value={themeMode}
+                options={THEME_OPTIONS}
+                onChange={(v) => persist({ themeMode: v })}
+              />
+            </SettingsRow>
+          </SettingsGroup>
+        </div>
+
+        <div>
+          <SettingsSectionLabel>任务</SettingsSectionLabel>
+          <SettingsGroup>
+            <SettingsRow
+              label={
+                <div>
+                  <div>运行时保持唤醒</div>
+                  <div className="mt-0.5 text-[11px] font-normal text-[var(--ink-soft)]">
+                    任务进行中防止电脑休眠
+                  </div>
+                </div>
+              }
+            >
+              <SettingsToggle
+                checked={preventSystemSleep}
+                onChange={(v) => persist({ preventSystemSleep: v })}
+              />
+            </SettingsRow>
+            <SettingsRow
+              last
+              label={
+                <div>
+                  <div>显示思考过程</div>
+                  <div className="mt-0.5 text-[11px] font-normal text-[var(--ink-soft)]">
+                    在任务界面展示推理步骤
+                  </div>
+                </div>
+              }
+            >
+              <SettingsToggle
+                checked={showThinking}
+                onChange={(v) => persist({ showThinking: v })}
+              />
+            </SettingsRow>
+          </SettingsGroup>
+        </div>
       </div>
     </section>
-  )
-}
-
-function Toggle({ label, desc, checked, onChange }: { label: string; desc: string; checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <div className="flex items-start justify-between gap-4">
-      <div>
-        <div className="text-sm font-medium text-[var(--ink)]">{label}</div>
-        <div className="text-xs text-[var(--ink-soft)] mt-0.5">{desc}</div>
-      </div>
-      <button
-        type="button"
-        aria-pressed={checked}
-        onClick={() => onChange(!checked)}
-        className={`relative h-6 w-11 rounded-full transition-colors flex-shrink-0 ${
-          checked ? 'bg-[#0071e3]' : 'bg-black/15 hover:bg-black/20'
-        }`}
-      >
-        <span
-          className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-            checked ? 'translate-x-5' : 'translate-x-0'
-          }`}
-        />
-      </button>
-    </div>
   )
 }

@@ -717,7 +717,7 @@ function replayStepFromEvent(event: TraceEvent, startedAt: number, options: Repl
     case 'question_response':
       return { ts: event.ts, offsetMs, kind: 'question', title: '用户补充信息', detail: String(data.customAnswer || '') }
     case 'append_input':
-      return { ts: event.ts, offsetMs, kind: 'user', title: '用户追加输入', detail: String(data.message || '') }
+      return { ts: event.ts, offsetMs, kind: 'user', title: '排队消息（旧协议）', detail: String(data.message || '') }
     case 'task_cancelled':
       return { ts: event.ts, offsetMs, kind: 'user', title: '用户取消任务' }
     case 'task_paused':

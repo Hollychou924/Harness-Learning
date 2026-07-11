@@ -4,6 +4,38 @@ import type { Turn } from '../agent/src/items.js'
 export type ImportSourceId = 'codex' | 'claude-code' | 'cursor'
 export type ImportCompatibility = 'full' | 'view-only' | 'unsupported'
 
+/** 导入清单矩阵行（V1） */
+export type ImportCategoryId =
+  | 'global-rules'
+  | 'global-memory'
+  | 'global-mcp'
+  | 'global-skills'
+  | 'project-rules'
+  | 'project-memory'
+  | 'project-chats'
+  | 'project-mcp'
+  | 'project-skills'
+
+export const ALL_IMPORT_CATEGORIES: ImportCategoryId[] = [
+  'global-rules', 'global-memory', 'global-mcp', 'global-skills',
+  'project-rules', 'project-memory', 'project-chats', 'project-mcp', 'project-skills'
+]
+
+export interface ImportCategoryCounts {
+  globalRules: number
+  globalMemory: number
+  globalMcp: number
+  globalSkills: number
+  projectRules: number
+  projectMemory: number
+  /** 项目数 */
+  projectChatProjects: number
+  /** 对话数 */
+  projectChatConversations: number
+  projectMcp: number
+  projectSkills: number
+}
+
 export interface ImportSourceSummary {
   id: ImportSourceId
   name: string
@@ -20,6 +52,10 @@ export interface ImportSourceSummary {
   extensions: number
   unavailable: number
   pending: number
+  importedConversations: number
+  importedProjects: number
+  /** 矩阵单元格计数 */
+  categories: ImportCategoryCounts
   note?: string
 }
 
@@ -97,9 +133,16 @@ export interface ImportCandidate {
 
 export interface ImportSelection {
   sources: ImportSourceId[]
-  includeProjectsAndConversations: boolean
-  includeInstructionsAndMemory: boolean
-  includeExtensions: boolean
+  /** 勾选的矩阵行；缺省时按下方三个布尔开关兼容旧调用 */
+  categories?: ImportCategoryId[]
+  /** 多来源同配置冲突时保留哪一个 */
+  conflictAuthority?: ImportSourceId
+  /** @deprecated 兼容旧 UI；有 categories 时忽略 */
+  includeProjectsAndConversations?: boolean
+  /** @deprecated */
+  includeInstructionsAndMemory?: boolean
+  /** @deprecated */
+  includeExtensions?: boolean
 }
 
 export interface ImportBatch {

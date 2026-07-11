@@ -113,6 +113,26 @@ export class AgentBridge {
       this.send({ type: 'test_request', request_id: requestId, config })
     })
   }
+
+  // 标题总结：把首条 query + 助手回复发给 agent，复用真实 provider 跑一次无工具一次性调用，回传 ≤10 字短标题
+  summarizeTitle(config: AgentConfig, userQuery: string, assistantReply: string): Promise<{ success: boolean; title?: string; error?: string }> {
+    const requestId = randomUUID()
+    return new Promise((resolveP) => {
+      const onResult = (msg: StdoutMessage) => {
+        if (msg.type === 'summarize_title_result' && msg.request_id === requestId) {
+          clearTimeout(guard)
+          this.listeners.delete(onResult)
+          resolveP({ success: msg.success, title: msg.title, error: msg.error })
+        }
+      }
+      const guard = setTimeout(() => {
+        this.listeners.delete(onResult)
+        resolveP({ success: false, error: '标题总结超时，agent 未响应' })
+      }, 30_000)
+      this.listeners.add(onResult)
+      this.send({ type: 'summarize_title_request', request_id: requestId, config, user_query: userQuery, assistant_reply: assistantReply })
+    })
+  }
 }
 
 export const agentBridge = new AgentBridge()

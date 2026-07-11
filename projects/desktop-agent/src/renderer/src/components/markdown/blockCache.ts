@@ -18,7 +18,9 @@ const PURIFY_CONFIG: PurifyConfig = {
   FORBID_TAGS: ['style'],
   FORBID_CONTENTS: ['style', 'script'],
   ADD_TAGS: ['svg', 'path'],
-  ADD_ATTR: ['d', 'viewBox', 'preserveAspectRatio', 'xmlns', 'target', 'rel', 'class', 'data-language']
+  ADD_ATTR: ['d', 'viewBox', 'preserveAspectRatio', 'xmlns', 'target', 'rel', 'class', 'data-language'],
+  // 允许导入图片用的 imported-asset:// 协议通过消毒；其余沿用 DOMPurify 默认（http/https/data/mailto 等）。
+  ALLOWED_URI_REGEXP: /^(?:(?:imported-asset|https?|ftp|mailto|tel|callto|sms|cid|xmpp|data):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-]|$))/i
 }
 
 // 确保 rel=noopener noreferrer
