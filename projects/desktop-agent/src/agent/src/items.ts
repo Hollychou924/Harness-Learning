@@ -14,6 +14,7 @@ export interface UserMessageContent {
   mime?: string
   size?: number
   textContent?: string
+  unavailableReason?: string
 }
 
 export interface UserMessageItem {
@@ -30,6 +31,7 @@ export interface AgentMessageItem {
   id: string
   text: string
   phase: AgentMessagePhase
+  images?: UserMessageContent[]
 }
 
 /**
@@ -96,6 +98,7 @@ export interface ToolCallItem {
   retryAfterMs?: number
   startedAt: number
   finishedAt?: number
+  images?: UserMessageContent[]
 }
 
 export interface PlanStepItem {

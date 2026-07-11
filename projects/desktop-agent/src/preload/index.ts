@@ -15,6 +15,11 @@ const api = {
     ipcRenderer.invoke('session:saveTurns', { sessionId, turns }) as Promise<{ success: boolean; error?: string }>,
   loadSessionTurns: (sessionId: string) =>
     ipcRenderer.invoke('session:loadTurns', sessionId) as Promise<unknown[]>,
+  scanExternalImports: () => ipcRenderer.invoke('externalImport:scan') as Promise<unknown>,
+  commitExternalImports: (selection: unknown) => ipcRenderer.invoke('externalImport:commit', selection) as Promise<unknown>,
+  getExternalImportHistory: () => ipcRenderer.invoke('externalImport:history') as Promise<unknown>,
+  revertExternalImport: (batchId: string, protectedSessionIds?: string[]) =>
+    ipcRenderer.invoke('externalImport:revert', { batchId, protectedSessionIds }) as Promise<unknown>,
   onAgentEvent: (fn: (msg: StdoutMessage) => void) => {
     const listener = (_e: unknown, msg: StdoutMessage) => fn(msg)
     ipcRenderer.on('agent:event', listener)
@@ -41,6 +46,8 @@ const api = {
   configGet: (key: string) => ipcRenderer.invoke('config:get', key) as Promise<unknown>,
   setThemeMode: (themeMode: 'system' | 'light' | 'dark') =>
     ipcRenderer.invoke('appearance:setThemeMode', themeMode) as Promise<{ success: boolean; themeMode: 'system' | 'light' | 'dark' }>,
+  setPreventSleepEnabled: (enabled: boolean) =>
+    ipcRenderer.invoke('power:setPreventSleepEnabled', enabled) as Promise<{ success: boolean; enabled: boolean }>,
   saveModelConfig: (cfg: { providerId: string; model: string; apiKey: string; apiBaseUrl: string; apiFormat: 'openai' | 'anthropic'; contextLimit: number; customProviderId?: string; customModelId?: string; displayName?: string; autoApproveLow?: boolean }, opts?: { activate?: boolean }) =>
     ipcRenderer.invoke('config:saveModel', { cfg, activate: opts?.activate ?? true }) as Promise<{ success: boolean; error?: string; modelId?: string }>,
   testModelConfig: (cfg: { providerId: string; model: string; apiKey: string; apiBaseUrl: string; apiFormat: 'openai' | 'anthropic'; contextLimit: number; customProviderId?: string; customModelId?: string; displayName?: string; autoApproveLow?: boolean }) =>
@@ -65,6 +72,12 @@ const api = {
   readAttachmentFile: (filePath: string) => ipcRenderer.invoke('dialog:readAttachmentFile', filePath) as Promise<unknown>,
   pickFolder: () => ipcRenderer.invoke('project:select') as Promise<string | null>,
   createProjectFolder: (name: string) => ipcRenderer.invoke('project:create', name) as Promise<string | null>,
+  getBranchInfo: (workspaceDir: string) => ipcRenderer.invoke('project:branchInfo', workspaceDir) as Promise<{ success: boolean; currentBranch?: string; branches?: string[]; changedFiles?: number; error?: string }>,
+  switchBranch: (workspaceDir: string, branchName: string) => ipcRenderer.invoke('project:switchBranch', { workspaceDir, branchName }) as Promise<{ success: boolean; currentBranch?: string; branches?: string[]; changedFiles?: number; error?: string }>,
+  createBranch: (workspaceDir: string, branchName: string) => ipcRenderer.invoke('project:createBranch', { workspaceDir, branchName }) as Promise<{ success: boolean; currentBranch?: string; branches?: string[]; changedFiles?: number; error?: string }>,
+  getCommitHistory: (workspaceDir: string, offset = 0, limit = 100) => ipcRenderer.invoke('project:commitHistory', { workspaceDir, offset, limit }) as Promise<unknown>,
+  getCommitDetail: (workspaceDir: string, hash: string) => ipcRenderer.invoke('project:commitDetail', { workspaceDir, hash }) as Promise<unknown>,
+  getCommitDiff: (workspaceDir: string, fromHash: string, toHash = 'HEAD', filePath?: string) => ipcRenderer.invoke('project:commitDiff', { workspaceDir, fromHash, toHash, filePath }) as Promise<unknown>,
   workspaceListFiles: (workspaceDir?: string, subDir?: string) =>
     ipcRenderer.invoke('workspace:listFiles', { workspaceDir, subDir }) as Promise<{ items: Array<{ name: string; type: string; size: number; path: string }>; error?: string }>,
   workspaceReadFile: (relPath: string, workspaceDir?: string) =>

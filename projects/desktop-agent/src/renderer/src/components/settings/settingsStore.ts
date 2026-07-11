@@ -13,12 +13,22 @@ import {
 export type SettingsTab =
   | 'model'
   | 'general'
+  | 'import'
   | 'archived'
   | 'diagnostics'
   | 'about'
 
 export type ApprovalMode = 'always_ask' | 'risk_only' | 'auto'
 export type ThemeMode = 'system' | 'dark' | 'light'
+
+interface GeneralSettings {
+  maxIterations: number
+  autoApproveLow?: boolean
+  approvalMode?: ApprovalMode
+  showThinking: boolean
+  themeMode?: ThemeMode
+  preventSystemSleep?: boolean
+}
 
 interface SettingsState {
   open: boolean
@@ -30,12 +40,13 @@ interface SettingsState {
   approvalMode: ApprovalMode
   showThinking: boolean
   themeMode: ThemeMode
+  preventSystemSleep: boolean
   openSettings: (tab?: SettingsTab) => void
   closeSettings: () => void
   setActiveTab: (tab: SettingsTab) => void
   refreshModelConfig: () => Promise<void>
   saveModelConfig: (cfg: ModelConfig, opts?: { activate?: boolean }) => Promise<void>
-  saveGeneral: (opts: { maxIterations: number; autoApproveLow?: boolean; approvalMode?: ApprovalMode; showThinking: boolean; themeMode?: ThemeMode }) => void
+  saveGeneral: (opts: GeneralSettings) => void
   loadGeneral: () => void
 }
 
@@ -65,14 +76,15 @@ function themeModeFromSaved(saved: { themeMode?: unknown } | null): ThemeMode {
   return 'system'
 }
 
-function saveGeneralToStorage(opts: { maxIterations: number; autoApproveLow?: boolean; approvalMode?: ApprovalMode; showThinking: boolean; themeMode?: ThemeMode }) {
+function saveGeneralToStorage(opts: GeneralSettings) {
   try {
     const approvalMode = opts.approvalMode ?? (opts.autoApproveLow ? 'risk_only' : 'always_ask')
     localStorage.setItem(GENERAL_KEY, JSON.stringify({
       ...opts,
       approvalMode,
       autoApproveLow: autoApproveLowFromMode(approvalMode),
-      themeMode: opts.themeMode ?? 'system'
+      themeMode: opts.themeMode ?? 'system',
+      preventSystemSleep: opts.preventSystemSleep ?? true
     }))
   } catch {
     /* ignore */
@@ -89,6 +101,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   approvalMode: 'always_ask',
   showThinking: true,
   themeMode: 'system',
+  preventSystemSleep: true,
 
   openSettings: (tab) => {
     set({ open: true, activeTab: tab ?? get().activeTab })
@@ -122,7 +135,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         autoApproveLow: autoApproveLowFromMode(approvalMode),
         approvalMode,
         showThinking: saved.showThinking ?? true,
-        themeMode
+        themeMode,
+        preventSystemSleep: saved.preventSystemSleep ?? true
       })
     }
   },
@@ -130,9 +144,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   saveGeneral: (opts) => {
     const approvalMode = opts.approvalMode ?? (opts.autoApproveLow ? 'risk_only' : 'always_ask')
     const themeMode = opts.themeMode ?? get().themeMode
-    saveGeneralToStorage({ ...opts, approvalMode, themeMode })
+    const preventSystemSleep = opts.preventSystemSleep ?? get().preventSystemSleep
+    saveGeneralToStorage({ ...opts, approvalMode, themeMode, preventSystemSleep })
     void api.setThemeMode(themeMode)
-    set({ ...opts, themeMode, approvalMode, autoApproveLow: autoApproveLowFromMode(approvalMode) })
+    void api.setPreventSleepEnabled(preventSystemSleep)
+    set({ ...opts, themeMode, preventSystemSleep, approvalMode, autoApproveLow: autoApproveLowFromMode(approvalMode) })
   }
 }))
 

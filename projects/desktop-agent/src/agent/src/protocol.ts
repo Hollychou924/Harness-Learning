@@ -68,6 +68,11 @@ export type StdinMessage =
   | { type: 'append_input'; task_id: string; message: string; mode?: 'inject' | 'queue' }
   | { type: 'plan_response'; request_id: string; decision: 'approve' | 'reject_stop' | 'reject_revise'; feedback?: string }
   | { type: 'continuation_response'; task_id: string; decision: 'continue' | 'stop' | 'split' }
+  // 测试连接：主进程把一份待测 AgentConfig 发给 agent，让 agent 用真实 provider 跑一次最小流式探测，
+  // 保证"测试连接"与"真实对话"走同一条请求路径（同样的 client、鉴权、baseURL、stream:true、字段构造）
+  | { type: 'test_request'; request_id: string; config: AgentConfig }
+  // 标题总结：把首条 query + 助手回复发给 agent，用真实 provider 跑一次无工具的一次性调用，回传 ≤10 字短标题
+  | { type: 'summarize_title_request'; request_id: string; config: AgentConfig; user_query: string; assistant_reply: string }
 
 // Agent -> 主进程 (stdout)：Turn/Item 事件模型
 export type StdoutMessage =
@@ -94,6 +99,10 @@ export type StdoutMessage =
   | { type: 'subtask_started'; subtask_id: string; title: string; agent_id?: string }
   | { type: 'subtask_completed'; subtask_id: string; title: string; duration_ms: number; tool_count: number; tokens: number }
   | { type: 'subtask_failed'; subtask_id: string; title: string; error: string }
+  // 测试连接结果：success=true 表示首个流式分片已到达，端点可用；error 为面向用户的可操作提示
+  | { type: 'test_result'; request_id: string; success: boolean; error?: string; message?: string; latencyMs?: number }
+  // 标题总结结果：title 为 ≤10 字短标题；失败时 error 给出原因，调用方保留原标题
+  | { type: 'summarize_title_result'; request_id: string; success: boolean; title?: string; error?: string }
 
 export interface QuestionOption {
   id: string

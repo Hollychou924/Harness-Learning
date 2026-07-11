@@ -28,3 +28,4 @@
 ## [2026-06-09 ingest] community-ingest | 孔某人的低维认知 Agent Harness 实现对比 2 篇(Memory 2026-06-03 + Context 压缩 2026-06-09) -> raw/community-posts/harness-implementation-comparison + 2 source-cards + comparisons/harness-memory-compaction-implementation + concepts/context-compaction + topics/harness-implementation-comparison-kongmouren;并更新 entity(claude-code/codex/openclaw)与 concepts/memory-synthesis-dreaming;产出 E4 飞书初稿对照清单待用户决策
 ## [2026-06-14 16:30 UTC] community-paper-ingest | Harness 自进化 23 篇微信 + Meta-Harness/Arxiv 3 份资料 -> raw + concepts/harness-self-evolution + topics/harness-self-evolution-2026-06 + E7 重新规划
 ## [2026-06-14 16:50 UTC] source-card | 用户点名 Harness 自进化 5 篇 -> 补齐 source-cards + 更新专题/覆盖账本/index
+## [2026-07-08 07:30 UTC] source-card+concept | 4 篇 Loop Engineering 微信文章 + momo-code 源码分析 -> 4 source-cards + concepts/loop-engineering + 更新 concepts/harness-self-evolution 补 momo-code 案例

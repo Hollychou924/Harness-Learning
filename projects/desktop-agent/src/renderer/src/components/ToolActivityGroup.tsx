@@ -64,10 +64,10 @@ function SingleToolCard({ item }: { item: ToolCallItem }) {
   }
 
   return (
-    <div className="rounded-lg overflow-hidden text-sm text-[var(--ink-soft)]">
+    <div className="rounded-lg overflow-hidden text-[13px] text-[var(--ink-soft)]">
       <button
         onClick={handleToggle}
-        className={`w-full flex items-center gap-2 px-2 py-1.5 transition hover:text-[var(--ink)] ${
+        className={`w-full flex items-center gap-2 px-2 py-1 transition hover:text-[var(--ink)] ${
           hasDetail && !isRunning ? 'cursor-pointer' : 'cursor-default'
         }`}
       >
@@ -98,7 +98,7 @@ function SingleToolCard({ item }: { item: ToolCallItem }) {
         )}
       </button>
       {isOpen && hasDetail && (
-        <div className="px-2 pb-2 pt-1 space-y-1.5">
+        <div className="px-2 pb-1 pt-0.5 space-y-1">
           {Object.keys(item.args).length > 0 && (
             <DetailBlock title="参数" content={JSON.stringify(item.args, null, 2)} />
           )}
@@ -129,10 +129,10 @@ function MergedToolGroupCard({ group }: { group: ToolGroup }) {
     : { dot: 'bg-sky-400', icon: null }
 
   return (
-    <div className="rounded-lg overflow-hidden text-sm text-[var(--ink-soft)]">
+    <div className="rounded-lg overflow-hidden text-[13px] text-[var(--ink-soft)]">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-2 py-1.5 hover:text-[var(--ink)] transition"
+        className="w-full flex items-center gap-2 px-2 py-0.5 hover:text-[var(--ink)] transition"
       >
         <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${groupColor.dot}`} />
         {groupColor.icon}
@@ -144,7 +144,7 @@ function MergedToolGroupCard({ group }: { group: ToolGroup }) {
         <ChevronRight size={14} className={`text-[var(--ink-soft)] transition-transform ml-auto ${open ? 'rotate-90' : ''}`} />
       </button>
       {open && (
-        <div className="px-2 pb-2 pt-1 space-y-0.5">
+        <div className="px-2 pb-1 pt-0.5 space-y-0.5">
           {group.items.map((item) => (
             <SingleToolCard key={item.id} item={item} />
           ))}

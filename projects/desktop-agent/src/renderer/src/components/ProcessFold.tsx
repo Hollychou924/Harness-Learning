@@ -32,7 +32,7 @@ export function ProcessFold({ children }: { children: ReactNode[] }) {
       <button
         type="button"
         onClick={() => setIsUnfolded(true)}
-        className="group/fold flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors hover:bg-black/[0.02] cursor-pointer"
+        className="group/fold flex w-full items-center gap-2 px-3 py-1 text-left text-sm transition-colors hover:bg-black/[0.02] cursor-pointer"
       >
         <span className="w-1.5 h-1.5 shrink-0" />
         <MoreHorizontal size={14} className="text-[var(--ink-soft)] shrink-0" />

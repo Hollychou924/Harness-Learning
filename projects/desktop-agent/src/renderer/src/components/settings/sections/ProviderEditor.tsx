@@ -48,6 +48,9 @@ export function ProviderEditor({ providerId, current, configuredModels, editorCo
   const [displayName, setDisplayName] = useState(currentForProvider?.displayName || (isCustom ? '我的自定义模型' : preset.label))
   const [model, setModel] = useState(initialModel)
   const [apiKey, setApiKey] = useState(currentForProvider?.apiKey || '')
+  const [apiFormat, setApiFormat] = useState<'openai' | 'anthropic'>(
+    (currentForProvider?.apiFormat as 'openai' | 'anthropic' | undefined) || preset.apiFormat
+  )
   const [apiBaseUrl, setApiBaseUrl] = useState(currentForProvider?.apiBaseUrl || preset.baseUrl)
   const [contextLimit, setContextLimit] = useState(
     isCustom
@@ -136,7 +139,7 @@ export function ProviderEditor({ providerId, current, configuredModels, editorCo
       model: model.trim(),
       apiKey: finalKey,
       apiBaseUrl: apiBaseUrl.trim(),
-      apiFormat: preset.apiFormat,
+      apiFormat: isCustom ? apiFormat : preset.apiFormat,
       contextLimit: Number(contextLimit) || getModelContextLimit(providerId, model, customProviderId),
       ...(isMify ? { customProviderId } : {}),
       ...(isCustom ? { customModelId, displayName: displayName.trim() } : {})
@@ -218,6 +221,32 @@ export function ProviderEditor({ providerId, current, configuredModels, editorCo
               placeholder="例如：公司内网模型、我的中转服务"
               className="w-full h-10 rounded-xl floating-subsurface px-3 text-sm outline-none"
             />
+          </Field>
+        )}
+
+        {isCustom && (
+          <Field label="调用协议">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => { setApiFormat('openai'); resetFeedback() }}
+                className={`flex-1 h-10 rounded-xl border px-3 text-sm transition ${apiFormat === 'openai' ? 'border-[#0071e3] bg-sky-50 text-[#0071e3]' : 'border-black/[0.06] text-[var(--ink-soft)] hover:bg-black/[0.04]'}`}
+              >
+                OpenAI 兼容
+              </button>
+              <button
+                type="button"
+                onClick={() => { setApiFormat('anthropic'); resetFeedback() }}
+                className={`flex-1 h-10 rounded-xl border px-3 text-sm transition ${apiFormat === 'anthropic' ? 'border-[#0071e3] bg-sky-50 text-[#0071e3]' : 'border-black/[0.06] text-[var(--ink-soft)] hover:bg-black/[0.04]'}`}
+              >
+                Anthropic 兼容
+              </button>
+            </div>
+            <p className="mt-1.5 text-[11px] text-[var(--ink-soft)]">
+              {apiFormat === 'openai'
+                ? '走 /chat/completions，Bearer 鉴权。适用于 OpenAI、DeepSeek、通义、Kimi、各种 one-api/new-api 中转及 Ollama 等。'
+                : '走 /v1/messages，x-api-key 鉴权。适用于 Anthropic 官方及 DeepSeek/Kimi/通义/智谱/火山/MiniMax 的 Anthropic 兼容端点。'}
+            </p>
           </Field>
         )}
 

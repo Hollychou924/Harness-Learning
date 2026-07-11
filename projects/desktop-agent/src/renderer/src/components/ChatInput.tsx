@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, ArrowUp, ChevronDown, Check, X, FileText, Image as ImageIcon, Eye, AlertCircle, FolderPlus, FolderOpen, Folder, History, AtSign, Target, StopCircle, RefreshCw, Loader2, Hand, ShieldCheck, ShieldAlert } from 'lucide-react'
+import { Plus, ArrowUp, ChevronDown, Check, X, FileText, Image as ImageIcon, Eye, AlertCircle, FolderPlus, FolderOpen, Folder, History, AtSign, Target, StopCircle, RefreshCw, Loader2, Hand, ShieldCheck, ShieldAlert, GitBranch, Laptop, Search } from 'lucide-react'
 import { api, type ModelConfig, type AttachmentFile } from '../api'
 import { useSettingsStore, type ApprovalMode } from './settings/settingsStore'
 import { useTaskStore, type Attachment, type Project, DEFAULT_PROJECT_ID } from '../store/task'
 import { PROVIDER_PRESETS, BUILTIN_PROVIDER_ORDER, modelSupportsVision } from './providerPresets'
 import { WhaleTooltip } from './WhaleTooltip'
+import { CreateBranchDialog } from './Dialogs'
+import { CommitHistoryDialog } from './CommitHistoryDialog'
 
 interface Props {
   value: string
@@ -31,6 +33,14 @@ function getModelLabel(config: ModelConfig | null): string {
   if (!config) return '未配置'
   if (config.providerId === 'custom') return config.displayName || '自定义模型'
   return PROVIDER_PRESETS[config.providerId]?.label || config.providerId
+}
+
+// 右下角模型展示用的"品牌 · 模型ID"组合：品牌为主，模型 ID 为辅，便于区分同一供应商下的不同模型
+function getModelDisplay(config: ModelConfig | null): { brand: string; modelId: string; full: string } {
+  const brand = getModelLabel(config)
+  const modelId = config?.model?.trim() || ''
+  const full = modelId ? `${brand} · ${modelId}` : brand
+  return { brand, modelId, full }
 }
 
 const APPROVAL_MODE_OPTIONS: Array<{
@@ -239,7 +249,7 @@ export function ChatInput({ value, onChange, onSend, onStop, isRunning = false, 
   const hasContent = !hasBlockedAttachment && (value.trim().length > 0 || readyAttachmentCount > 0)
   const shouldStop = isRunning && !hasContent && Boolean(onStop)
   const sendLabel = hasBlockedAttachment ? '请先删除或重试失败附件' : '发送'
-  const modelLabel = getModelLabel(config)
+  const modelDisplay = getModelDisplay(config)
   const activeApprovalMode = APPROVAL_MODE_OPTIONS.find((option) => option.id === approvalMode) || APPROVAL_MODE_OPTIONS[0]
 
   const currentModelSupportsVision = config
@@ -684,8 +694,15 @@ ${text}` : text
                 }}
                 ref={modelBtnRef}
                 className="flex items-center gap-1 text-[11px] text-[var(--ink-soft)] hover:text-[var(--ink)] transition px-1.5 py-1.5 rounded-lg hover:bg-black/[0.04]"
+                title={modelDisplay.full}
               >
-                <span className="truncate max-w-[120px]">{modelLabel}</span>
+                <span className="truncate max-w-[88px]">{modelDisplay.brand}</span>
+                {modelDisplay.modelId && (
+                  <>
+                    <span className="text-[var(--ink-soft)]/60">·</span>
+                    <span className="truncate max-w-[120px] text-[var(--ink-soft)]/80">{modelDisplay.modelId}</span>
+                  </>
+                )}
                 <ChevronDown size={11} />
               </button>
 
@@ -998,6 +1015,66 @@ function ProjectPicker({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [menuStyle, setMenuStyle] = useState<{ left: number; top: number; maxHeight: number } | null>(null)
+  const [branchMenuOpen, setBranchMenuOpen] = useState(false)
+  const [createBranchOpen, setCreateBranchOpen] = useState(false)
+  const [commitHistoryOpen, setCommitHistoryOpen] = useState(false)
+  const [branchLoading, setBranchLoading] = useState(false)
+  const [switchingBranch, setSwitchingBranch] = useState('')
+  const [branchQuery, setBranchQuery] = useState('')
+  const [currentBranch, setCurrentBranch] = useState('')
+  const [branches, setBranches] = useState<string[]>([])
+  const [changedFiles, setChangedFiles] = useState(0)
+  const [branchError, setBranchError] = useState('')
+  const [toast, setToast] = useState('')
+  const toastTimer = useRef<number | null>(null)
+
+  const showToast = (text: string) => {
+    setToast(text)
+    if (toastTimer.current) window.clearTimeout(toastTimer.current)
+    toastTimer.current = window.setTimeout(() => setToast(''), 2400)
+  }
+
+  const friendlyBranchError = (message?: string) => {
+    const text = message || ''
+    if (/local changes.*overwritten|would be overwritten by (checkout|switch)/is.test(text)) return '当前有未保存的项目修改，请先提交或处理后再切换分支。'
+    if (/untracked working tree files.*overwritten/is.test(text)) return '当前有未保存的新文件，请先处理后再切换分支。'
+    if (/^[\x00-\x7F]{40,}$/.test(text) || text.length > 160) return '分支切换失败，请检查未保存的修改后重试。'
+    return text || '分支切换失败，请稍后重试。'
+  }
+
+  const loadBranches = useCallback(async () => {
+    if (!active?.folderPath) {
+      setCurrentBranch('')
+      setBranches([])
+      setChangedFiles(0)
+      setBranchError('当前项目没有绑定本地文件夹')
+      return
+    }
+    setBranchLoading(true)
+    setBranchError('')
+    try {
+      const result = await api.getBranchInfo(active.folderPath)
+      if (result.success) {
+        setCurrentBranch(result.currentBranch || '')
+        setBranches(result.branches || [])
+        setChangedFiles(result.changedFiles || 0)
+      } else {
+        setCurrentBranch('')
+        setBranches([])
+        setChangedFiles(0)
+        setBranchError(result.error || '无法读取分支')
+      }
+    } catch {
+      setCurrentBranch('')
+      setBranches([])
+      setChangedFiles(0)
+      setBranchError('无法连接到本地项目')
+    } finally {
+      setBranchLoading(false)
+    }
+  }, [active?.folderPath])
+
+  useEffect(() => { void loadBranches() }, [loadBranches])
 
   const close = () => setOpen(false)
   const updateMenuPosition = useCallback(() => {
@@ -1048,9 +1125,45 @@ function ProjectPicker({
     }
   }
 
+  const switchBranch = async (branchName: string) => {
+    if (!active?.folderPath || branchName === currentBranch || switchingBranch) return
+    setSwitchingBranch(branchName)
+    try {
+      const result = await api.switchBranch(active.folderPath, branchName)
+      if (!result.success) {
+        showToast(friendlyBranchError(result.error))
+        return
+      }
+      setCurrentBranch(result.currentBranch || branchName)
+      setBranches(result.branches || branches)
+      setChangedFiles(result.changedFiles || 0)
+      setBranchMenuOpen(false)
+      showToast(`已切换到 ${branchName}`)
+    } catch {
+      showToast('无法连接到本地项目')
+    } finally {
+      setSwitchingBranch('')
+    }
+  }
+
+  const createBranch = async (branchName: string): Promise<string | null> => {
+    if (!active?.folderPath) return '当前项目没有绑定本地文件夹'
+    const result = await api.createBranch(active.folderPath, branchName)
+    if (!result.success) return result.error || '创建失败'
+    setCurrentBranch(result.currentBranch || branchName)
+    setBranches(result.branches || branches)
+    setChangedFiles(result.changedFiles || 0)
+    setCreateBranchOpen(false)
+    setBranchMenuOpen(false)
+    showToast(`已创建并切换到 ${branchName}`)
+    return null
+  }
+
+  const visibleBranches = branches.filter((name) => name.toLowerCase().includes(branchQuery.trim().toLowerCase()))
+
   return (
     <div className="relative z-[1] mx-auto w-[calc(100%-28px)] rounded-t-[24px] border border-b-0 border-black/[0.04] bg-[var(--composer-project-bg)] px-5 pb-1.5 pt-2">
-      <div className="flex min-w-0 items-center overflow-hidden">
+      <div className="flex min-w-0 items-center overflow-visible">
         <button
           ref={buttonRef}
           onClick={() => {
@@ -1069,7 +1182,59 @@ function ProjectPicker({
           </span>
           <ChevronDown size={14} className="flex-shrink-0 text-[var(--ink-soft)]" />
         </button>
+        <button onClick={() => showToast('暂时只支持本地模式')} className="no-drag ml-1 flex h-7 flex-shrink-0 items-center gap-1.5 rounded-xl px-2.5 text-sm text-[var(--ink)] transition hover:bg-black/[0.05]">
+          <Laptop size={15} />
+          本地
+        </button>
+        <div className="relative ml-1 flex-shrink-0">
+          <button
+            onClick={() => { setBranchMenuOpen((value) => !value); setOpen(false); setBranchQuery('') }}
+            className="no-drag flex h-7 max-w-[220px] items-center gap-1.5 rounded-xl px-2.5 text-sm text-[var(--ink)] transition hover:bg-black/[0.05]"
+          >
+            <GitBranch size={15} />
+            <span className="truncate">{currentBranch || (branchLoading ? '正在读取分支…' : '分支')}</span>
+          </button>
+          {branchMenuOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setBranchMenuOpen(false)} />
+              <div className="absolute left-0 top-9 z-50 w-[340px] max-w-[calc(100vw-32px)] floating-surface rounded-2xl p-2">
+                <div className="flex h-9 items-center gap-2 px-2 text-[var(--ink-soft)]">
+                  <Search size={15} />
+                  <input value={branchQuery} onChange={(event) => setBranchQuery(event.target.value)} placeholder="搜索分支" className="min-w-0 flex-1 bg-transparent text-sm text-[var(--ink)] outline-none" autoFocus />
+                </div>
+                <div className="px-2 pb-1 pt-2 text-xs font-medium text-[var(--ink-soft)]">分支</div>
+                <div className="max-h-56 overflow-y-auto">
+                  {branchLoading && branches.length === 0 && <div className="px-2 py-4 text-center text-xs text-[var(--ink-soft)]">正在读取分支…</div>}
+                  {!branchLoading && branchError && <div className="px-2 py-4 text-center text-xs text-red-500">{branchError}</div>}
+                  {!branchLoading && !branchError && visibleBranches.length === 0 && <div className="px-2 py-4 text-center text-xs text-[var(--ink-soft)]">没有找到分支</div>}
+                  {visibleBranches.map((name) => (
+                    <button key={name} disabled={Boolean(switchingBranch)} onClick={() => void switchBranch(name)} className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-sm text-[var(--ink)] hover:bg-black/[0.05] disabled:opacity-50">
+                      <GitBranch size={15} className="flex-shrink-0 text-[var(--ink-soft)]" />
+                      <span className="min-w-0 flex-1 truncate">{name}</span>
+                      {name === currentBranch && <Check size={15} className="flex-shrink-0" />}
+                      {name === switchingBranch && <span className="flex-shrink-0 text-xs text-[var(--ink-soft)]">正在切换…</span>}
+                      {name === currentBranch && changedFiles > 0 && <span className="text-xs text-[var(--ink-soft)]">未提交：{changedFiles} 个文件</span>}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-2 border-t border-black/[0.08] pt-2">
+                  <button disabled={!active?.folderPath || Boolean(branchError)} onClick={() => setCreateBranchOpen(true)} className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-sm text-[var(--ink)] hover:bg-black/[0.05] disabled:opacity-40">
+                    <Plus size={16} />
+                    创建并切换新分支…
+                  </button>
+                  <button disabled={!active?.folderPath || Boolean(branchError)} onClick={() => { setBranchMenuOpen(false); setCommitHistoryOpen(true) }} className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-sm text-[var(--ink)] hover:bg-black/[0.05] disabled:opacity-40">
+                    <GitBranch size={16} />
+                    项目提交历史
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
+      {createBranchOpen && <CreateBranchDialog onCancel={() => setCreateBranchOpen(false)} onCreate={createBranch} />}
+      {commitHistoryOpen && active?.folderPath && <CommitHistoryDialog workspaceDir={active.folderPath} projectName={active.name} onClose={() => setCommitHistoryOpen(false)} />}
+      {toast && createPortal(<div className="pointer-events-none fixed bottom-24 left-1/2 z-[240] max-w-[min(420px,calc(100vw-32px))] -translate-x-1/2 rounded-2xl floating-toast px-4 py-2 text-center text-xs leading-relaxed text-white">{toast}</div>, document.body)}
 
       {open && (
         createPortal(

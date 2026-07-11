@@ -1,10 +1,13 @@
 import { createInterface } from 'node:readline'
-import type { StdinMessage, StdoutMessage, AgentMessage } from './protocol.js'
+import type { StdinMessage, StdoutMessage, AgentConfig, AgentMessage } from './protocol.js'
 import { send } from './protocol.js'
 import { runReact } from './loop/react.js'
 import { clearTaskApprovalMemory, resolveApproval } from './approval.js'
 import { resolveQuestion, resolveContinuation } from './question.js'
 import { resolvePlanResponse } from './tools/plan.js'
+import { OpenAIProvider } from './providers/openai.js'
+import { AnthropicProvider } from './providers/anthropic.js'
+import type { LlmProvider, StreamEvent } from './providers/anthropic.js'
 
 // Agent 子进程入口：读 stdin JSON Lines，写 stdout JSON Lines
 // 不依赖任何 Electron API（依据 docs/03 第四章进程边界）
@@ -117,6 +120,124 @@ async function handleStdin(msg: StdinMessage): Promise<void> {
     resolveContinuation(msg.task_id, msg.decision)
     return
   }
+
+  if (msg.type === 'test_request') {
+    runConnectionTest(msg.request_id, msg.config).catch((e) => {
+      send({ type: 'test_result', request_id: msg.request_id, success: false, error: e instanceof Error ? e.message : String(e) })
+    })
+    return
+  }
+
+  if (msg.type === 'summarize_title_request') {
+    runTitleSummarize(msg.request_id, msg.config, msg.user_query, msg.assistant_reply).catch((e) => {
+      send({ type: 'summarize_title_result', request_id: msg.request_id, success: false, error: e instanceof Error ? e.message : String(e) })
+    })
+    return
+  }
+}
+
+// 测试连接：用真实 provider 跑一次最小流式探测，首个分片到达即判成功。
+// 这样"测试"与"真实对话"共用同一条请求路径（client、鉴权、baseURL、stream:true、字段构造），从根上避免形状漂移。
+async function runConnectionTest(requestId: string, config: AgentConfig): Promise<void> {
+  const started = Date.now()
+  const testConfig: AgentConfig = {
+    ...config,
+    // 测试时关闭思考，避免浪费思考配额；thinking 相关字段对兼容性探测无意义
+    thinkingLevel: 'off',
+    thinkingConfig: undefined
+  }
+
+  // 15s 墙钟超时：超过即判失败，避免用户长时间等待
+  const timeoutMs = 15_000
+  let timedOut = false
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => {
+      timedOut = true
+      reject(new Error('__TIMEOUT__'))
+    }, timeoutMs)
+  })
+
+  try {
+    const provider: LlmProvider = testConfig.apiFormat === 'openai'
+      ? new OpenAIProvider(testConfig)
+      : new AnthropicProvider(testConfig)
+
+    const probeMessages: AgentMessage[] = [
+      { role: 'user', content: 'ping' }
+    ]
+
+    const firstEventPromise = (async () => {
+      for await (const ev of provider.stream(probeMessages, testConfig, [])) {
+        // 首个有意义分片（文本/用量/结束信号）即证明端到端通路可用
+        if (ev.type === 'text' || ev.type === 'usage' || ev.type === 'message_stop') {
+          return ev
+        }
+      }
+      return null
+    })()
+
+    const ev = (await Promise.race([firstEventPromise, timeoutPromise])) as StreamEvent | null
+    const latencyMs = Date.now() - started
+    if (timedOut) {
+      send({ type: 'test_result', request_id: requestId, success: false, error: '连接超时，请检查网络或连接地址', latencyMs })
+      return
+    }
+    if (!ev) {
+      send({ type: 'test_result', request_id: requestId, success: false, error: '服务端未返回任何内容，请检查模型 ID 是否正确', latencyMs })
+      return
+    }
+    send({ type: 'test_result', request_id: requestId, success: true, message: `连接成功，用时 ${latencyMs}ms`, latencyMs })
+  } catch (e) {
+    const latencyMs = Date.now() - started
+    if (timedOut) {
+      send({ type: 'test_result', request_id: requestId, success: false, error: '连接超时，请检查网络或连接地址', latencyMs })
+      return
+    }
+    send({ type: 'test_result', request_id: requestId, success: false, error: classifyConnectionError(e), latencyMs })
+  }
+}
+
+// 把 SDK/网络错误归类成面向用户的可操作提示（P2：结构化错误诊断）
+function classifyConnectionError(e: unknown): string {
+  if (!(e instanceof Error) && typeof e !== 'object') {
+    return e ? String(e) : '连接失败，请检查配置'
+  }
+  const err = e as { status?: number; message?: string; error?: { message?: string; detail?: string; error?: string } | string; code?: string; name?: string }
+  const status = typeof err.status === 'number' ? err.status : undefined
+  const rawBody = typeof err.error === 'string' ? err.error : (err.error?.message || err.error?.detail || err.error?.error || '')
+  const msg = (err.message || '').trim()
+
+  // 网络层
+  if (err.code === 'ECONNREFUSED') return '无法连接到服务端：连接被拒绝，请检查连接地址和端口'
+  if (err.code === 'ENOTFOUND') return '域名无法解析，请检查连接地址是否拼写正确'
+  if (err.code === 'ECONNRESET') return '连接被服务端重置，可能是网络代理或服务端异常'
+  if (err.name === 'AbortError' || /timeout/i.test(msg)) return '连接超时，请检查网络或连接地址'
+
+  // HTTP 状态层
+  if (status === 401 || status === 403) {
+    return `鉴权失败（${status}）：密钥无效、过期或无权访问该模型${rawBody ? '；服务端返回：' + truncate(rawBody) : ''}`
+  }
+  if (status === 404) {
+    return `端点不存在（404）：请检查连接地址路径是否正确（如是否需要 /v1）${rawBody ? '；服务端返回：' + truncate(rawBody) : ''}`
+  }
+  if (status === 429) {
+    return `请求被限流或额度不足（429）${rawBody ? '；服务端返回：' + truncate(rawBody) : ''}`
+  }
+  if (status && status >= 500) {
+    return `服务端错误（${status}）${rawBody ? '：' + truncate(rawBody) : ''}`
+  }
+  if (status === 400 || status === 422) {
+    // 字段不兼容：stream、max_tokens、tools、stream_options 等
+    const hint = /stream/i.test(rawBody) ? '（服务端对流式/字段有特殊要求）' : ''
+    return `请求被服务端拒绝（${status}）${hint}：${truncate(rawBody) || truncate(msg)}`
+  }
+
+  // 兜底：优先用服务端正文，其次错误消息
+  return truncate(rawBody) || truncate(msg) || '连接失败，请检查配置'
+}
+
+function truncate(s: string): string {
+  return s.replace(/\s+/g, ' ').trim().slice(0, 200)
 }
 
 process.stderr.write('小蓝鲸 Agent 子进程已启动\n')

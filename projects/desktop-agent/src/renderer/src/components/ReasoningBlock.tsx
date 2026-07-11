@@ -85,7 +85,7 @@ export function ReasoningBlock({
     <div className="rounded-xl overflow-hidden text-[var(--ink-soft)]">
       <button
         onClick={handleToggle}
-        className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm transition ${
+        className={`w-full flex items-center gap-2 px-2 py-0.5 text-[13px] transition ${
           forceExpanded ? 'cursor-default' : 'hover:text-[var(--ink)] cursor-pointer'
         }`}
       >
@@ -107,8 +107,8 @@ export function ReasoningBlock({
         )}
       </button>
       {expanded && fullContent && (
-        <div className="px-2 pb-2 pt-0.5">
-          <div className="text-xs text-[var(--ink-soft)]/80 leading-relaxed whitespace-pre-wrap max-h-[300px] overflow-y-auto border-l border-black/[0.06] pl-3">
+        <div className="px-2 pb-1 pt-0.5">
+          <div className="text-[13px] text-[var(--ink-soft)]/80 leading-relaxed whitespace-pre-wrap max-h-[300px] overflow-y-auto border-l border-black/[0.06] pl-3">
             {fullContent}
           </div>
         </div>

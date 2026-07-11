@@ -1,5 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import { resolve } from 'node:path'
+import { randomUUID } from 'node:crypto'
 import { createInterface } from 'node:readline'
 import { app } from 'electron'
 import type { StdoutMessage, StdinMessage, AgentConfig, AgentMessage, MessageAttachment } from '../agent/src/protocol.js'
@@ -8,6 +9,7 @@ import type { StdoutMessage, StdinMessage, AgentConfig, AgentMessage, MessageAtt
 export class AgentBridge {
   private proc: ChildProcessWithoutNullStreams | null = null
   private listeners = new Set<(msg: StdoutMessage) => void>()
+  private exitListeners = new Set<() => void>()
   /** 当前运行的 turn_id，用于 cancel 时补发 stopped 状态 */
   private currentTurnId: string | null = null
 
@@ -49,12 +51,19 @@ export class AgentBridge {
     this.proc.on('exit', (code) => {
       console.log('[agent] exit', code)
       this.proc = null
+      this.currentTurnId = null
+      this.exitListeners.forEach((fn) => fn())
     })
   }
 
   onMessage(fn: (msg: StdoutMessage) => void): () => void {
     this.listeners.add(fn)
     return () => this.listeners.delete(fn)
+  }
+
+  onExit(fn: () => void): () => void {
+    this.exitListeners.add(fn)
+    return () => this.exitListeners.delete(fn)
   }
 
   send(msg: StdinMessage): void {
@@ -82,6 +91,27 @@ export class AgentBridge {
   stop(): void {
     this.proc?.kill()
     this.proc = null
+  }
+
+  // 测试连接：把待测配置发给 agent 子进程，复用真实 provider 跑一次最小流式探测
+  testModel(config: AgentConfig): Promise<{ success: boolean; error?: string; message?: string; latencyMs?: number }> {
+    const requestId = randomUUID()
+    return new Promise((resolveP) => {
+      const onResult = (msg: StdoutMessage) => {
+        if (msg.type === 'test_result' && msg.request_id === requestId) {
+          clearTimeout(guard)
+          this.listeners.delete(onResult)
+          resolveP({ success: msg.success, error: msg.error, message: msg.message, latencyMs: msg.latencyMs })
+        }
+      }
+      // 兜底：30s 内若 agent 无响应，主动释放监听并返回失败（agent 侧已有 15s 墙钟）
+      const guard = setTimeout(() => {
+        this.listeners.delete(onResult)
+        resolveP({ success: false, error: '测试连接超时，agent 未响应，请重试' })
+      }, 30_000)
+      this.listeners.add(onResult)
+      this.send({ type: 'test_request', request_id: requestId, config })
+    })
   }
 }
 

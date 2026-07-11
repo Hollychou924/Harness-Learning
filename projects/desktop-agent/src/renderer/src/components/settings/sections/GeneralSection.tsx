@@ -1,7 +1,7 @@
 import { useSettingsStore } from '../settingsStore'
 
 export function GeneralSection() {
-  const { maxIterations, approvalMode, showThinking, saveGeneral } = useSettingsStore()
+  const { maxIterations, approvalMode, showThinking, preventSystemSleep, saveGeneral } = useSettingsStore()
 
   return (
     <section>
@@ -11,6 +11,12 @@ export function GeneralSection() {
       </header>
 
       <div className="space-y-6">
+        <Toggle
+          label="运行任务时保持唤醒"
+          desc="任务运行期间防止电脑休眠，任务结束后恢复原有规则"
+          checked={preventSystemSleep}
+          onChange={(v) => saveGeneral({ maxIterations, approvalMode, showThinking, preventSystemSleep: v })}
+        />
         <Toggle
           label="显示思考过程"
           desc="在任务执行界面实时展示 Agent 的推理步骤"

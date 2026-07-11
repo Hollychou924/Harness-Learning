@@ -19,6 +19,7 @@ import {
   Circle,
   MailOpen,
   Mail,
+  Bell,
 } from 'lucide-react'
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useTaskStore, type Session, type Project, DEFAULT_PROJECT_ID } from '../store/task'
@@ -152,11 +153,13 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
     const expanded = isExpanded(p)
     const list = sessionsOf(p.id)
     const isDefault = p.id === DEFAULT_PROJECT_ID
+    const hasPending = list.some((s) => s.pendingAction)
     return (
       <div key={p.id} className="space-y-0.5">
         <ProjectRow
           project={p}
           expanded={expanded}
+          hasPending={hasPending}
           onToggle={() => toggleCollapse(p.id)}
           onActivate={() => store.setActiveProject(p.id)}
           onRename={isDefault ? null : () => { setRenamingProject(p.id); setNewProjectName(p.name) }}
@@ -415,8 +418,8 @@ function SectionLabel({ label, action, collapsed, onToggle }: { label: string; a
 }
 
 /* ---- 项目行 ---- */
-function ProjectRow({ project, expanded, onToggle, onActivate, onRename, onDelete, onTogglePin, onArchiveAll, onMarkAllRead }: {
-  project: Project; expanded: boolean; onToggle: () => void; onActivate: () => void
+function ProjectRow({ project, expanded, hasPending, onToggle, onActivate, onRename, onDelete, onTogglePin, onArchiveAll, onMarkAllRead }: {
+  project: Project; expanded: boolean; hasPending?: boolean; onToggle: () => void; onActivate: () => void
   onRename: (() => void) | null; onDelete: (() => void) | null
   onTogglePin: (() => void) | null; onArchiveAll: (() => void) | null
   onMarkAllRead?: () => void
@@ -433,6 +436,13 @@ function ProjectRow({ project, expanded, onToggle, onActivate, onRename, onDelet
           <Folder size={15} className="text-[var(--ink-soft)]" />
         </span>
         <span className="flex-1 text-[12px] font-medium text-[var(--ink)] truncate">{project.name}</span>
+        {hasPending && (
+          <WhaleTooltip label="有待确认的对话">
+            <span className="inline-flex items-center justify-center w-4 h-4 flex-shrink-0">
+              <Bell size={11} className="text-amber-500 animate-pulse" />
+            </span>
+          </WhaleTooltip>
+        )}
         {project.pinned && <Pin size={10} className="text-amber-400 flex-shrink-0" />}
         {expanded ? <ChevronDown size={13} className="text-[var(--ink-soft)] flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100" /> : <ChevronRight size={13} className="text-[var(--ink-soft)] flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />}
       </button>
@@ -474,10 +484,20 @@ function ProjectRow({ project, expanded, onToggle, onActivate, onRename, onDelet
 
 /* ---- 单条对话行 ---- */
 
+/* 待确认动作 → 侧边栏右侧胶囊文案。比泛泛"待确认"更具体，用户一眼知道要做什么 */
+const PENDING_ACTION_LABEL: Record<NonNullable<Session['pendingAction']>, string> = {
+  approval: '待审批',
+  question: '待回答',
+  plan: '待审阅',
+  continuation: '待继续'
+}
+
 /* ---- 未读判断：优先使用显式未读标记，否则按时间比较 ---- */
 function isUnread(session: Session): boolean {
-  if (session.unread === true) return true
-  return Boolean(session.lastMessageAt && (session.lastReadAt ?? 0) < session.lastMessageAt)
+  const explicit = session.unread === true
+  const timeBased = Boolean(session.lastMessageAt && (session.lastReadAt ?? 0) < session.lastMessageAt)
+  console.log('[isUnread]', session.id.slice(0, 12), session.title.slice(0, 12), { explicit, timeBased, unread: session.unread, lastReadAt: session.lastReadAt, lastMessageAt: session.lastMessageAt })
+  return explicit || timeBased
 }
 function SessionRow({ session, active, onClick, onDragStart, onDragOver, onDrop, isDragging, isDragOver, showProject, compact, onRename }: {
   session: Session; active: boolean; onClick: () => void
@@ -487,16 +507,21 @@ function SessionRow({ session, active, onClick, onDragStart, onDragOver, onDrop,
   const unread = isUnread(session)
   const store = useTaskStore()
   const [menuOpen, setMenuOpen] = useState(false)
+  const pending = session.pendingAction ?? null
 
-  const icon = session.status === 'completed'
-    ? <CheckCircle2 size={12} className="text-green-500 flex-shrink-0 mt-0.5" />
-    : session.status === 'failed'
-      ? <XCircle size={12} className="text-red-500 flex-shrink-0 mt-0.5" />
-      : <Clock size={12} className="text-[var(--ink-soft)] flex-shrink-0 mt-0.5" />
+  const icon = pending
+    ? <Bell size={13} className="text-amber-500 flex-shrink-0 mt-0.5 animate-pulse" />
+    : session.status === 'executing'
+      ? <LoadingDots size={12} />
+      : session.status === 'completed'
+        ? <CheckCircle2 size={12} className="text-green-500 flex-shrink-0 mt-0.5" />
+        : session.status === 'failed'
+          ? <XCircle size={12} className="text-red-500 flex-shrink-0 mt-0.5" />
+          : <Clock size={12} className="text-[var(--ink-soft)] flex-shrink-0 mt-0.5" />
 
   const actions: MenuAction[] = [
     { id: 'pin', label: session.pinned ? '取消置顶' : '置顶', icon: session.pinned ? <PinOff size={12} /> : <Pin size={12} />, onClick: () => store.togglePinSession(session.id) },
-    { id: 'read', label: unread ? '标记为已读' : '标记为未读', icon: unread ? <MailOpen size={12} /> : <Mail size={12} />, onClick: () => store.markSessionRead(session.id, !unread) },
+    { id: 'read', label: unread ? '标记为已读' : '标记为未读', icon: unread ? <MailOpen size={12} /> : <Mail size={12} />, onClick: () => { console.log('[markSessionRead click]', session.id.slice(0, 12), !unread); store.markSessionRead(session.id, !unread) } },
     { id: 'rename', label: '重命名', icon: <Pencil size={12} />, onClick: () => { onRename?.(); setMenuOpen(false) } },
     session.archived
       ? { id: 'unarchive', label: '取消归档', icon: <ArchiveRestore size={12} />, onClick: () => store.unarchiveSession(session.id) }
@@ -514,18 +539,25 @@ function SessionRow({ session, active, onClick, onDragStart, onDragOver, onDrop,
       onDrop={onDrop}
       onDragEnd={() => { /* 状态由父组件清理 */ }}
       className={`group relative flex items-center ${compact ? 'pl-2.5' : 'pl-7'} pr-1.5 py-[5px] rounded-[10px] cursor-pointer transition ${
-        active ? 'bg-black/[0.07]' : 'hover:bg-black/[0.04]'
-      } ${isDragging ? 'opacity-40' : ''} ${isDragOver ? 'border-t-2 border-blue-400' : ''}`}
+        active ? 'bg-black/[0.07]' : pending ? 'bg-amber-50/60 hover:bg-amber-50' : 'hover:bg-black/[0.04]'
+      } ${isDragging ? 'opacity-40' : ''} ${isDragOver ? 'border-t-2 border-blue-400' : ''} ${pending ? 'border-l-2 border-l-amber-400' : ''}`}
     >
       <div className="flex-1 flex items-center gap-2.5 min-w-0 text-left pr-1">
         <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">{icon}</span>
         <span className={`flex-1 truncate text-xs ${active ? 'text-[var(--ink)] font-medium' : 'text-[var(--ink)]/75'}`}>{session.title}</span>
-        {unread && <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" aria-label="未读" />}
+        {unread && !pending && <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" aria-label="未读" />}
       </div>
       {/* 右侧：项目标签 + 相对时间/状态 + 置顶图标 */}
       <div className="ml-auto flex items-center gap-1 flex-shrink-0">
         {showProject && <span className="text-[11px] text-[var(--ink-soft)]/60 bg-black/[0.04] px-1 rounded max-w-[48px] truncate">{showProject}</span>}
-        {session.status === 'executing' ? (
+        {pending ? (
+          <WhaleTooltip label={PENDING_ACTION_LABEL[pending]}>
+            <span className="inline-flex items-center gap-1 px-1.5 h-[18px] rounded-full bg-amber-400/20 text-amber-600 text-[11px] font-medium flex-shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+              {PENDING_ACTION_LABEL[pending]}
+            </span>
+          </WhaleTooltip>
+        ) : session.status === 'executing' ? (
           <WhaleTooltip label="进行中">
             <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse flex-shrink-0" />
           </WhaleTooltip>
@@ -557,6 +589,29 @@ function SessionRow({ session, active, onClick, onDragStart, onDragOver, onDrop,
 
 /* ---- 小工具 ---- */
 interface MenuAction { id: string; label: string; icon: React.ReactNode; onClick: () => void; danger?: boolean }
+
+/* 侧边栏会话加载图标：三点呈三角形排列，轮流呼吸（仿 Cursor 加载态）。
+ * size 为容器边长（px），三个点按容器尺寸自适应定位与缩放。 */
+function LoadingDots({ size = 12, className = '' }: { size?: number; className?: string }) {
+  const dot = Math.max(3, Math.round(size * 0.34))
+  const half = size / 2
+  // 顶点居中、底部两点左右分开，构成等腰三角形
+  const top = { left: half - dot / 2, top: 0 }
+  const bl = { left: 0, top: size - dot }
+  const br = { left: size - dot, top: size - dot }
+  return (
+    <span
+      className={`whale-loading-dots ${className}`}
+      style={{ width: size, height: size }}
+      role="status"
+      aria-label="加载中"
+    >
+      <span className="whale-ld-dot" style={{ width: dot, height: dot, ...top }} />
+      <span className="whale-ld-dot" style={{ width: dot, height: dot, ...bl }} />
+      <span className="whale-ld-dot" style={{ width: dot, height: dot, ...br }} />
+    </span>
+  )
+}
 
 function timeAgo(ts: number): string {
   const diff = Date.now() - ts

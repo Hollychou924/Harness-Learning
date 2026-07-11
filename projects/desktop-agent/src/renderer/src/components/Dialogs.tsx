@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { FolderOpen, FolderPlus } from 'lucide-react'
+import { FolderOpen, FolderPlus, X } from 'lucide-react'
 import { api } from '../api'
 
 /* ---- 通用命名弹窗：整窗居中 ---- */
@@ -21,6 +21,61 @@ export function NameDialog({ title, initial, placeholder, confirmLabel, onCancel
         <div className="flex justify-end gap-2 mt-4">
           <button onClick={onCancel} className="px-3 py-1.5 text-xs text-[var(--ink-soft)] hover:text-[var(--ink)] transition">取消</button>
           <button onClick={() => val.trim() && onConfirm(val)} className="px-3 py-1.5 text-xs rounded-lg bg-[var(--ink)] text-white hover:opacity-90 transition">{confirmLabel}</button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
+export function CreateBranchDialog({ onCancel, onCreate }: {
+  onCancel: () => void
+  onCreate: (name: string) => Promise<string | null>
+}) {
+  const [name, setName] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const ref = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { ref.current?.focus() }, [])
+
+  const submit = async () => {
+    const branchName = name.trim()
+    if (!branchName || busy) return
+    setBusy(true)
+    setError('')
+    const nextError = await onCreate(branchName)
+    if (nextError) setError(nextError)
+    setBusy(false)
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-[220] flex items-center justify-center floating-screen" onClick={onCancel}>
+      <div className="w-[420px] max-w-[calc(100vw-32px)] floating-surface rounded-[28px] p-6" onClick={(event) => event.stopPropagation()}>
+        <div className="mb-5 flex items-center justify-between">
+          <h3 className="text-xl font-semibold text-[var(--ink)]">创建并切换分支</h3>
+          <button onClick={onCancel} className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--ink-soft)] hover:bg-black/[0.05]">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="flex items-center justify-between text-sm font-medium text-[var(--ink)]">
+          <label htmlFor="new-branch-name">分支名称</label>
+        </div>
+        <input
+          id="new-branch-name"
+          ref={ref}
+          value={name}
+          onChange={(event) => { setName(event.target.value); setError('') }}
+          onKeyDown={(event) => { if (event.key === 'Enter') void submit(); if (event.key === 'Escape') onCancel() }}
+          placeholder="例如：feature/new-page"
+          className="mt-2 h-12 w-full rounded-xl border border-black/10 bg-white/80 px-3 text-sm text-[var(--ink)] outline-none focus:border-[#0071e3]"
+        />
+        <div className="mt-2 min-h-5 text-xs text-red-500">{error}</div>
+        <div className="mt-4 flex justify-end gap-2">
+          <button onClick={onCancel} className="h-10 rounded-xl bg-black/[0.04] px-5 text-sm text-[var(--ink)] hover:bg-black/[0.07]">关闭</button>
+          <button onClick={() => void submit()} disabled={!name.trim() || busy} className="h-10 rounded-xl bg-[var(--ink)] px-5 text-sm text-white disabled:opacity-40">
+            {busy ? '创建中…' : '创建并切换'}
+          </button>
         </div>
       </div>
     </div>,

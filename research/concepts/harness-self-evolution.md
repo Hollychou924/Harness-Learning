@@ -11,6 +11,11 @@ sources:
   - wiki/raw/community-posts/harness-self-evolution-2026-06/2026-04-24-hermes-agent-self-evolution-ali.md
   - wiki/raw/community-posts/harness-self-evolution-2026-06/2026-05-13-cloud-agent-skill-evolution.md
   - wiki/raw/community-posts/harness-self-evolution-2026-06/2026-04-03-claude-code-agent-loop-self-iteration.md
+  - projects/competitor-references/02-cli-terminals/momo-code/ （momo-code 源码级双速自进化循环实现）
+  - https://mp.weixin.qq.com/s/w6I4MeRbwxnmZF52rd3HWg （Claude 官方 Loop 入门）
+  - https://mp.weixin.qq.com/s/-zNyfvaPMGAJrKThPRZWkA （Claude Code /loop 实操教程）
+  - https://mp.weixin.qq.com/s/ayESVu4F_3RC3OdP8aV7ow （翁荔 Harness Engineering for Self-Improvement）
+  - https://mp.weixin.qq.com/s/kICrdEkPCYAiyOiwI-Gt1Q （Loop Engineering 实操手册）
 owners: ["zhouhao"]
 when_to_load: "讨论 Agent 越用越聪明、自进化、自迭代、自演化、Skill 自动沉淀、Harness 反哺模型训练、第7章写作时加载"
 ---
@@ -140,6 +145,26 @@ Hermes 相关材料把自进化拆成两层：
 | 写经验和用经验是两种能力；弱模型常败在不会调用和遵守 Harness | arxiv 2605.30621 |
 | Hermes 展示了外部 Skill 沉淀与内部训练反哺的双路径 | 阿里云开发者 Hermes、技术自由圈 Hermes |
 | 自进化必须受治理：版本、验证、灰度、回滚、人工审核 | 多篇 Harness 自优化 / AHE / 自演进文章共识 |
+
+## 8. 源码级实现案例：momo-code 双速自进化循环
+
+momo-code（`projects/competitor-references/02-cli-terminals/momo-code/`）是目前竞品参考库中自进化 loop 实现最完整的源码级案例。它把自进化做成了两个独立循环：
+
+- **快循环 KEP**（秒级~分钟级）：Observe→Distill→Gate→Inject→Solidify，每次任务结束自动运行，把信号蒸馏成 Tactic（战术），用 Beta(α,β) 分布 + Thompson 采样做探索-利用平衡
+- **慢循环 MCGS**（小时级~天级）：Curriculum→Baseline→Train→Eval→Ratchet Gate，手动 `/fine-tune run` 触发，用 held-out 测试集验证候选，通过 Ratchet Gate（改善 ≥ 2% 且零回归）后原子替换生产战术库
+
+这个案例对第七章的价值：
+
+| 第七章论点 | momo-code 源码对应 |
+|---|---|
+| 自进化需要免费客观信号 | bash 退出码/tsc 编译结果直接作为 Signal，无需 LLM 打分 |
+| 经验需要分层沉淀 | Tactic（战术）/ Case（案例）/ Ledger（审计日志）三层结构 |
+| 写经验和用经验是两种能力 | 快循环负责"用"（Thompson 采样注入），慢循环负责"写"（蒸馏+微调） |
+| 评估器要活在循环之外 | Ratchet Gate 用独立 held-out 测试集，不参与训练 |
+| 自进化必须受治理 | Gate 状态机（draft→active→promoted→retired）+ 原子替换 + 一键 rollback |
+| 安全红线 | Guard 拦截 secret 正则、forbiddenPaths、banned shell patterns |
+
+详见 [Loop Engineering](loop-engineering.md) 概念页第 4-5 节的源码级解析。
 
 ## 相关页面
 

@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { api } from '../api'
 import { useSettingsStore } from '../components/settings/settingsStore'
+import type { ImportedProjectSummary, ImportedSessionSummary } from '../api'
+import { mergeImportedLists, removeImportedLists } from '../importProjectMerge'
 import type { StdoutMessage, AgentMessage, MessageAttachment } from '../../../agent/src/protocol'
 import type { Turn } from '../../../agent/src/items'
 import { reduceTurnsEvent, getFinalAnswerOfTurn, deriveAgentMessages, type TurnsReducerState } from './turns'
@@ -80,6 +82,8 @@ export interface Project {
   order: number
   /** 绑定的本地文件夹绝对路径（从零新建或选已有文件夹）；无则走默认产出目录 */
   folderPath?: string
+  importedSourceName?: string
+  importedSourceFolderPath?: string
 }
 
 export interface Session {
@@ -113,6 +117,11 @@ export interface Session {
   lastMessageAt?: number
   /** 是否标记为未读 */
   unread?: boolean
+  /** 待用户确认的动作类型：审批/提问/计划/续跑。切到别的项目时侧边栏据此显示醒目提示 */
+  pendingAction?: 'approval' | 'question' | 'plan' | 'continuation' | null
+  importedSourceTitle?: string
+  importedSourceProjectId?: string
+  importedSourceArchived?: boolean
 }
 
 export interface ApprovalRequest {
@@ -315,6 +324,9 @@ export interface TaskState {
   markSessionRead: (sessionId: string, read?: boolean) => void
   /** 批量标记项目下所有会话已读 */
   markAllReadInProject: (projectId: string) => void
+  /** 将外部导入的项目和对话可靠地合并到侧边栏清单。 */
+  mergeImportedData: (projects: ImportedProjectSummary[], sessions: ImportedSessionSummary[]) => void
+  removeImportedData: (projectIds: string[], sessionIds: string[]) => void
 }
 
 // 各模式的状态快照，切换 Work/Code 时保存/恢复
@@ -412,6 +424,29 @@ function saveSessionsToStorage(s: Session[]) {
     localStorage.setItem(SESSIONS_KEY, JSON.stringify(s))
   } catch {
     /* ignore */
+  }
+}
+
+function saveImportedListsOrRestore(projects: Project[], sessions: Session[]): void {
+  const previousProjects = localStorage.getItem(PROJECTS_KEY)
+  const previousSessions = localStorage.getItem(SESSIONS_KEY)
+  try {
+    localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects))
+    localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions))
+    const savedProjects = JSON.parse(localStorage.getItem(PROJECTS_KEY) || 'null') as unknown
+    const savedSessions = JSON.parse(localStorage.getItem(SESSIONS_KEY) || 'null') as unknown
+    if (!Array.isArray(savedProjects) || savedProjects.length !== projects.length ||
+      !Array.isArray(savedSessions) || savedSessions.length !== sessions.length) {
+      throw new Error('导入清单写入后核对失败')
+    }
+  } catch (error) {
+    if (previousProjects === null) localStorage.removeItem(PROJECTS_KEY)
+    else localStorage.setItem(PROJECTS_KEY, previousProjects)
+    if (previousSessions === null) localStorage.removeItem(SESSIONS_KEY)
+    else localStorage.setItem(SESSIONS_KEY, previousSessions)
+    throw new Error(error instanceof Error && error.name === 'QuotaExceededError'
+      ? '本机可用保存空间不足，导入资料尚未加入侧边栏'
+      : '导入清单保存失败，原有项目和对话已保留')
   }
 }
 
@@ -770,6 +805,31 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     saveSessionsToStorage(next)
     set({ sessions: next })
   },
+  mergeImportedData: (importedProjects, importedSessions) => {
+    const currentProjects = get().projects
+    const currentSessions = get().sessions
+    const { projects: nextProjects, sessions: nextSessions, projectIdChanges } = mergeImportedLists(
+      currentProjects, currentSessions, importedProjects, importedSessions)
+    const activeProjectId = projectIdChanges.get(get().activeProjectId) || get().activeProjectId
+    saveImportedListsOrRestore(nextProjects, nextSessions)
+    saveActiveProject(activeProjectId)
+    set({ projects: nextProjects, sessions: nextSessions, activeProjectId })
+  },
+  removeImportedData: (projectIds, sessionIds) => {
+    const removedSessions = new Set(sessionIds)
+    const { projects: nextProjects, sessions: nextSessions } = removeImportedLists(
+      get().projects, get().sessions, projectIds, sessionIds)
+    const remainingProjectIds = new Set(nextProjects.map((project) => project.id))
+    const activeProjectId = remainingProjectIds.has(get().activeProjectId) ? get().activeProjectId : DEFAULT_PROJECT_ID
+    saveImportedListsOrRestore(nextProjects, nextSessions)
+    saveActiveProject(activeProjectId)
+    set({
+      projects: nextProjects,
+      sessions: nextSessions,
+      activeProjectId,
+      activeSessionId: get().activeSessionId && removedSessions.has(get().activeSessionId as string) ? null : get().activeSessionId
+    })
+  },
   reset: () => {
     // 释放附件的 Object URL，防止内存泄漏
     for (const a of get().attachments) { if (a.objectUrl) URL.revokeObjectURL(a.objectUrl) }
@@ -797,6 +857,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     if (approvalPending) {
       await api.sendApproval(approvalPending.requestId, approved, scope)
       set({ approvalPending: null })
+      setSessionPendingAction(set, get, get().activeSessionId, null)
     }
   },
   respondQuestion: async (selectedOptionIds?: string[], customAnswer?: string, skipped?: boolean, skipAll?: boolean) => {
@@ -807,6 +868,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         : customAnswer
       await api.sendQuestionResponse(pendingQuestion.requestId, selectedOptionIds, finalCustomAnswer, skipped || skipAll)
       set({ pendingQuestion: null })
+      setSessionPendingAction(set, get, get().activeSessionId, null)
     }
   },
   respondPlan: async (decision: 'approve' | 'reject_stop' | 'reject_revise', feedback?: string) => {
@@ -814,6 +876,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     if (pendingPlan) {
       await api.sendPlanResponse(pendingPlan.requestId, decision, feedback)
       set({ pendingPlan: null })
+      setSessionPendingAction(set, get, get().activeSessionId, null)
     }
   },
   respondContinuation: async (decision: 'continue' | 'stop' | 'split') => {
@@ -821,6 +884,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     if (continuationPending && taskId) {
       await api.sendContinuationResponse(taskId, decision)
       set({ continuationPending: null })
+      setSessionPendingAction(set, get, get().activeSessionId, null)
     }
   },
   appendEvent: (msg) => {
@@ -846,6 +910,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       }
 
       let patch: Partial<TaskRuntime> = {}
+      // 后台任务收到需用户确认的事件：在侧边栏会话上标记 pendingAction，用户在别的项目也能看到
+      let pendingAction: Session['pendingAction'] = null
       switch (msg.type) {
         case 'artifact': patch = { artifacts: [...base.artifacts, { type: msg.artifact_type, filePath: msg.file_path }] }; break
         case 'usage': patch = { usage: { inputTokens: base.usage.inputTokens + msg.inputTokens, outputTokens: base.usage.outputTokens + msg.outputTokens } }; break
@@ -855,17 +921,17 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         const sessErr = gsErr.sessions.find((x) => x.id === evTaskId)
         if (sessErr && gsErr.activeSessionId !== evTaskId) {
           const nowErr = Date.now()
-          const nextSessionsErr = gsErr.sessions.map((x) => x.id === evTaskId ? { ...x, lastMessageAt: nowErr, updatedAt: nowErr } : x)
+          const nextSessionsErr = gsErr.sessions.map((x) => x.id === evTaskId ? { ...x, lastMessageAt: nowErr, updatedAt: nowErr, pendingAction: null } : x)
           saveSessionsToStorage(nextSessionsErr)
           set({ sessions: nextSessionsErr })
         }
         patch = { error: msg.message, status: 'failed', finishedAt: Date.now() }
         break
       }
-        case 'approval_request': patch = { approvalPending: { requestId: msg.request_id, toolName: msg.tool_name, args: msg.args, riskLevel: msg.risk_level, impact: msg.impact, canRollback: msg.can_rollback } }; break
-        case 'plan_proposed': patch = { pendingPlan: { requestId: msg.request_id, plan: msg.plan, steps: msg.steps } }; break
-        case 'question_proposed': patch = { pendingQuestion: { requestId: msg.request_id, question: msg.question, detail: msg.detail, options: msg.options, multiple: msg.multiple, allowCustom: msg.allow_custom, allowSkip: msg.allow_skip, prompts: msg.prompts } }; break
-        case 'continuation_request': patch = { continuationPending: { taskId: msg.task_id, currentStep: msg.current_step, hint: msg.hint } }; break
+        case 'approval_request': patch = { approvalPending: { requestId: msg.request_id, toolName: msg.tool_name, args: msg.args, riskLevel: msg.risk_level, impact: msg.impact, canRollback: msg.can_rollback } }; pendingAction = 'approval'; break
+        case 'plan_proposed': patch = { pendingPlan: { requestId: msg.request_id, plan: msg.plan, steps: msg.steps } }; pendingAction = 'plan'; break
+        case 'question_proposed': patch = { pendingQuestion: { requestId: msg.request_id, question: msg.question, detail: msg.detail, options: msg.options, multiple: msg.multiple, allowCustom: msg.allow_custom, allowSkip: msg.allow_skip, prompts: msg.prompts } }; pendingAction = 'question'; break
+        case 'continuation_request': patch = { continuationPending: { taskId: msg.task_id, currentStep: msg.current_step, hint: msg.hint } }; pendingAction = 'continuation'; break
         case 'todo_update': patch = { todos: msg.todos }; break
         case 'completed': {
           // 后台任务完成：累积轮次落盘，但不更新全局展示
@@ -883,7 +949,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
             if (sess) {
               const isActive = gs.activeSessionId === evTaskId
               const now = Date.now()
-              const nextSessions = gs.sessions.map((x) => x.id === evTaskId ? { ...x, status: 'completed' as TaskStatus, updatedAt: now, stepCount: finishedTurns.length, tokens: base.usage.inputTokens + base.usage.outputTokens, title: assistantText.slice(0, 40) || x.title, lastMessageAt: isActive ? x.lastMessageAt : now } : x)
+              const nextSessions = gs.sessions.map((x) => x.id === evTaskId ? { ...x, status: 'completed' as TaskStatus, updatedAt: now, stepCount: finishedTurns.length, tokens: base.usage.inputTokens + base.usage.outputTokens, title: x.title && x.title !== '新对话' ? x.title : (assistantText.slice(0, 40) || x.title), lastMessageAt: isActive ? x.lastMessageAt : now, pendingAction: null } : x)
               saveSessionsToStorage(nextSessions)
               set({ sessions: nextSessions })
             }
@@ -896,6 +962,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         default: break
       }
       set((st) => ({ runningTasks: { ...st.runningTasks, [evTaskId as string]: { ...base, ...patch } } }))
+      if (pendingAction) setSessionPendingAction(set, get, evTaskId as string, pendingAction)
       return
     }
 
@@ -924,6 +991,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         break
       case 'error':
         set({ error: msg.message, status: 'failed', finishedAt: Date.now(), continuationPending: null })
+        setSessionPendingAction(set, get, evTaskId, null)
         { const rt = { ...get().runningTasks }; delete rt[evTaskId]; set({ runningTasks: rt }) }
         break
       case 'completed': {
@@ -933,6 +1001,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         const nextMessages = buildCompletedSessionMessages(cur2.messages, msg.messages, derivedTail)
         const finalStatus: TaskStatus = cur2.status === 'failed' ? 'failed' : 'completed'
         set({ status: finalStatus, summary: msg.summary, finishedAt: Date.now(), messages: nextMessages, continuationPending: null })
+        setSessionPendingAction(set, get, evTaskId, null)
         pushHistory(set, get)
         if (evTaskId) {
           void api.saveSessionMessages(evTaskId, nextMessages)
@@ -943,18 +1012,22 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       }
       case 'approval_request':
         set({ approvalPending: { requestId: msg.request_id, toolName: msg.tool_name, args: msg.args, riskLevel: msg.risk_level, impact: msg.impact, canRollback: msg.can_rollback } })
+        setSessionPendingAction(set, get, evTaskId, 'approval')
         syncRT()
         break
       case 'plan_proposed':
         set({ pendingPlan: { requestId: msg.request_id, plan: msg.plan, steps: msg.steps } })
+        setSessionPendingAction(set, get, evTaskId, 'plan')
         syncRT()
         break
       case 'question_proposed':
         set({ pendingQuestion: { requestId: msg.request_id, question: msg.question, detail: msg.detail, options: msg.options, multiple: msg.multiple, allowCustom: msg.allow_custom, allowSkip: msg.allow_skip, prompts: msg.prompts } })
+        setSessionPendingAction(set, get, evTaskId, 'question')
         syncRT()
         break
       case 'continuation_request':
         set({ continuationPending: { taskId: msg.task_id, currentStep: msg.current_step, hint: msg.hint } })
+        setSessionPendingAction(set, get, evTaskId, 'continuation')
         syncRT()
         break
       case 'todo_update':
@@ -1094,8 +1167,33 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       }
     } else {
       set({ taskId: res.taskId, activeSessionId: res.taskId })
-      // 新对话立刻落盘用户消息，防止丢失
+      // 新对话：立即在侧边栏落一条 executing 记录，并显示加载图标；
+      // 任务完成时 pushHistory 会按 id 命中并更新（不会重复创建）
       if (!isContinue) {
+        const startNow = Date.now()
+        const initialTitle = visibleTitle.slice(0, 40) || '新对话'
+        const cur2 = get()
+        const newSess: Session = {
+          id: res.taskId,
+          title: initialTitle,
+          mode,
+          status: 'executing',
+          projectId: cur2.activeProjectId,
+          createdAt: startNow,
+          updatedAt: startNow,
+          stepCount: 0,
+          tokens: 0,
+          pinned: false,
+          archived: false,
+          order: 0,
+          lastReadAt: startNow,
+          unread: false,
+          startedAt: startNow
+        }
+        const nextSessions = [newSess, ...cur2.sessions]
+        saveSessionsToStorage(nextSessions)
+        set({ sessions: nextSessions })
+        // 新对话立刻落盘用户消息，防止丢失
         void api.saveSessionMessages(res.taskId, [userMsg])
       }
     }
@@ -1208,6 +1306,25 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     }
   }
 }))
+
+/** 更新某条会话的待确认状态，并落盘。action 传 null/undefined 表示清除。
+ *  用于审批/提问/计划/续跑等待用户输入时，在侧边栏给出醒目提示（即便用户在别的项目）。 */
+function setSessionPendingAction(
+  set: (partial: Partial<TaskState> | ((s: TaskState) => Partial<TaskState>)) => void,
+  get: () => TaskState,
+  sessionId: string | null | undefined,
+  action: Session['pendingAction']
+) {
+  if (!sessionId) return
+  const now = Date.now()
+  const next = get().sessions.map((s) =>
+    s.id === sessionId
+      ? { ...s, pendingAction: action ?? null, lastMessageAt: action ? now : s.lastMessageAt }
+      : s
+  )
+  saveSessionsToStorage(next)
+  set({ sessions: next })
+}
 
 function pushHistory(
   set: (partial: Partial<TaskState> | ((s: TaskState) => Partial<TaskState>)) => void,

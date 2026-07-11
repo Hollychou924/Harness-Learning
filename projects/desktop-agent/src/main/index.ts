@@ -1,14 +1,21 @@
-import { app, BrowserWindow, ipcMain, shell, nativeTheme, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, nativeTheme, dialog, powerSaveBlocker, protocol } from 'electron'
 import { isAbsolute, join, resolve, relative } from 'node:path'
+import { createReadStream } from 'node:fs'
+import { stat } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'node:fs'
 import { readdir as readdirAsync, stat as statAsync } from 'node:fs/promises'
 import { agentBridge } from './agent-bridge.js'
 import { startTrace, logAgentEvent, logUserAction, listTraces, getTrace, exportTracePackage, createFeedbackTicket, listFeedbackTickets, getDiagnosticsOverview, getReplayBundle, exportReplayPackage } from './trace-logger.js'
 import type { StdoutMessage, AgentConfig, MessageAttachment } from '../agent/src/protocol.js'
 import { getModelThinkingConfig } from '../renderer/src/components/providerPresets.js'
+import { getCommitDetail, getCommitDiff, getCommitHistory } from './git-history.js'
+import { RuntimeWakeLock } from './runtime-wake-lock.js'
+import { ImportStore } from './import-store.js'
+import { countPending, scanKnownSources } from './import-sources.js'
+import type { ImportSelection } from './import-types.js'
 import {
   resolveModelConfigForSave,
   sameModelSlot,
@@ -20,6 +27,73 @@ import {
 } from './model-config.js'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
+
+// 注册 imported-asset:// 协议：导入的图片资源通过这个协议从 external-imports/assets 目录读取。
+// 必须在 app ready 之前声明为特权 scheme，否则渲染端加载会被安全策略拦截。
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'imported-asset', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }
+])
+
+type BranchInfoResult = {
+  success: boolean
+  currentBranch?: string
+  branches?: string[]
+  changedFiles?: number
+  error?: string
+}
+
+function runGit(workspaceDir: string, args: string[]): string {
+  return execFileSync('git', ['-C', workspaceDir, ...args], {
+    encoding: 'utf8',
+    maxBuffer: 1024 * 1024 * 4,
+    stdio: ['ignore', 'pipe', 'pipe']
+  }).trim()
+}
+
+function gitErrorMessage(error: unknown): string {
+  if (error && typeof error === 'object' && 'stderr' in error) {
+    const stderr = String((error as { stderr?: string | Buffer }).stderr || '').trim()
+    if (stderr) return stderr.replace(/^fatal:\s*/i, '')
+  }
+  return error instanceof Error ? error.message : String(error || '操作失败')
+}
+
+function branchSwitchErrorMessage(error: unknown): string {
+  const message = gitErrorMessage(error)
+  if (/local changes.*overwritten|would be overwritten by (checkout|switch)/is.test(message)) {
+    return '当前有未保存的项目修改，切换分支可能覆盖这些内容。请先提交或处理修改后再试。'
+  }
+  if (/untracked working tree files.*overwritten/is.test(message)) {
+    return '当前有未保存的新文件，切换分支可能覆盖这些文件。请先处理后再试。'
+  }
+  if (/already checked out at|used by worktree/is.test(message)) {
+    return '这个分支正在另一个项目窗口中使用，暂时无法切换。'
+  }
+  if (/invalid reference|unknown revision|did not match any file/is.test(message)) {
+    return '没有找到这个分支，请刷新后重试。'
+  }
+  return '分支切换失败，请稍后重试。'
+}
+
+function getBranchInfo(workspaceDir: string): BranchInfoResult {
+  try {
+    runGit(workspaceDir, ['rev-parse', '--is-inside-work-tree'])
+    const currentBranch = runGit(workspaceDir, ['branch', '--show-current'])
+    const branches = runGit(workspaceDir, ['for-each-ref', '--format=%(refname:short)', 'refs/heads'])
+      .split('\n')
+      .map((name) => name.trim())
+      .filter(Boolean)
+      .sort((left, right) => left.localeCompare(right))
+    if (currentBranch) {
+      const currentIndex = branches.indexOf(currentBranch)
+      if (currentIndex > 0) branches.unshift(...branches.splice(currentIndex, 1))
+    }
+    const changedFiles = runGit(workspaceDir, ['status', '--porcelain']).split('\n').filter(Boolean).length
+    return { success: true, currentBranch: currentBranch || undefined, branches, changedFiles }
+  } catch (error) {
+    return { success: false, error: gitErrorMessage(error) }
+  }
+}
 
 function getConfigPath(): string {
   return join(app.getPath('userData'), 'model-config.json')
@@ -57,6 +131,20 @@ function applyThemeMode(themeMode: ThemeMode): void {
 // 会话消息持久化目录：~/Library/Application Support/小蓝鲸/sessions/<id>.json
 function getSessionsDir(): string {
   return join(app.getPath('userData'), 'sessions')
+}
+
+function getImportStore(): ImportStore {
+  return new ImportStore(join(app.getPath('userData'), 'external-imports'))
+}
+
+const ASSET_MIME_BY_EXT: Record<string, string> = {
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp',
+  '.gif': 'image/gif', '.heic': 'image/heic', '.svg': 'image/svg+xml'
+}
+
+function inferAssetMime(filePath: string): string {
+  const ext = filePath.toLowerCase().match(/\.[^.]+$/)?.[0] || ''
+  return ASSET_MIME_BY_EXT[ext] || 'application/octet-stream'
 }
 
 function getSessionPath(sessionId: string): string {
@@ -143,11 +231,6 @@ function resolveModelConfigWithSavedKey(cfg: ModelConfig): ModelConfig {
   ])
 }
 
-function joinEndpoint(baseUrl: string, path: string): string {
-  const base = baseUrl.replace(/\/+$/, '')
-  return `${base}${path}`
-}
-
 async function testModelConnection(cfg: ModelConfig): Promise<{ success: boolean; message?: string; error?: string; latencyMs?: number }> {
   const resolvedCfg = resolveModelConfigWithSavedKey(cfg)
   const configError = validateModelConfig(resolvedCfg)
@@ -155,56 +238,33 @@ async function testModelConnection(cfg: ModelConfig): Promise<{ success: boolean
   if (!resolvedCfg.model.trim()) return { success: false, error: '请先填写模型 ID' }
   if (!resolvedCfg.apiBaseUrl.trim()) return { success: false, error: '请先填写连接地址' }
 
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 15000)
-  const started = Date.now()
-  try {
-    const headers: Record<string, string> = { 'content-type': 'application/json' }
-    let url = ''
-    let body: Record<string, unknown>
-    if (resolvedCfg.apiFormat === 'anthropic') {
-      url = joinEndpoint(resolvedCfg.apiBaseUrl, '/v1/messages')
-      headers['x-api-key'] = resolvedCfg.apiKey
-      headers['anthropic-version'] = '2023-06-01'
-      body = {
-        model: resolvedCfg.model,
-        max_tokens: 16,
-        messages: [{ role: 'user', content: 'ping' }]
-      }
-    } else {
-      url = joinEndpoint(resolvedCfg.apiBaseUrl, '/chat/completions')
-      headers.authorization = `Bearer ${resolvedCfg.apiKey}`
-      if (resolvedCfg.providerId === 'mify' && resolvedCfg.customProviderId) {
-        headers['x-model-provider-id'] = resolvedCfg.customProviderId
-      }
-      body = {
-        model: resolvedCfg.model,
-        messages: [{ role: 'user', content: 'ping' }],
-        max_tokens: 16,
-        stream: false
-      }
-    }
-    const res = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-      signal: controller.signal
-    })
-    const text = await res.text()
-    const latencyMs = Date.now() - started
-    if (!res.ok) {
-      const detail = text.replace(/\s+/g, ' ').slice(0, 180)
-      return { success: false, error: detail || `连接失败：${res.status}`, latencyMs }
-    }
-    return { success: true, message: `连接成功，用时 ${latencyMs}ms`, latencyMs }
-  } catch (e) {
-    const message = e instanceof Error && e.name === 'AbortError'
-      ? '连接超时，请检查网络或连接地址'
-      : e instanceof Error ? e.message : '连接失败，请检查配置'
-    return { success: false, error: message, latencyMs: Date.now() - started }
-  } finally {
-    clearTimeout(timer)
+  // 走真实 provider 路径：让 agent 子进程用与正式对话完全相同的 client/鉴权/baseURL/stream 行为做一次最小探测，
+  // 这样"测试连接"检验的就是用户真正会发送的请求形状，避免测试与真实使用形状漂移导致的假阳/假阴。
+  const isMify = resolvedCfg.providerId === 'mify'
+  const preset = getModelThinkingConfig(
+    resolvedCfg.providerId,
+    resolvedCfg.model,
+    isMify,
+    isMify ? resolvedCfg.customProviderId : undefined
+  )
+  const supportsThinking = preset?.supportsThinking === true
+  const agentConfig: AgentConfig = {
+    provider: resolvedCfg.apiFormat === 'anthropic' ? 'anthropic' : 'openai',
+    model: resolvedCfg.model,
+    apiKey: resolvedCfg.apiKey,
+    apiBaseUrl: resolvedCfg.apiBaseUrl || undefined,
+    maxIterations: 1,
+    workspaceDir: process.env.XLJ_WORKSPACE || join(app.getPath('documents'), '小蓝鲸产出'),
+    providerId: resolvedCfg.providerId,
+    apiFormat: resolvedCfg.apiFormat,
+    contextLimit: resolvedCfg.contextLimit,
+    customProviderId: resolvedCfg.customProviderId,
+    autoApproveLow: false,
+    thinkingLevel: 'off',
+    thinkingConfig: supportsThinking ? preset!.thinkingConfig : undefined
   }
+
+  return agentBridge.testModel(agentConfig)
 }
 
 function getActiveModelConfig(): ModelConfig | null {
@@ -256,6 +316,7 @@ function buildAgentConfig(): AgentConfig {
 let mainWindow: BrowserWindow | null = null
 let activeTaskId: string | null = null
 let activeTraceId: string | null = null
+const runtimeWakeLock = new RuntimeWakeLock(powerSaveBlocker)
 
 function getWindowIconPath(): string {
   const packagedIconPath = join(process.resourcesPath, 'build', 'icon.png')
@@ -299,6 +360,8 @@ function createWindow(): void {
     if (traceId) {
       logAgentEvent(traceId, msg)
       if (msg.type === 'completed' || msg.type === 'error' || (msg.type === 'turn_completed' && msg.status === 'cancelled')) {
+        const finishedTaskId = msg.type === 'completed' ? msg.task_id : taskId
+        if (finishedTaskId) runtimeWakeLock.taskFinished(finishedTaskId)
         activeTaskId = null
         activeTraceId = null
       }
@@ -322,6 +385,28 @@ if (process.env.ELECTRON_RENDERER_URL) {
 
 app.whenReady().then(() => {
   applyThemeMode(loadThemeMode())
+  // 解析 imported-asset://<assetId> 到 external-imports/assets/<assetId> 文件。
+  // assetId 形如 asset-<24位十六进制>，由导入流程稳定生成；非法的 id 直接返回 404，避免越权读取其他文件。
+  protocol.handle('imported-asset', async (request) => {
+    const assetId = request.url.hostname || request.url.pathname.replace(/^\/+/, '')
+    const store = getImportStore()
+    const filePath = store.assetPath(assetId)
+    if (!filePath) return new Response('资源不存在', { status: 404 })
+    try {
+      const info = await stat(filePath)
+      const mime = inferAssetMime(filePath)
+      return new Response(createReadStream(filePath) as unknown as BodyInit, {
+        status: 200, headers: { 'Content-Type': mime, 'Content-Length': String(info.size), 'Cache-Control': 'immutable, max-age=31536000' }
+      })
+    } catch {
+      return new Response('资源读取失败', { status: 404 })
+    }
+  })
+  agentBridge.onExit(() => {
+    runtimeWakeLock.releaseAll()
+    activeTaskId = null
+    activeTraceId = null
+  })
   agentBridge.start()
   createWindow()
 
@@ -331,8 +416,13 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
+  runtimeWakeLock.releaseAll()
   agentBridge.stop()
   if (process.platform !== 'darwin') app.quit()
+})
+
+app.on('before-quit', () => {
+  runtimeWakeLock.releaseAll()
 })
 
 // IPC 通道（依据 docs/09 第二章）
@@ -351,8 +441,6 @@ ipcMain.handle('agent:startTask', async (_e, args: { mode: 'work' | 'code'; mess
   if (args.maxIterations) config.maxIterations = args.maxIterations
   if (args.approvalMode) config.approvalMode = args.approvalMode
   if (args.autoApproveLow !== undefined) config.autoApproveLow = args.autoApproveLow
-  activeTaskId = sessionId
-  activeTraceId = traceId
   // 输出目录：优先用用户指定，否则用系统文档目录下的「小蓝鲸产出」
   const outputDir = args.workspaceDir || join(app.getPath('documents'), '小蓝鲸产出')
   startTrace(traceId, {
@@ -375,9 +463,19 @@ ipcMain.handle('agent:startTask', async (_e, args: { mode: 'work' | 'code'; mess
     historyCount: Array.isArray(args.history) ? args.history.length : 0,
     workspaceDir: outputDir
   })
-  if (!existsSync(outputDir)) mkdirSync(outputDir, { recursive: true })
-  agentBridge.startTask(sessionId, args.message, config, outputDir, args.history, args.attachments as MessageAttachment[] | undefined)
-  return { taskId: sessionId, traceId }
+  try {
+    if (!existsSync(outputDir)) mkdirSync(outputDir, { recursive: true })
+    activeTaskId = sessionId
+    activeTraceId = traceId
+    runtimeWakeLock.taskStarted(sessionId)
+    agentBridge.startTask(sessionId, args.message, config, outputDir, args.history, args.attachments as MessageAttachment[] | undefined)
+    return { taskId: sessionId, traceId }
+  } catch (error) {
+    runtimeWakeLock.taskFinished(sessionId)
+    activeTaskId = null
+    activeTraceId = null
+    return { taskId: sessionId, traceId, error: error instanceof Error ? error.message : String(error) }
+  }
 })
 
 ipcMain.handle('config:get', async (_e, key: string) => {
@@ -413,6 +511,11 @@ ipcMain.handle('config:get', async (_e, key: string) => {
   if (key === 'maxIterations') return (cfg as Record<string, unknown> | null)?.maxIterations ?? null
   if (key === 'themeMode') return loadThemeMode()
   return null
+})
+
+ipcMain.handle('power:setPreventSleepEnabled', async (_e, enabled: boolean) => {
+  runtimeWakeLock.setEnabled(enabled === true)
+  return { success: true, enabled: enabled === true }
 })
 
 ipcMain.handle('appearance:setThemeMode', async (_e, themeMode: ThemeMode) => {
@@ -619,6 +722,82 @@ ipcMain.handle('session:loadTurns', async (_e, sessionId: string) => {
     return Array.isArray(arr) ? arr : []
   } catch {
     return []
+  }
+})
+
+ipcMain.handle('externalImport:scan', async () => {
+  try {
+    const result = scanKnownSources()
+    const catalog = getImportStore().loadCatalog()
+    for (const source of result.preview.sources) {
+      const candidate = result.candidates.find((item) => item.source === source.id)
+      if (!candidate) continue
+      source.pending = countPending(candidate, catalog)
+    }
+    return { success: true, preview: result.preview }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : '检查资料失败' }
+  }
+})
+
+ipcMain.handle('externalImport:commit', async (_e, selection: ImportSelection) => {
+  let committed: Awaited<ReturnType<ImportStore['commit']>> | undefined
+  try {
+    const store = getImportStore()
+    const scanned = scanKnownSources()
+    const existing = store.loadCatalog()
+    const locallyChanged = new Set(existing.sessions
+      .filter((session) => store.hasVisibleSessionChanged(session.id, getSessionsDir()))
+      .map((session) => session.id))
+    committed = await store.commit(scanned.candidates, selection)
+    const changedIds = new Set([...committed.batch.createdSessionIds, ...committed.batch.updatedSessionIds])
+    for (const session of committed.sessions) {
+      if (changedIds.has(session.id) && !locallyChanged.has(session.id)) store.copySessionTo(session, getSessionsDir())
+    }
+    return { success: true, result: committed }
+  } catch (error) {
+    if (committed) {
+      return {
+        success: true,
+        result: committed,
+        warning: '资料已经保存，但部分内容暂时没有加入侧边栏；重新打开导入页面会自动补齐'
+      }
+    }
+    return { success: false, error: error instanceof Error ? error.message : '导入失败，原资料未改动' }
+  }
+})
+
+ipcMain.handle('externalImport:history', async () => {
+  try {
+    return { success: true, catalog: getImportStore().loadCatalog() }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : '读取导入记录失败' }
+  }
+})
+
+ipcMain.handle('externalImport:revert', async (_e, input: { batchId: string; protectedSessionIds?: string[] }) => {
+  try {
+    const store = getImportStore()
+    const catalog = store.loadCatalog()
+    const target = catalog.batches.find((batch) => batch.id === input.batchId)
+    const protectedIds = new Set(input.protectedSessionIds || [])
+    for (const change of target?.sessionChanges || []) {
+      if (store.hasVisibleSessionChanged(change.id, getSessionsDir())) protectedIds.add(change.id)
+    }
+    const result = store.revert(input.batchId, [...protectedIds])
+    const currentSessionIds = new Set(result.sessions.map((session) => session.id))
+    for (const change of result.batch.sessionChanges) {
+      if (currentSessionIds.has(change.id)) store.copySessionTo({ id: change.id }, getSessionsDir())
+      else {
+        for (const suffix of ['.json', '.turns.json']) {
+          const path = join(getSessionsDir(), `${change.id}${suffix}`)
+          if (existsSync(path)) unlinkSync(path)
+        }
+      }
+    }
+    return { success: true, result }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : '撤回失败' }
   }
 })
 
@@ -915,3 +1094,40 @@ ipcMain.handle('project:create', async (_e, name: string) => {
   mkdirSync(finalPath, { recursive: true })
   return finalPath
 })
+
+ipcMain.handle('project:branchInfo', (_e, workspaceDir: string): BranchInfoResult => {
+  if (!workspaceDir || !isAbsolute(workspaceDir)) return { success: false, error: '当前项目没有绑定本地文件夹' }
+  return getBranchInfo(workspaceDir)
+})
+
+ipcMain.handle('project:switchBranch', (_e, args: { workspaceDir: string; branchName: string }): BranchInfoResult => {
+  if (!args?.workspaceDir || !isAbsolute(args.workspaceDir)) return { success: false, error: '当前项目没有绑定本地文件夹' }
+  try {
+    runGit(args.workspaceDir, ['switch', '--', args.branchName])
+    return getBranchInfo(args.workspaceDir)
+  } catch (error) {
+    return { success: false, error: branchSwitchErrorMessage(error) }
+  }
+})
+
+ipcMain.handle('project:createBranch', (_e, args: { workspaceDir: string; branchName: string }): BranchInfoResult => {
+  if (!args?.workspaceDir || !isAbsolute(args.workspaceDir)) return { success: false, error: '当前项目没有绑定本地文件夹' }
+  const branchName = args.branchName?.trim()
+  if (!branchName) return { success: false, error: '请输入分支名称' }
+  try {
+    runGit(args.workspaceDir, ['check-ref-format', '--branch', branchName])
+    runGit(args.workspaceDir, ['switch', '-c', branchName])
+    return getBranchInfo(args.workspaceDir)
+  } catch (error) {
+    return { success: false, error: gitErrorMessage(error) }
+  }
+})
+
+ipcMain.handle('project:commitHistory', (_e, args: { workspaceDir: string; offset?: number; limit?: number }) =>
+  getCommitHistory(args?.workspaceDir, args?.offset, args?.limit))
+
+ipcMain.handle('project:commitDetail', (_e, args: { workspaceDir: string; hash: string }) =>
+  getCommitDetail(args?.workspaceDir, args?.hash))
+
+ipcMain.handle('project:commitDiff', (_e, args: { workspaceDir: string; fromHash: string; toHash?: string; filePath?: string }) =>
+  getCommitDiff(args?.workspaceDir, args?.fromHash, args?.toHash, args?.filePath))

@@ -8,7 +8,7 @@ categories:
     count: 8
   "02-cli-terminals":
     desc: CLI / 终端工具，纯命令行交互
-    count: 5
+    count: 6
   "03-cli-multi-form":
     desc: CLI 为主、多形态扩展，同代码库延伸桌面/Web/IDE
     count: 6
@@ -98,6 +98,9 @@ public_open_source:
   - name: qwenpaw
     url: https://github.com/agentscope-ai/QwenPaw.git
     category: "06-multi-platform-engine"
+  - name: momo-code
+    url: https://github.com/momozi1996/momo-code.git
+    category: "02-cli-terminals"
 
 local_learning:
   - name: claude-code-learning
@@ -113,7 +116,7 @@ renamed:
     note: Kun 改名前的旧名，已归入 01-desktop-apps/Kun，无需重复拉取。
 
 notes:
-  - 共 26 个本地参考项目：25 个公开开源项目 + 1 个本地学习项目。
+  - 共 27 个本地参考项目：26 个公开开源项目 + 1 个本地学习项目。
   - 所有源码仅供本地分析，不提交到当前仓库。
   - 后续小蓝鲸决策可以引用这些项目做对比，但不能直接复制源码。
   - 每个分类子目录含 _category.md 说明，根目录含 _category-index.md 总索引。

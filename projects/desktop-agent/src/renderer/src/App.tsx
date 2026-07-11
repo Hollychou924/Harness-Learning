@@ -7,13 +7,16 @@ import { RightPanel } from './components/RightPanel'
 import { SettingsDialog } from './components/settings/SettingsDialog'
 import { useSettingsStore } from './components/settings/settingsStore'
 import { api } from './api'
+import { ExternalImportReminder } from './components/ExternalImportReminder'
 
 export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [rightCollapsed, setRightCollapsed] = useState(false)
   const status = useTaskStore((s) => s.status)
   const themeMode = useSettingsStore((s) => s.themeMode)
+  const preventSystemSleep = useSettingsStore((s) => s.preventSystemSleep)
   const loadGeneral = useSettingsStore((s) => s.loadGeneral)
+  const mergeImportedData = useTaskStore((s) => s.mergeImportedData)
   const showRightToggle = status !== 'idle'
 
   useEffect(() => {
@@ -21,8 +24,22 @@ export default function App() {
   }, [loadGeneral])
 
   useEffect(() => {
+    void api.getExternalImportHistory().then((response) => {
+      if (response.success && response.catalog) {
+        mergeImportedData(response.catalog.projects, response.catalog.sessions)
+      }
+    }).catch(() => {
+      // Existing local projects remain available when import history cannot be read.
+    })
+  }, [mergeImportedData])
+
+  useEffect(() => {
     void api.setThemeMode(themeMode)
   }, [themeMode])
+
+  useEffect(() => {
+    void api.setPreventSleepEnabled(preventSystemSleep)
+  }, [preventSystemSleep])
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)')
@@ -52,6 +69,7 @@ export default function App() {
         onToggleRight={() => setRightCollapsed((v) => !v)}
       />
       <SettingsDialog />
+      <ExternalImportReminder />
 
       <button
         title={sidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'}

@@ -84,7 +84,7 @@ export function TurnItemsView({ turn, showThinking }: { turn: Turn; showThinking
   )
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-0.5">
       {shouldCollapse ? <CollapsedTurnBar turn={turn}>{processContent}</CollapsedTurnBar> : processContent}
     </div>
   )

@@ -6,11 +6,13 @@ import { GeneralSection } from './sections/GeneralSection'
 import { AboutSection } from './sections/AboutSection'
 import { DiagnosticsSection } from './sections/DiagnosticsSection'
 import { ArchivedSection } from './sections/ArchivedSection'
+import { ImportSection } from './sections/ImportSection'
 
 const NAV_ITEMS: { id: SettingsTab; label: string }[] = [
   { id: 'general', label: '通用' },
   { id: 'model', label: '模型' },
   { id: 'archived', label: '已归档' },
+  { id: 'import', label: '导入资料' },
   { id: 'diagnostics', label: '反馈' },
   { id: 'about', label: '关于' }
 ]
@@ -79,6 +81,7 @@ export function SettingsDialog() {
             {activeTab === 'general' && <GeneralSection />}
             {activeTab === 'about' && <AboutSection />}
             {activeTab === 'archived' && <ArchivedSection />}
+            {activeTab === 'import' && <ImportSection />}
             {activeTab === 'diagnostics' && <DiagnosticsSection />}
           </div>
         </div>

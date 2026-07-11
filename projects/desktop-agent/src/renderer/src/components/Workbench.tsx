@@ -176,7 +176,7 @@ function RunningView({ summary, status }: { summary: string; status: string }) {
  * 点击历史对话后，从这里"像没离开过一样"继续聊
  * ============================================================ */
 function ConversationView({ status }: { status: string }) {
-  const { turns, currentTurn, goal, message, startedAt } = useTaskStore()
+  const { turns, currentTurn, goal, message, startedAt, taskId } = useTaskStore()
   const liveUserDraft = userDraftFromTurn(currentTurn) || { text: goal || message, attachments: [] }
   const { showThinking } = useSettingsStore()
   const liveRevision = currentTurn?.items.map((item) => {
@@ -186,6 +186,10 @@ function ConversationView({ status }: { status: string }) {
     return item.id
   }).join('|') || ''
   const scrollRef = useRef<HTMLDivElement>(null)
+  const staysAtBottomRef = useRef(true)
+  const pendingJumpRef = useRef<string | null>(null)
+  const timeline = useTimelineScroll(turns.length)
+  const [activeTurnId, setActiveTurnId] = useState<string | null>(turns[turns.length - 1]?.id || null)
   const [toast, setToast] = useState<string | null>(null)
   const showToast = (text: string) => {
     setToast(text)
@@ -193,32 +197,86 @@ function ConversationView({ status }: { status: string }) {
   }
 
   useEffect(() => {
-    if (scrollRef.current) {
+    if (scrollRef.current && staysAtBottomRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }, [turns.length, liveRevision, status])
 
+  useEffect(() => {
+    pendingJumpRef.current = null
+    staysAtBottomRef.current = true
+    setActiveTurnId(turns[turns.length - 1]?.id || null)
+  }, [taskId])
+
+  useEffect(() => {
+    const turnId = pendingJumpRef.current
+    const container = scrollRef.current
+    if (!turnId || !container) return
+    const target = container.querySelector(`[data-turn-id="${CSS.escape(turnId)}"]`)
+    if (!(target instanceof HTMLElement)) return
+
+    pendingJumpRef.current = null
+    const containerTop = container.getBoundingClientRect().top
+    const targetTop = target.getBoundingClientRect().top
+    container.scrollTo({ top: container.scrollTop + targetTop - containerTop - 24, behavior: 'smooth' })
+    target.classList.add('turn-jump-highlight')
+    window.setTimeout(() => target.classList.remove('turn-jump-highlight'), 900)
+  }, [timeline.visibleTurnCount])
+
   // 本轮正在进行：currentTurn 存在时才走实时渲染；完成后 currentTurn 置空并入 turns，交由历史轮统一渲染，避免重复
   const isLiveTurn = Boolean(currentTurn)
 
-  // 点击导航条刻度：滚动定位到对应轮次，并高亮闪一下
   const handleJump = (turnId: string) => {
     const container = scrollRef.current
     if (!container) return
-    const target = container.querySelector(`[data-turn-id="${turnId}"]`)
-    if (target instanceof HTMLElement) {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      target.classList.add('turn-jump-highlight')
-      window.setTimeout(() => target.classList.remove('turn-jump-highlight'), 1200)
+    const turnIndex = turns.findIndex((turn) => turn.id === turnId)
+    if (turnIndex < 0) return
+
+    pendingJumpRef.current = turnId
+    setActiveTurnId(turnId)
+    timeline.revealTurn(turnIndex)
+
+    // 目标原本已显示时，轮次数不变化，直接完成定位。
+    const target = container.querySelector(`[data-turn-id="${CSS.escape(turnId)}"]`)
+    if (!(target instanceof HTMLElement)) return
+    pendingJumpRef.current = null
+    const containerTop = container.getBoundingClientRect().top
+    const targetTop = target.getBoundingClientRect().top
+    container.scrollTo({ top: container.scrollTop + targetTop - containerTop - 24, behavior: 'smooth' })
+    target.classList.add('turn-jump-highlight')
+    window.setTimeout(() => target.classList.remove('turn-jump-highlight'), 900)
+  }
+
+  const handleConversationScroll = () => {
+    const container = scrollRef.current
+    if (!container) return
+    staysAtBottomRef.current = container.scrollHeight - container.scrollTop - container.clientHeight < 48
+
+    const readingLine = container.getBoundingClientRect().top + 80
+    const targets = Array.from(container.querySelectorAll<HTMLElement>('[data-turn-id]'))
+    let current = targets[0]
+    for (const target of targets) {
+      if (target.getBoundingClientRect().top <= readingLine) current = target
+      else break
     }
+    if (current?.dataset.turnId) setActiveTurnId(current.dataset.turnId)
   }
 
   return (
     <div className="flex h-full min-h-0 overflow-hidden">
-      {/* 左侧跨轮导航条：超过 3 轮才出现 */}
-      <TurnNavigator turns={turns} onJump={handleJump} />
-      <div ref={scrollRef} className="flex-1 w-full max-w-4xl mx-auto px-6 py-6 space-y-4 overflow-y-auto h-full">
-        <TimelinePaged turns={turns} showThinking={showThinking} status={status} showToast={showToast} />
+      <TurnNavigator turns={turns} activeTurnId={activeTurnId} onJump={handleJump} />
+      <div ref={scrollRef} onScroll={handleConversationScroll} className="flex-1 w-full max-w-4xl mx-auto px-6 py-6 space-y-4 overflow-y-auto h-full">
+        <TimelinePaged
+          turns={turns}
+          showThinking={showThinking}
+          status={status}
+          showToast={showToast}
+          visibleTurnCount={timeline.visibleTurnCount}
+          hasHidden={timeline.hasHidden}
+          shouldShowCollapseButton={timeline.shouldShowCollapseButton}
+          loadEarlier={timeline.loadEarlier}
+          collapseEarlier={timeline.collapseEarlier}
+        />
         {/* 本轮用户消息气泡 */}
         {isLiveTurn && hasUserDraft(liveUserDraft) && (
           <UserMessageBubble
@@ -269,7 +327,7 @@ function HistoryTurnView({
   const { ref, shouldRender } = useDeferredRender<HTMLDivElement>({ rootMargin: '300px' })
 
   return (
-    <div ref={ref} data-turn-id={turn.id} className="space-y-3 turn-target">
+    <div ref={ref} data-turn-id={turn.id} className="space-y-1 turn-target">
       {userDraft && hasUserDraft(userDraft) && (
         <UserMessageBubble
           draft={userDraft}
@@ -357,7 +415,7 @@ function TurnContentFlow({
   }
 
   flushProcess('process-tail')
-  return <div className="space-y-3">{blocks}</div>
+  return <div className="space-y-1">{blocks}</div>
 }
 
 /** 虚拟分页的历史轮次渲染：超阈值自动折叠，可手动加载/折叠更早轮次（来自 Kun） */
@@ -365,14 +423,23 @@ function TimelinePaged({
   turns,
   showThinking,
   status,
-  showToast
+  showToast,
+  visibleTurnCount,
+  hasHidden,
+  shouldShowCollapseButton,
+  loadEarlier,
+  collapseEarlier
 }: {
   turns: Turn[]
   showThinking: boolean
   status: string
   showToast: (text: string) => void
+  visibleTurnCount: number
+  hasHidden: boolean
+  shouldShowCollapseButton: boolean
+  loadEarlier: () => void
+  collapseEarlier: () => void
 }) {
-  const { visibleTurnCount, hasHidden, shouldShowCollapseButton, loadEarlier, collapseEarlier } = useTimelineScroll(turns.length)
   const hiddenCount = Math.max(0, turns.length - visibleTurnCount)
   const visibleTurns = hasHidden ? turns.slice(hiddenCount) : turns
 
