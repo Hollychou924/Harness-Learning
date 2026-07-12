@@ -453,6 +453,12 @@ function saveSessionsToStorage(s: Session[]) {
   }
 }
 
+/** 新会话插到列表最前，其余 order 顺延，保证侧边栏「最新在上」 */
+function prependSession(sessions: Session[], session: Session): Session[] {
+  const rest = sessions.filter((s) => s.id !== session.id).map((s, i) => ({ ...s, order: i + 1 }))
+  return [{ ...session, order: 0 }, ...rest]
+}
+
 function saveImportedListsOrRestore(projects: Project[], sessions: Session[]): void {
   const previousProjects = localStorage.getItem(PROJECTS_KEY)
   const previousSessions = localStorage.getItem(SESSIONS_KEY)
@@ -793,7 +799,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       lastReadAt: now,
       unread: false
     }
-    const next = [session, ...get().sessions]
+    const next = prependSession(get().sessions, session)
     saveSessionsToStorage(next)
     set({ sessions: next, activeSessionId: session.id })
     return session.id
@@ -868,11 +874,20 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   },
   markSessionRead: (sessionId, read = true) => {
     const now = Date.now()
-    const next = get().sessions.map((s) =>
-      s.id === sessionId
-        ? { ...s, lastReadAt: read ? now : s.lastReadAt, unread: !read, updatedAt: now }
-        : s
-    )
+    const next = get().sessions.map((s) => {
+      if (s.id !== sessionId) return s
+      if (read) {
+        // 已读：两条通道一起清掉，避免 explicit / timeBased 拧巴
+        return { ...s, lastReadAt: now, unread: false, updatedAt: now }
+      }
+      // 未读：显式标记，并保证 lastMessageAt >= lastReadAt，timeBased 也能成立
+      return {
+        ...s,
+        unread: true,
+        lastMessageAt: Math.max(s.lastMessageAt ?? 0, (s.lastReadAt ?? 0) + 1, now),
+        updatedAt: now
+      }
+    })
     saveSessionsToStorage(next)
     set({ sessions: next })
   },
@@ -1101,11 +1116,25 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     }
   },
   respondContinuation: async (decision: 'continue' | 'stop' | 'split') => {
-    const { continuationPending, taskId } = get()
+    const { continuationPending, taskId, summary, message, activeProjectId, sessions } = get()
     if (continuationPending && taskId) {
       await api.sendContinuationResponse(taskId, decision)
       set({ continuationPending: null })
       setSessionPendingAction(set, get, get().activeSessionId, null)
+      if (decision === 'split') {
+        const parent = sessions.find((s) => s.id === taskId)
+        const goalSeed =
+          (summary && summary.trim().slice(0, 240)) ||
+          (message && message.trim().slice(0, 240)) ||
+          '请基于上一任务的未完成部分继续，拆成更小可验证步骤。'
+        const newId = get().createSession(activeProjectId || parent?.projectId)
+        const title = `拆分自：${(parent?.title || '对话').slice(0, 24)}`
+        get().renameSession(newId, title)
+        set({
+          message: `【接力拆分】上一任务已达步数上限。请继续完成剩余目标：\n${goalSeed}`,
+          status: 'idle'
+        })
+      }
     }
   },
   appendEvent: (msg) => {
@@ -1170,7 +1199,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
             if (sess) {
               const isActive = gs.activeSessionId === evTaskId
               const now = Date.now()
-              const nextSessions = gs.sessions.map((x) => x.id === evTaskId ? { ...x, status: 'completed' as TaskStatus, updatedAt: now, stepCount: finishedTurns.length, tokens: base.usage.inputTokens + base.usage.outputTokens, title: x.title && x.title !== '新对话' ? x.title : (assistantText.slice(0, 40) || x.title), lastMessageAt: isActive ? x.lastMessageAt : now, pendingAction: null } : x)
+              const nextSessions = gs.sessions.map((x) => x.id === evTaskId ? { ...x, status: 'completed' as TaskStatus, updatedAt: now, stepCount: finishedTurns.length, tokens: base.usage.inputTokens + base.usage.outputTokens, title: x.title && x.title !== '新对话' ? x.title : (assistantText.slice(0, 40) || x.title), lastMessageAt: isActive ? x.lastMessageAt : now, lastReadAt: isActive ? now : x.lastReadAt, unread: isActive ? false : x.unread, pendingAction: null } : x)
               saveSessionsToStorage(nextSessions)
               set({ sessions: nextSessions })
             }
@@ -1416,7 +1445,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
           startedAt: startNow,
           titleAuto: true
         }
-        const nextSessions = [newSess, ...cur2.sessions]
+        const nextSessions = prependSession(cur2.sessions, newSess)
         saveSessionsToStorage(nextSessions)
         set({ sessions: nextSessions })
         // 新对话立刻落盘用户消息，防止丢失
@@ -1467,7 +1496,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       finishedAt: source.finishedAt || now,
       durationMs: forkTurns[0]?.startedAt ? (source.finishedAt || now) - forkTurns[0].startedAt : undefined
     }
-    const nextSessions = [session, ...cur.sessions.map((s, i) => ({ ...s, order: i + 1 }))]
+    const nextSessions = prependSession(cur.sessions, session)
     saveSessionsToStorage(nextSessions)
     await api.saveSessionMessages(session.id, forkMessages)
     await api.saveSessionTurns(session.id, forkTurns)
@@ -1510,14 +1539,16 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     // 切到目标：优先从 runningTasks 恢复运行时（任务还在跑），否则读盘恢复历史(消息+轮次)
     const rt = get().runningTasks[sessionId]
     const sess = get().sessions.find((s) => s.id === sessionId)
+    // 切到这条会话即视为已读（含后台仍在跑的任务）
+    const readNow = Date.now()
+    const nextSessionsRead = get().sessions.map((s) =>
+      s.id === sessionId ? { ...s, lastReadAt: readNow, unread: false } : s
+    )
+    saveSessionsToStorage(nextSessionsRead)
     if (rt && rt.status === 'executing') {
-      set({ ...initial, ...rt, messages: cur.messages, messageQueues: get().messageQueues, mode: sess?.mode || cur.mode, activeSessionId: sessionId, activeProjectId: sess?.projectId || cur.activeProjectId, taskId: sessionId, goal: sess?.title || '', runningTasks: get().runningTasks, projects: get().projects, sessions: get().sessions, history: get().history })
+      set({ ...initial, ...rt, messages: cur.messages, messageQueues: get().messageQueues, mode: sess?.mode || cur.mode, activeSessionId: sessionId, activeProjectId: sess?.projectId || cur.activeProjectId, taskId: sessionId, goal: sess?.title || '', runningTasks: get().runningTasks, projects: get().projects, sessions: nextSessionsRead, history: get().history })
     } else {
-      // 切到这条会话即视为已读
-      const now = Date.now()
-      const nextSessions = get().sessions.map((s) => s.id === sessionId ? { ...s, lastReadAt: now, unread: false } : s)
-      saveSessionsToStorage(nextSessions)
-      set({ sessions: nextSessions })
+      set({ sessions: nextSessionsRead })
       const [stored, storedTurns] = await Promise.all([
         api.loadSessionMessages(sessionId) as Promise<AgentMessage[]>,
         api.loadSessionTurns(sessionId) as Promise<Turn[]>
@@ -1550,7 +1581,8 @@ function scheduleQueueDispatch(sessionId: string): void {
 }
 
 /** 更新某条会话的待确认状态，并落盘。action 传 null/undefined 表示清除。
- *  用于审批/提问/计划/续跑等待用户输入时，在侧边栏给出醒目提示（即便用户在别的项目）。 */
+ *  用于审批/提问/计划/续跑等待用户输入时，在侧边栏给出醒目提示（即便用户在别的项目）。
+ *  未读规则：仅后台会话 bump lastMessageAt；前台正在看则同步已读，避免「人在看仍蓝点」。 */
 function setSessionPendingAction(
   set: (partial: Partial<TaskState> | ((s: TaskState) => Partial<TaskState>)) => void,
   get: () => TaskState,
@@ -1559,11 +1591,17 @@ function setSessionPendingAction(
 ) {
   if (!sessionId) return
   const now = Date.now()
-  const next = get().sessions.map((s) =>
-    s.id === sessionId
-      ? { ...s, pendingAction: action ?? null, lastMessageAt: action ? now : s.lastMessageAt }
-      : s
-  )
+  const isActive = get().activeSessionId === sessionId
+  const next = get().sessions.map((s) => {
+    if (s.id !== sessionId) return s
+    if (action) {
+      if (isActive) {
+        return { ...s, pendingAction: action, lastReadAt: now, unread: false }
+      }
+      return { ...s, pendingAction: action, lastMessageAt: now }
+    }
+    return { ...s, pendingAction: null }
+  })
   saveSessionsToStorage(next)
   set({ sessions: next })
 }
@@ -1610,6 +1648,7 @@ function titleLooksSuspect(title: string): boolean {
   const t = String(title || '').trim()
   if (!t) return true
   if (t === '新对话' || t === '新任务' || t === '新路线') return true
+  if (/^#?\s*Files mentioned by the user/i.test(t) || /^My request for Codex/i.test(t)) return true
   if (/^【(图片|文档)\s/.test(t) || /^【[^】]+】$/.test(t)) return true
   if (FILENAME_LIKE_RE.test(t) && !/[\u4e00-\u9fa5]/.test(t)) return true
   return false
@@ -1638,8 +1677,17 @@ function titleNeedsReconcile(title: string, firstUserText: string): boolean {
 }
 
 /** 从单条 user 消息提取可用文本：正文优先，其次附件 textContent。 */
+function stripCodexFilesMentionedForDisplay(text: string): string {
+  if (!/(?:^|\n)#?\s*Files mentioned by the user:/i.test(text)) return text
+  const myRequest = text.match(/##\s*My request for Codex:\s*/i)
+  const next = myRequest && myRequest.index !== undefined
+    ? text.slice(myRequest.index + myRequest[0].length)
+    : text.replace(/(?:^|\n)#?\s*Files mentioned by the user:[^\n]*\n(?:##\s+[^\n]+\n)*/i, '\n')
+  return next.replace(/<image\b[^>]*>/gi, '').replace(/\n{3,}/g, '\n\n').trim()
+}
+
 function userTextFromMessage(m: AgentMessage): string {
-  const base = typeof m.content === 'string' ? m.content.trim() : ''
+  const base = typeof m.content === 'string' ? stripCodexFilesMentionedForDisplay(m.content.trim()) : ''
   if (base) return base
   const fromAttach = (m.attachments || [])
     .map((a) => a.textContent?.trim())
@@ -1737,7 +1785,21 @@ function pushHistory(
   if (existing) {
     nextSessions = s.sessions.map((sess) =>
       sess.id === entry.id
-        ? { ...sess, title: entry.title, status: entry.status, updatedAt: now, stepCount: entry.stepCount, tokens: entry.tokens, startedAt: s.startedAt ?? sess.startedAt, finishedAt: entry.finishedAt, durationMs: s.startedAt ? entry.finishedAt - s.startedAt : sess.durationMs, lastMessageAt: isActive ? sess.lastMessageAt : now, unread: isActive ? sess.unread : (sess.unread ?? false) }
+        ? {
+            ...sess,
+            title: entry.title,
+            status: entry.status,
+            updatedAt: now,
+            stepCount: entry.stepCount,
+            tokens: entry.tokens,
+            startedAt: s.startedAt ?? sess.startedAt,
+            finishedAt: entry.finishedAt,
+            durationMs: s.startedAt ? entry.finishedAt - s.startedAt : sess.durationMs,
+            // 前台看完：清未读；后台完成：bump lastMessageAt 触发未读
+            lastMessageAt: isActive ? sess.lastMessageAt : now,
+            lastReadAt: isActive ? now : sess.lastReadAt,
+            unread: isActive ? false : (sess.unread ?? false)
+          }
         : sess
     )
   } else {
@@ -1761,7 +1823,7 @@ function pushHistory(
       lastMessageAt: isActive ? undefined : entry.finishedAt,
       unread: false
     }
-    nextSessions = [newSession, ...s.sessions]
+    nextSessions = prependSession(s.sessions, newSession)
   }
   saveSessionsToStorage(nextSessions)
   set({ history: next, sessions: nextSessions })

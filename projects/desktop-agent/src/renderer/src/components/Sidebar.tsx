@@ -12,14 +12,14 @@ import {
   Trash2,
   FolderPlus,
   Folder,
+  FolderOpen,
   Puzzle,
   ChevronDown,
   ChevronRight,
   ChevronUp,
-  Circle,
   MailOpen,
   Mail,
-  Bell,
+  MoreHorizontal,
 } from 'lucide-react'
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useTaskStore, type Session, type Project, DEFAULT_PROJECT_ID } from '../store/task'
@@ -109,7 +109,8 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
 
   const sessionsOf = (pid: string) => {
     const list = sessions.filter((s) => s.projectId === pid && !s.archived)
-    return [...list].sort((a, b) => Number(b.pinned) - Number(a.pinned) || (b.pinnedAt ?? 0) - (a.pinnedAt ?? 0) || b.order - a.order || b.updatedAt - a.updatedAt)
+    // 置顶优先；其余按 order 升序（拖拽写入的下标），同 order 再按更新时间倒序——新建对话 order=0 应在最前
+    return [...list].sort((a, b) => Number(b.pinned) - Number(a.pinned) || (b.pinnedAt ?? 0) - (a.pinnedAt ?? 0) || a.order - b.order || b.updatedAt - a.updatedAt)
   }
 
 
@@ -149,19 +150,27 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
     setDragSessionId(null); setDragOverId(null)
   }
 
+  const startProjectChat = (projectId: string) => {
+    store.setActiveProject(projectId)
+    // 确保项目展开，方便看到随后落进去的新对话
+    setProjectCollapsed((m) => ({ ...m, [projectId]: false }))
+    reset()
+  }
+
   const renderProjectBlock = (p: Project) => {
     const expanded = isExpanded(p)
     const list = sessionsOf(p.id)
     const isDefault = p.id === DEFAULT_PROJECT_ID
-    const hasPending = list.some((s) => s.pendingAction)
+    const attention = getProjectAttention(list, activeSessionId)
     return (
       <div key={p.id} className="space-y-0.5">
         <ProjectRow
           project={p}
           expanded={expanded}
-          hasPending={hasPending}
+          attention={attention}
           onToggle={() => toggleCollapse(p.id)}
           onActivate={() => store.setActiveProject(p.id)}
+          onNewChat={() => startProjectChat(p.id)}
           onRename={isDefault ? null : () => { setRenamingProject(p.id); setNewProjectName(p.name) }}
           onDelete={isDefault ? null : () => { if (confirm(`删除项目「${p.name}」及其下所有对话？`)) store.deleteProject(p.id) }}
           onTogglePin={isDefault ? null : () => store.togglePinProject(p.id)}
@@ -171,7 +180,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
         {expanded && (
           <>
             {list.length === 0 && (
-              <p className="pl-7 py-1 text-[11px] text-[var(--ink-soft)]/60">暂无对话</p>
+              <p className="pl-2.5 py-1 text-[11px] text-[var(--ink-soft)]/60">暂无对话</p>
             )}
             {(expandedAll[p.id] ? list : list.slice(0, SESSION_VISIBLE_DEFAULT)).map((s) => (
               <SessionRow
@@ -189,13 +198,13 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
             ))}
             {!expandedAll[p.id] && list.length > SESSION_VISIBLE_DEFAULT && (
               <button onClick={() => setExpandedAll((m) => ({ ...m, [p.id]: true }))}
-                className="w-full flex items-center gap-1 pl-7 pr-2 py-1 text-[11px] text-[var(--ink-soft)]/70 hover:text-[var(--ink-soft)] transition">
+                className="w-full flex items-center gap-1 pl-2.5 pr-1 py-1 text-[11px] text-[var(--ink-soft)]/70 hover:text-[var(--ink-soft)] transition">
                 <ChevronDown size={11} /> 展开显示 {list.length - SESSION_VISIBLE_DEFAULT} 条
               </button>
             )}
             {expandedAll[p.id] && list.length > SESSION_VISIBLE_DEFAULT && (
               <button onClick={() => setExpandedAll((m) => ({ ...m, [p.id]: false }))}
-                className="w-full flex items-center gap-1 pl-7 pr-2 py-1 text-[11px] text-[var(--ink-soft)]/70 hover:text-[var(--ink-soft)] transition">
+                className="w-full flex items-center gap-1 pl-2.5 pr-1 py-1 text-[11px] text-[var(--ink-soft)]/70 hover:text-[var(--ink-soft)] transition">
                 <ChevronUp size={11} /> 收起
               </button>
             )}
@@ -231,7 +240,7 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
         onRename={(id, title) => setRenamingSession({ id, title })} />
 
       {/* 主体列表：按项目分组，项目下对话按时间倒序（最新在前） */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 pb-2 space-y-1">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden pl-3 pr-1.5 pb-2 space-y-1">
         {pinnedProjects.length > 0 && (
           <div className="space-y-0.5">
             <SectionLabel
@@ -284,19 +293,18 @@ export function Sidebar({ collapsed }: { collapsed: boolean }) {
                       onDrop={(e) => handleDrop(e, s.id, DEFAULT_PROJECT_ID)}
                       isDragging={dragSessionId === s.id}
                       isDragOver={dragOverId === s.id}
-                      compact
                       onRename={() => setRenamingSession({ id: s.id, title: s.title })}
                     />
                   ))}
                   {!expandedAll[DEFAULT_PROJECT_ID] && list.length > SESSION_VISIBLE_DEFAULT && (
                     <button onClick={() => setExpandedAll((m) => ({ ...m, [DEFAULT_PROJECT_ID]: true }))}
-                      className="w-full flex items-center gap-1 pl-2.5 pr-2 py-1 text-[11px] text-[var(--ink-soft)]/70 hover:text-[var(--ink-soft)] transition">
+                      className="w-full flex items-center gap-1 pl-2.5 pr-1 py-1 text-[11px] text-[var(--ink-soft)]/70 hover:text-[var(--ink-soft)] transition">
                       <ChevronDown size={11} /> 展开显示 {list.length - SESSION_VISIBLE_DEFAULT} 条
                     </button>
                   )}
                   {expandedAll[DEFAULT_PROJECT_ID] && list.length > SESSION_VISIBLE_DEFAULT && (
                     <button onClick={() => setExpandedAll((m) => ({ ...m, [DEFAULT_PROJECT_ID]: false }))}
-                      className="w-full flex items-center gap-1 pl-2.5 pr-2 py-1 text-[11px] text-[var(--ink-soft)]/70 hover:text-[var(--ink-soft)] transition">
+                      className="w-full flex items-center gap-1 pl-2.5 pr-1 py-1 text-[11px] text-[var(--ink-soft)]/70 hover:text-[var(--ink-soft)] transition">
                       <ChevronUp size={11} /> 收起
                     </button>
                   )}
@@ -375,13 +383,13 @@ function PinnedDropZone({ sessions, activeId, onClick, onDrop, onDragOver, isDra
 }) {
   if (sessions.length === 0) return null
   return (
-    <div className={`px-3 pb-1 ${isDragOver ? 'bg-amber-50/50 rounded-lg' : ''}`}
+    <div className={`pl-3 pr-1.5 pb-1 ${isDragOver ? 'bg-amber-50/50 rounded-lg' : ''}`}
       onDragOver={onDragOver} onDrop={onDrop}>
       <SectionLabel label="置顶对话" collapsed={collapsed} onToggle={onToggle} />
       {!collapsed && (
         <div className="space-y-0.5">
           {sessions.map((s) => (
-            <SessionRow key={s.id} session={s} active={s.id === activeId} onClick={() => onClick(s.id)} compact onRename={() => onRename?.(s.id, s.title)} />
+            <SessionRow key={s.id} session={s} active={s.id === activeId} onClick={() => onClick(s.id)} onRename={() => onRename?.(s.id, s.title)} />
           ))}
         </div>
       )}
@@ -417,35 +425,138 @@ function SectionLabel({ label, action, collapsed, onToggle }: { label: string; a
   )
 }
 
+/* ---- 待确认文案 / 未读 / 项目折叠汇总 ---- */
+const PENDING_ACTION_LABEL: Record<NonNullable<Session['pendingAction']>, string> = {
+  approval: '待审批',
+  question: '待回答',
+  plan: '待审阅',
+  continuation: '待继续'
+}
+
+function isUnread(session: Session): boolean {
+  if (session.unread === true) return true
+  return Boolean(session.lastMessageAt && (session.lastReadAt ?? 0) < session.lastMessageAt)
+}
+
+type ProjectAttention =
+  | { kind: 'pending'; count: number; tooltip: string }
+  | { kind: 'running'; count: number; tooltip: string }
+  | { kind: 'unread'; count: number; tooltip: string }
+
+/** 折叠项目行右侧单一信号：待确认 > 进行中 > 未读 */
+function getProjectAttention(sessions: Session[], activeSessionId: string | null): ProjectAttention | null {
+  const pendingList = sessions.filter((s) => s.pendingAction)
+  if (pendingList.length > 0) {
+    const counts: Partial<Record<NonNullable<Session['pendingAction']>, number>> = {}
+    for (const s of pendingList) {
+      const key = s.pendingAction!
+      counts[key] = (counts[key] ?? 0) + 1
+    }
+    const tooltip = (Object.keys(PENDING_ACTION_LABEL) as Array<keyof typeof PENDING_ACTION_LABEL>)
+      .filter((k) => counts[k])
+      .map((k) => `${PENDING_ACTION_LABEL[k]} ${counts[k]}`)
+      .join(' · ')
+    return { kind: 'pending', count: pendingList.length, tooltip }
+  }
+
+  const runningCount = sessions.filter((s) => s.status === 'executing').length
+  if (runningCount > 0) {
+    return { kind: 'running', count: runningCount, tooltip: `${runningCount} 个对话进行中` }
+  }
+
+  const unreadCount = sessions.filter(
+    (s) => s.id !== activeSessionId && s.status !== 'executing' && isUnread(s)
+  ).length
+  if (unreadCount > 0) {
+    return { kind: 'unread', count: unreadCount, tooltip: `${unreadCount} 条未读` }
+  }
+
+  return null
+}
+
 /* ---- 项目行 ---- */
-function ProjectRow({ project, expanded, hasPending, onToggle, onActivate, onRename, onDelete, onTogglePin, onArchiveAll, onMarkAllRead }: {
-  project: Project; expanded: boolean; hasPending?: boolean; onToggle: () => void; onActivate: () => void
+function ProjectRow({ project, expanded, attention, onToggle, onActivate, onNewChat, onRename, onDelete, onTogglePin, onArchiveAll, onMarkAllRead }: {
+  project: Project; expanded: boolean; attention: ProjectAttention | null; onToggle: () => void; onActivate: () => void
+  onNewChat: () => void
   onRename: (() => void) | null; onDelete: (() => void) | null
   onTogglePin: (() => void) | null; onArchiveAll: (() => void) | null
   onMarkAllRead?: () => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const showSummary = !expanded && attention
   return (
     <div
       className="group relative flex items-center rounded-[10px] hover:bg-black/[0.04] transition"
       onContextMenu={(e) => { e.preventDefault(); setMenuOpen(true) }}
     >
       <button onClick={() => { onActivate(); onToggle() }}
-        className="flex-1 flex items-center gap-2.5 px-2.5 py-1.5 text-left min-w-0">
+        className="flex-1 flex items-center gap-2.5 px-2.5 py-1.5 pr-14 text-left min-w-0">
         <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">
-          <Folder size={15} className="text-[var(--ink-soft)]" />
+          {expanded
+            ? <FolderOpen size={15} className="text-[var(--ink-soft)]" />
+            : <Folder size={15} className="text-[var(--ink-soft)]" />}
         </span>
         <span className="flex-1 text-[12px] font-medium text-[var(--ink)] truncate">{project.name}</span>
-        {hasPending && (
-          <WhaleTooltip label="有待确认的对话">
-            <span className="inline-flex items-center justify-center w-4 h-4 flex-shrink-0">
-              <Bell size={11} className="text-amber-500 animate-pulse" />
-            </span>
-          </WhaleTooltip>
+        {!showSummary && project.pinned && (
+          <Pin size={10} className="text-amber-400 flex-shrink-0 group-hover:opacity-0" />
         )}
-        {project.pinned && <Pin size={10} className="text-amber-400 flex-shrink-0" />}
-        {expanded ? <ChevronDown size={13} className="text-[var(--ink-soft)] flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100" /> : <ChevronRight size={13} className="text-[var(--ink-soft)] flex-shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />}
       </button>
+      {/* 折叠时右侧汇总：待确认 > 进行中 > 未读；悬停让位给操作 */}
+      {showSummary && (
+        <div className="absolute right-0.5 top-1/2 z-[5] flex h-6 -translate-y-1/2 items-center gap-1 transition-opacity group-hover:pointer-events-none group-hover:opacity-0">
+          {attention.kind === 'pending' && (
+            <WhaleTooltip label={attention.tooltip}>
+              <span className="inline-flex h-[18px] flex-shrink-0 items-center gap-1 rounded-full bg-amber-400/20 px-1.5 text-[11px] font-medium text-amber-600">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                {attention.count > 1 ? `待确认 · ${attention.count}` : '待确认'}
+              </span>
+            </WhaleTooltip>
+          )}
+          {attention.kind === 'running' && (
+            <WhaleTooltip label={attention.tooltip}>
+              <span className="inline-flex items-center gap-1">
+                <RunningIndicator size={12} />
+                {attention.count > 1 && (
+                  <span className="text-[11px] tabular-nums text-[var(--ink-soft)]/70">{attention.count}</span>
+                )}
+              </span>
+            </WhaleTooltip>
+          )}
+          {attention.kind === 'unread' && (
+            <WhaleTooltip label={attention.tooltip}>
+              {attention.count >= 2 ? (
+                <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-blue-500 px-1 text-[10px] font-semibold text-white">
+                  {attention.count > 99 ? '99+' : attention.count}
+                </span>
+              ) : (
+                <span className="h-2 w-2 flex-shrink-0 rounded-full bg-blue-500" aria-label="未读" />
+              )}
+            </WhaleTooltip>
+          )}
+          {project.pinned && <Pin size={9} className="flex-shrink-0 text-amber-400" />}
+        </div>
+      )}
+      {/* 悬停操作：… 菜单 + 新对话，贴在标题最右侧 */}
+      <div className="absolute right-0.5 top-1/2 z-10 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+        <WhaleTooltip label="更多操作">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setMenuOpen(true) }}
+            className="flex h-6 w-6 items-center justify-center rounded-md text-[var(--ink-soft)] transition hover:bg-black/[0.08] hover:text-[var(--ink)]"
+          >
+            <MoreHorizontal size={14} />
+          </button>
+        </WhaleTooltip>
+        <WhaleTooltip label="新对话">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onNewChat() }}
+            className="flex h-6 w-6 items-center justify-center rounded-md text-[var(--ink-soft)] transition hover:bg-black/[0.08] hover:text-[var(--ink)]"
+          >
+            <MessageSquarePlus size={14} />
+          </button>
+        </WhaleTooltip>
+      </div>
       {menuOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
@@ -483,44 +594,31 @@ function ProjectRow({ project, expanded, hasPending, onToggle, onActivate, onRen
 }
 
 /* ---- 单条对话行 ---- */
-
-/* 待确认动作 → 侧边栏右侧胶囊文案。比泛泛"待确认"更具体，用户一眼知道要做什么 */
-const PENDING_ACTION_LABEL: Record<NonNullable<Session['pendingAction']>, string> = {
-  approval: '待审批',
-  question: '待回答',
-  plan: '待审阅',
-  continuation: '待继续'
-}
-
-/* ---- 未读判断：优先使用显式未读标记，否则按时间比较 ---- */
-function isUnread(session: Session): boolean {
-  const explicit = session.unread === true
-  const timeBased = Boolean(session.lastMessageAt && (session.lastReadAt ?? 0) < session.lastMessageAt)
-  return explicit || timeBased
-}
-function SessionRow({ session, active, onClick, onDragStart, onDragOver, onDrop, isDragging, isDragOver, showProject, compact, onRename }: {
+function SessionRow({ session, active, onClick, onDragStart, onDragOver, onDrop, isDragging, isDragOver, showProject, onRename }: {
   session: Session; active: boolean; onClick: () => void
   onDragStart?: (e: React.DragEvent) => void; onDragOver?: (e: React.DragEvent) => void; onDrop?: (e: React.DragEvent) => void
-  isDragging?: boolean; isDragOver?: boolean; showProject?: string; compact?: boolean; onRename?: () => void
+  isDragging?: boolean; isDragOver?: boolean; showProject?: string; onRename?: () => void
 }) {
-  const unread = isUnread(session)
+  const unreadFlag = isUnread(session)
+  // 当前正在看的会话、或进行中：不展示蓝点（进行中左侧已有指示）
+  const showUnread = unreadFlag && !active && session.status !== 'executing'
   const store = useTaskStore()
   const [menuOpen, setMenuOpen] = useState(false)
   const pending = session.pendingAction ?? null
 
-  const icon = pending
-    ? <Bell size={13} className="text-amber-500 flex-shrink-0 mt-0.5 animate-pulse" />
-    : session.status === 'executing'
-      ? <LoadingDots size={12} />
+  // 左侧只表示任务生命周期；待确认/未读一律放右侧
+  const icon =
+    session.status === 'executing'
+      ? <RunningIndicator size={13} />
       : session.status === 'completed'
-        ? <CheckCircle2 size={12} className="text-green-500 flex-shrink-0 mt-0.5" />
+        ? <CheckCircle2 size={13} className="text-green-500 flex-shrink-0" />
         : session.status === 'failed'
-          ? <XCircle size={12} className="text-red-500 flex-shrink-0 mt-0.5" />
-          : <Clock size={12} className="text-[var(--ink-soft)] flex-shrink-0 mt-0.5" />
+          ? <XCircle size={13} className="text-red-500 flex-shrink-0" />
+          : <Clock size={13} className="text-[var(--ink-soft)] flex-shrink-0" />
 
   const actions: MenuAction[] = [
     { id: 'pin', label: session.pinned ? '取消置顶' : '置顶', icon: session.pinned ? <PinOff size={12} /> : <Pin size={12} />, onClick: () => store.togglePinSession(session.id) },
-    { id: 'read', label: unread ? '标记为已读' : '标记为未读', icon: unread ? <MailOpen size={12} /> : <Mail size={12} />, onClick: () => store.markSessionRead(session.id, !unread) },
+    { id: 'read', label: unreadFlag ? '标记为已读' : '标记为未读', icon: unreadFlag ? <MailOpen size={12} /> : <Mail size={12} />, onClick: () => store.markSessionRead(session.id, !unreadFlag) },
     { id: 'rename', label: '重命名', icon: <Pencil size={12} />, onClick: () => { onRename?.(); setMenuOpen(false) } },
     session.archived
       ? { id: 'unarchive', label: '取消归档', icon: <ArchiveRestore size={12} />, onClick: () => store.unarchiveSession(session.id) }
@@ -537,37 +635,66 @@ function SessionRow({ session, active, onClick, onDragStart, onDragOver, onDrop,
       onDragOver={onDragOver}
       onDrop={onDrop}
       onDragEnd={() => { /* 状态由父组件清理 */ }}
-      className={`group relative flex items-center ${compact ? 'pl-2.5' : 'pl-7'} pr-1.5 py-[5px] rounded-[10px] cursor-pointer transition ${
+      className={`group relative flex items-center pl-2.5 pr-0.5 py-[5px] rounded-[10px] cursor-pointer transition ${
         active ? 'bg-black/[0.07]' : pending ? 'bg-amber-50/60 hover:bg-amber-50' : 'hover:bg-black/[0.04]'
       } ${isDragging ? 'opacity-40' : ''} ${isDragOver ? 'border-t-2 border-blue-400' : ''} ${pending ? 'border-l-2 border-l-amber-400' : ''}`}
     >
-      <div className="flex-1 flex items-center gap-2.5 min-w-0 text-left pr-1">
-        <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">{icon}</span>
-        <span className={`flex-1 truncate text-xs ${active ? 'text-[var(--ink)] font-medium' : 'text-[var(--ink)]/75'}`}>{session.title}</span>
-        {unread && !pending && <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" aria-label="未读" />}
+      <div className={`flex min-w-0 flex-1 items-center gap-2.5 text-left ${pending ? 'pr-[72px]' : 'pr-[52px]'}`}>
+        <span className="flex h-4 w-4 flex-shrink-0 items-center justify-center">{icon}</span>
+        <span className={`min-w-0 flex-1 truncate text-xs ${active ? 'text-[var(--ink)] font-medium' : 'text-[var(--ink)]/75'}`}>{session.title}</span>
+        {showProject && <span className="max-w-[48px] truncate rounded bg-black/[0.04] px-1 text-[11px] text-[var(--ink-soft)]/60">{showProject}</span>}
       </div>
-      {/* 右侧：项目标签 + 相对时间/状态 + 置顶图标 */}
-      <div className="ml-auto flex items-center gap-1 flex-shrink-0">
-        {showProject && <span className="text-[11px] text-[var(--ink-soft)]/60 bg-black/[0.04] px-1 rounded max-w-[48px] truncate">{showProject}</span>}
+      {/* 右侧：待确认 > 未读 > 时间/置顶；悬停换成置顶/归档 */}
+      <div className={`absolute right-0.5 top-1/2 z-10 flex h-6 -translate-y-1/2 items-center justify-end ${pending ? '' : 'w-[50px]'}`}>
         {pending ? (
           <WhaleTooltip label={PENDING_ACTION_LABEL[pending]}>
-            <span className="inline-flex items-center gap-1 px-1.5 h-[18px] rounded-full bg-amber-400/20 text-amber-600 text-[11px] font-medium flex-shrink-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+            <span className="inline-flex h-[18px] flex-shrink-0 items-center gap-1 rounded-full bg-amber-400/20 px-1.5 text-[11px] font-medium text-amber-600">
+              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
               {PENDING_ACTION_LABEL[pending]}
             </span>
           </WhaleTooltip>
-        ) : session.status === 'executing' ? (
-          <WhaleTooltip label="进行中">
-            <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse flex-shrink-0" />
-          </WhaleTooltip>
         ) : (
-          <WhaleTooltip label={new Date(session.updatedAt).toLocaleString('zh-CN')}>
-            <span className="text-[11px] tabular-nums text-[var(--ink-soft)]/55">
-              {timeAgo(session.updatedAt)}
-            </span>
-          </WhaleTooltip>
+          <>
+            <div className="flex items-center gap-1 transition-opacity group-hover:pointer-events-none group-hover:opacity-0">
+              {showUnread ? (
+                <WhaleTooltip label="未读">
+                  <span className="h-2 w-2 flex-shrink-0 rounded-full bg-blue-500" aria-label="未读" />
+                </WhaleTooltip>
+              ) : (
+                <WhaleTooltip label={new Date(session.updatedAt).toLocaleString('zh-CN')}>
+                  <span className="text-[11px] tabular-nums text-[var(--ink-soft)]/55">
+                    {timeAgo(session.updatedAt)}
+                  </span>
+                </WhaleTooltip>
+              )}
+              {session.pinned && <Pin size={9} className="flex-shrink-0 text-amber-400" />}
+            </div>
+            <div className="absolute inset-y-0 right-0 flex items-center opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto">
+              <WhaleTooltip label={session.pinned ? '取消置顶' : '置顶'}>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); store.togglePinSession(session.id) }}
+                  className="flex h-6 w-6 items-center justify-center rounded-md text-[var(--ink-soft)] transition hover:bg-black/[0.08] hover:text-[var(--ink)]"
+                >
+                  {session.pinned ? <PinOff size={13} /> : <Pin size={13} />}
+                </button>
+              </WhaleTooltip>
+              <WhaleTooltip label={session.archived ? '取消归档' : '归档'}>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (session.archived) store.unarchiveSession(session.id)
+                    else store.archiveSession(session.id)
+                  }}
+                  className="flex h-6 w-6 items-center justify-center rounded-md text-[var(--ink-soft)] transition hover:bg-black/[0.08] hover:text-[var(--ink)]"
+                >
+                  {session.archived ? <ArchiveRestore size={13} /> : <Archive size={13} />}
+                </button>
+              </WhaleTooltip>
+            </div>
+          </>
         )}
-        {session.pinned && <Pin size={9} className="text-amber-400 flex-shrink-0" />}
       </div>
       {menuOpen && (
         <>
@@ -589,26 +716,20 @@ function SessionRow({ session, active, onClick, onDragStart, onDragOver, onDrop,
 /* ---- 小工具 ---- */
 interface MenuAction { id: string; label: string; icon: React.ReactNode; onClick: () => void; danger?: boolean }
 
-/* 侧边栏会话加载图标：三点呈三角形排列，轮流呼吸（仿 Cursor 加载态）。
- * size 为容器边长（px），三个点按容器尺寸自适应定位与缩放。 */
-function LoadingDots({ size = 12, className = '' }: { size?: number; className?: string }) {
-  const dot = Math.max(3, Math.round(size * 0.34))
-  const half = size / 2
-  // 顶点居中、底部两点左右分开，构成等腰三角形
-  const top = { left: half - dot / 2, top: 0 }
-  const bl = { left: 0, top: size - dot }
-  const br = { left: size - dot, top: size - dot }
+/* 侧边栏「进行中」指示：细轨 + 渐隐弧线匀速旋转，克制一点 */
+function RunningIndicator({ size = 13, className = '' }: { size?: number; className?: string }) {
   return (
-    <span
-      className={`whale-loading-dots ${className}`}
-      style={{ width: size, height: size }}
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      className={`whale-running-indicator ${className}`}
       role="status"
-      aria-label="加载中"
+      aria-label="进行中"
     >
-      <span className="whale-ld-dot" style={{ width: dot, height: dot, ...top }} />
-      <span className="whale-ld-dot" style={{ width: dot, height: dot, ...bl }} />
-      <span className="whale-ld-dot" style={{ width: dot, height: dot, ...br }} />
-    </span>
+      <circle className="whale-running-track" cx="8" cy="8" r="5.5" />
+      <circle className="whale-running-arc" cx="8" cy="8" r="5.5" />
+    </svg>
   )
 }
 

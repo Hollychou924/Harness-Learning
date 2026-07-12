@@ -3,3 +3,4 @@ out/
 dist/
 *.log
 .vite/
+eval/golden-t1/.promote-ledger/

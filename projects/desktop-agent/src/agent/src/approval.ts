@@ -46,6 +46,18 @@ export function waitForApproval(requestId: string): Promise<ApprovalDecision> {
   })
 }
 
+/** 取消时批量拒绝所有挂起审批 */
+export function rejectAllPendingApprovals(): number {
+  let n = 0
+  for (const [id, pending] of [...pendingApprovals.entries()]) {
+    clearTimeout(pending.timer)
+    pendingApprovals.delete(id)
+    pending.resolve({ approved: false, scope: 'once' })
+    n += 1
+  }
+  return n
+}
+
 export function resolveApproval(requestId: string, approved: boolean, scope: ApprovalScope = 'once'): boolean {
   const pending = pendingApprovals.get(requestId)
   if (!pending) return false

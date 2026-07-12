@@ -38,6 +38,9 @@ export function ContinuationCard() {
           拆成更小任务
         </button>
       </div>
+      <p className="mt-2 text-[11px] text-[var(--ink-soft)]">
+        「拆分」会停止当前任务，并新建对话预填剩余目标，便于接力继续。
+      </p>
     </div>
   )
 }

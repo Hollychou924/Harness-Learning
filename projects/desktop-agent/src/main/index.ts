@@ -12,6 +12,7 @@ import { startTrace, logAgentEvent, logUserAction, listTraces, getTrace, exportT
 import type { StdoutMessage, AgentConfig, MessageAttachment } from '../agent/src/protocol.js'
 import { getModelThinkingConfig } from '../renderer/src/components/providerPresets.js'
 import { getCommitDetail, getCommitDiff, getCommitHistory } from './git-history.js'
+import { gitRootMissingMessage, resolveGitRoot } from './git-root.js'
 import { RuntimeWakeLock } from './runtime-wake-lock.js'
 import { ImportStore } from './import-store.js'
 import { countPending, scanKnownSources } from './import-sources.js'
@@ -58,6 +59,17 @@ function gitErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error || '操作失败')
 }
 
+function branchInfoErrorMessage(error: unknown): string {
+  const message = gitErrorMessage(error)
+  if (/not a git repository/i.test(message)) {
+    return '当前项目文件夹还不是 Git 仓库。请绑定含有 .git 的仓库根目录，或先在该文件夹执行 git init。'
+  }
+  if (/Permission denied|Operation not permitted/i.test(message)) {
+    return '没有权限读取这个项目文件夹的 Git 信息。'
+  }
+  return message || '无法读取分支信息'
+}
+
 function branchSwitchErrorMessage(error: unknown): string {
   const message = gitErrorMessage(error)
   if (/local changes.*overwritten|would be overwritten by (checkout|switch)/is.test(message)) {
@@ -76,10 +88,12 @@ function branchSwitchErrorMessage(error: unknown): string {
 }
 
 function getBranchInfo(workspaceDir: string): BranchInfoResult {
+  const gitRoot = resolveGitRoot(workspaceDir)
+  if (!gitRoot) return { success: false, error: gitRootMissingMessage() }
   try {
-    runGit(workspaceDir, ['rev-parse', '--is-inside-work-tree'])
-    const currentBranch = runGit(workspaceDir, ['branch', '--show-current'])
-    const branches = runGit(workspaceDir, ['for-each-ref', '--format=%(refname:short)', 'refs/heads'])
+    runGit(gitRoot, ['rev-parse', '--is-inside-work-tree'])
+    const currentBranch = runGit(gitRoot, ['branch', '--show-current'])
+    const branches = runGit(gitRoot, ['for-each-ref', '--format=%(refname:short)', 'refs/heads'])
       .split('\n')
       .map((name) => name.trim())
       .filter(Boolean)
@@ -88,10 +102,10 @@ function getBranchInfo(workspaceDir: string): BranchInfoResult {
       const currentIndex = branches.indexOf(currentBranch)
       if (currentIndex > 0) branches.unshift(...branches.splice(currentIndex, 1))
     }
-    const changedFiles = runGit(workspaceDir, ['status', '--porcelain']).split('\n').filter(Boolean).length
+    const changedFiles = runGit(gitRoot, ['status', '--porcelain']).split('\n').filter(Boolean).length
     return { success: true, currentBranch: currentBranch || undefined, branches, changedFiles }
   } catch (error) {
-    return { success: false, error: gitErrorMessage(error) }
+    return { success: false, error: branchInfoErrorMessage(error) }
   }
 }
 
@@ -631,7 +645,7 @@ ipcMain.handle('agent:startTask', async (_e, args: { mode: 'work' | 'code'; mess
     activeTaskId = sessionId
     activeTraceId = traceId
     runtimeWakeLock.taskStarted(sessionId)
-    agentBridge.startTask(sessionId, args.message, config, outputDir, args.history, args.attachments as MessageAttachment[] | undefined)
+    agentBridge.startTask(sessionId, args.message, config, outputDir, args.history, args.attachments as MessageAttachment[] | undefined, args.mode)
     return { taskId: sessionId, traceId }
   } catch (error) {
     runtimeWakeLock.taskFinished(sessionId)
@@ -1132,6 +1146,63 @@ ipcMain.handle('feedback:list', async (_e, limit?: number) => {
   return listFeedbackTickets(limit ?? 50)
 })
 
+ipcMain.handle('experience:recordOutcome', async (_e, input: {
+  workspaceDir: string
+  outcome: 'accept' | 'edit' | 'reject'
+  taskId?: string
+  note?: string
+  family?: 'T1' | 'T2' | 'other'
+}) => {
+  const { recordOutcomeFeedback } = await import('../agent/src/evolution/feedback.js')
+  return recordOutcomeFeedback(input.workspaceDir, {
+    outcome: input.outcome,
+    taskId: input.taskId,
+    note: input.note,
+    family: input.family
+  })
+})
+
+ipcMain.handle('experience:listLedger', async (_e, input: { workspaceDir: string }) => {
+  const { readExperienceLedger, seedDefaultTactics } = await import('../agent/src/evolution/index.js')
+  if (input.workspaceDir) seedDefaultTactics(input.workspaceDir, 'T1')
+  return { success: true, ...readExperienceLedger(input.workspaceDir || '') }
+})
+
+ipcMain.handle('experience:updateTactic', async (_e, input: {
+  workspaceDir: string
+  tacticId: string
+  action: 'enable' | 'disable' | 'rollback'
+}) => {
+  const { setTacticEnabled, rollbackTactic } = await import('../agent/src/evolution/index.js')
+  if (!input.workspaceDir) return { success: false, error: '未指定工作区' }
+  try {
+    if (input.action === 'rollback') {
+      return rollbackTactic(input.workspaceDir, input.tacticId)
+    }
+    const tactic = setTacticEnabled(input.workspaceDir, input.tacticId, input.action === 'enable')
+    if (!tactic) return { success: false, error: 'tactic 不存在' }
+    return { success: true, deleted: false, tactic }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : String(e) }
+  }
+})
+
+ipcMain.handle('experience:updateFailureCase', async (_e, input: {
+  workspaceDir: string
+  failureId: string
+  enabled: boolean
+}) => {
+  const { setFailureCaseEnabled } = await import('../agent/src/evolution/index.js')
+  if (!input.workspaceDir) return { success: false, error: '未指定工作区' }
+  try {
+    const failureCase = setFailureCaseEnabled(input.workspaceDir, input.failureId, input.enabled)
+    if (!failureCase) return { success: false, error: 'failure case 不存在' }
+    return { success: true, failureCase }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : String(e) }
+  }
+})
+
 ipcMain.handle('diagnostics:overview', async (_e, limit?: number) => {
   return getDiagnosticsOverview(limit ?? 200)
 })
@@ -1305,9 +1376,11 @@ ipcMain.handle('project:branchInfo', (_e, workspaceDir: string): BranchInfoResul
 
 ipcMain.handle('project:switchBranch', (_e, args: { workspaceDir: string; branchName: string }): BranchInfoResult => {
   if (!args?.workspaceDir || !isAbsolute(args.workspaceDir)) return { success: false, error: '当前项目没有绑定本地文件夹' }
+  const gitRoot = resolveGitRoot(args.workspaceDir)
+  if (!gitRoot) return { success: false, error: gitRootMissingMessage() }
   try {
-    runGit(args.workspaceDir, ['switch', '--', args.branchName])
-    return getBranchInfo(args.workspaceDir)
+    runGit(gitRoot, ['switch', '--', args.branchName])
+    return getBranchInfo(gitRoot)
   } catch (error) {
     return { success: false, error: branchSwitchErrorMessage(error) }
   }
@@ -1317,10 +1390,12 @@ ipcMain.handle('project:createBranch', (_e, args: { workspaceDir: string; branch
   if (!args?.workspaceDir || !isAbsolute(args.workspaceDir)) return { success: false, error: '当前项目没有绑定本地文件夹' }
   const branchName = args.branchName?.trim()
   if (!branchName) return { success: false, error: '请输入分支名称' }
+  const gitRoot = resolveGitRoot(args.workspaceDir)
+  if (!gitRoot) return { success: false, error: gitRootMissingMessage() }
   try {
-    runGit(args.workspaceDir, ['check-ref-format', '--branch', branchName])
-    runGit(args.workspaceDir, ['switch', '-c', branchName])
-    return getBranchInfo(args.workspaceDir)
+    runGit(gitRoot, ['check-ref-format', '--branch', branchName])
+    runGit(gitRoot, ['switch', '-c', branchName])
+    return getBranchInfo(gitRoot)
   } catch (error) {
     return { success: false, error: gitErrorMessage(error) }
   }

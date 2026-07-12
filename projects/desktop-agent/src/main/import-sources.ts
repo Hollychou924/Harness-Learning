@@ -57,6 +57,16 @@ function time(value: unknown, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
+function rawTextFromBlocks(value: unknown): string {
+  if (typeof value === 'string') return value
+  if (!Array.isArray(value)) return ''
+  return value.flatMap((block) => {
+    if (!block || typeof block !== 'object') return []
+    if (typeof block.text === 'string' && ['input_text', 'output_text', 'text'].includes(block.type)) return [block.text]
+    return []
+  }).join('\n')
+}
+
 function textFromBlocks(value: unknown): string {
   if (typeof value === 'string') return cleanLeakedWrapperTags(stripInjectedAgentsInstructions(hideSensitiveText(value)))
   if (!Array.isArray(value)) return ''
@@ -65,6 +75,44 @@ function textFromBlocks(value: unknown): string {
     if (typeof block.text === 'string' && ['input_text', 'output_text', 'text'].includes(block.type)) return [cleanLeakedWrapperTags(stripInjectedAgentsInstructions(hideSensitiveText(block.text)))]
     return []
   }).join('\n')
+}
+
+const CODEX_FILES_MENTIONED_RE = /(?:^|\n)#?\s*Files mentioned by the user:/i
+const CODEX_MY_REQUEST_RE = /##\s*My request for Codex:\s*/i
+
+/** Codex 粘贴截图时会在正文前塞「Files mentioned by the user」文件清单和 `<image path=…>` 标签。 */
+export function extractCodexClipboardImagePaths(text: string): string[] {
+  const paths = new Set<string>()
+  for (const match of text.matchAll(/^##\s+[^:]+:\s*(\/.*\.(?:png|jpe?g|webp|gif|heic))\s*$/gim)) {
+    paths.add(match[1].trim())
+  }
+  for (const match of text.matchAll(/<image\b[^>]*\bpath=["']([^"']+)["'][^>]*\/?>/gi)) {
+    paths.add(match[1].trim())
+  }
+  return [...paths]
+}
+
+export function stripCodexFilesMentionedBlock(text: string): string {
+  if (!CODEX_FILES_MENTIONED_RE.test(text)) return text
+  const myRequestMatch = text.match(CODEX_MY_REQUEST_RE)
+  let next = myRequestMatch && myRequestMatch.index !== undefined
+    ? text.slice(myRequestMatch.index + myRequestMatch[0].length)
+    : text.replace(/(?:^|\n)#?\s*Files mentioned by the user:[^\n]*\n(?:##\s+[^\n]+\n)*/i, '\n')
+  return next
+    .replace(/<image\b[^>]*>/gi, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+export function parseCodexUserContent(content: string): { text: string; imagePaths: string[] } {
+  const imagePaths = extractCodexClipboardImagePaths(content)
+  const stripped = stripCodexFilesMentionedBlock(content)
+  const text = cleanLeakedWrapperTags(stripInjectedAgentsInstructions(hideSensitiveText(stripped)))
+  return { text, imagePaths }
+}
+
+function hasCodexFilesMentionedBlock(text: string): boolean {
+  return CODEX_FILES_MENTIONED_RE.test(text)
 }
 
 // 用户从其他工具（主要是 Cursor）复制粘贴的正文里会残留 UI 包裹标签：<user_query>、
@@ -76,6 +124,7 @@ export function cleanLeakedWrapperTags(text: string): string {
     .replace(/<image_files>[\s\S]*?<\/image_files>/gi, '')
     .replace(/<timestamp>[\s\S]*?<\/timestamp>/gi, '')
     .replace(/<\/?(?:user_query|attached_files|environment_details)>/gi, '')
+    .replace(/<image\b[^>]*>/gi, '')
     .replace(/^\s*\[Image\]\s*$/gim, '')
     .replace(/^\s*\*\*复制\*\*\s*$/gim, '')
     .replace(/\n{3,}/g, '\n\n')
@@ -249,7 +298,9 @@ function cleanCursorAssistantText(content: string): string {
 }
 
 function titleFrom(messages: AgentMessage[], fallback: string): string {
-  const title = messages.find((message) => message.role === 'user')?.content.replace(/\s+/g, ' ').trim()
+  const firstUser = messages.find((message) => message.role === 'user')
+  const raw = firstUser?.content || ''
+  const title = (hasCodexFilesMentionedBlock(raw) ? parseCodexUserContent(raw).text : raw).replace(/\s+/g, ' ').trim()
   return title ? title.slice(0, 80) : fallback
 }
 
@@ -342,7 +393,8 @@ export function repairStoredSession(
   const repairedMessages = messages.map((message) => {
     const raw = message.content || ''
     if (message.role === 'user') {
-      const hasWrapper = /<(?:user_query|image_files|timestamp)>/i.test(raw) || /^\s*\[Image\]\s*$/m.test(raw)
+      const hasCodexFilesBlock = hasCodexFilesMentionedBlock(raw)
+      const hasWrapper = /<(?:user_query|image_files|timestamp)>/i.test(raw) || /^\s*\[Image\]\s*$/m.test(raw) || hasCodexFilesBlock || /<image\b/i.test(raw)
       const hasAgentsBlock = hasInjectedAgentsInstructions(raw)
       if (!hasWrapper && !hasAgentsBlock && (message.attachments || []).length) return message
       const fileAssets = extractImageFiles(raw)
@@ -351,6 +403,13 @@ export function repairStoredSession(
       if (source === 'cursor') {
         const parsed = cursorUserText(raw)
         text = parsed.text
+      } else if (hasCodexFilesBlock) {
+        const parsed = parseCodexUserContent(raw)
+        text = parsed.text
+        parsed.imagePaths.map(imageAssetFromPath).forEach((asset) => {
+          remember(asset)
+          fileAssets.push(asset)
+        })
       } else {
         text = cleanLeakedWrapperTags(stripInjectedAgentsInstructions(hideSensitiveText(raw)))
       }
@@ -625,16 +684,29 @@ export function parseCodexFile(path: string): { project: ImportedProject; sessio
     const payload = record.type === 'response_item' ? record.payload : undefined
     if (!payload || !['user', 'assistant'].includes(payload.role) || payload.type !== 'message') return []
     if (payload.role === 'user') userIndex += 1
-    const content = textFromBlocks(payload.content)
+    const raw = rawTextFromBlocks(payload.content)
+    let content: string
+    let clipboardAssets: ImportedAsset[] = []
+    if (payload.role === 'user' && hasCodexFilesMentionedBlock(raw)) {
+      const parsed = parseCodexUserContent(raw)
+      content = parsed.text
+      clipboardAssets = parsed.imagePaths.map(imageAssetFromPath)
+    } else {
+      content = textFromBlocks(payload.content)
+    }
     const imageAssets = payload.role === 'user' && Array.isArray(payload.content)
-      ? payload.content.flatMap((block: JsonRecord, index: number) => {
-          if (!['input_image', 'image'].includes(block?.type)) return []
-          const dataUrl = block.image_url || block.url
-          const asset = typeof dataUrl === 'string' ? imageAssetFromDataUrl(dataUrl, `用户图片-${index + 1}`) : undefined
-          if (asset) assets.push(asset)
-          return asset ? [asset] : []
-        })
+      ? [
+          ...payload.content.flatMap((block: JsonRecord, index: number) => {
+            if (!['input_image', 'image'].includes(block?.type)) return []
+            const dataUrl = block.image_url || block.url
+            const asset = typeof dataUrl === 'string' ? imageAssetFromDataUrl(dataUrl, `用户图片-${index + 1}`) : undefined
+            if (asset) assets.push(asset)
+            return asset ? [asset] : []
+          }),
+          ...clipboardAssets
+        ]
       : []
+    if (clipboardAssets.length) assets.push(...clipboardAssets)
     return content || imageAssets.length ? [{
       role: payload.role as 'user' | 'assistant', content,
       ...(imageAssets.length ? { attachments: imageAssets.map((asset) => ({

@@ -4,6 +4,7 @@ import { getFinalAnswerOfTurn } from '../store/turns'
 import { Composer } from './Composer'
 import { ResultView } from './ResultView'
 import { ProcessFlow } from './ProcessFlow'
+import { OutcomeFeedbackCard } from './OutcomeFeedbackCard'
 import { TurnItemsView } from './TurnItemsView'
 import { TurnNavigator } from './TurnNavigator'
 import { ChatInput } from './ChatInput'
@@ -301,6 +302,7 @@ function ConversationView({ status }: { status: string }) {
         {status === 'idle' && (
           <p className="text-center text-xs text-[var(--ink-soft)] py-2">在下方输入继续对话，上下文已完整保留</p>
         )}
+        {(status === 'completed' || status === 'failed') && <OutcomeFeedbackCard />}
         {toast && <FloatingToast text={toast} />}
       </div>
     </div>

@@ -15,6 +15,7 @@ export type SettingsTab =
   | 'general'
   | 'import'
   | 'archived'
+  | 'evolution'
   | 'diagnostics'
   | 'about'
 

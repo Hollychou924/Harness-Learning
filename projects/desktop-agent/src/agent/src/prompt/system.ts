@@ -1,7 +1,7 @@
 import type { TaskMode } from '../protocol.js'
 
 // 系统提示词构建，对应 docs/03 目录 prompt/
-export function buildSystemPrompt(mode: TaskMode, workspaceDir?: string): string {
+export function buildSystemPrompt(mode: TaskMode, workspaceDir?: string, experienceBlock?: string): string {
   const base = `你是小蓝鲸，一个能在本地工作区执行长程复杂任务的桌面 Agent。
 
 核心原则：
@@ -23,6 +23,8 @@ export function buildSystemPrompt(mode: TaskMode, workspaceDir?: string): string
 
 工作区：${workspaceDir || '未指定'}`
 
+  const experience = experienceBlock?.trim() ? `\n${experienceBlock.trim()}` : ''
+
   if (mode === 'work') {
     return `${base}
 
@@ -41,10 +43,11 @@ export function buildSystemPrompt(mode: TaskMode, workspaceDir?: string): string
 - 当用户明确要求生成 Word 文档时，调用 create_docx 生成排版好的 .docx 文件。
 - 当用户明确要求生成 Excel 表格时，调用 create_xlsx 生成 .xlsx 文件。
 - 当用户未明确指定格式但内容适合表格呈现时，可自行判断用 create_xlsx。
-- 生成后在回复中告知用户文件路径。`
+- 生成后在回复中告知用户文件路径。${experience}`
   }
 
   return `${base}
 
-当前是 Code 工作台，擅长理解项目结构、定位问题、给出小范围修改建议。`
+当前是 Code 工作台，擅长理解项目结构、定位问题、给出小范围修改建议。
+改代码后优先用 shell 跑测试或编译做硬验证，再交付结论。${experience}`
 }

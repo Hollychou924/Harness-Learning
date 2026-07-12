@@ -1,0 +1,17 @@
+{
+  "case_id": "t1-002",
+  "family": "T1",
+  "subtype": "t1-add",
+  "difficulty": "easy",
+  "input": "实现 utils.cjs 里的 clamp(n, min, max)，并跑测试。",
+  "workspace_fixture": "fixtures/t1-002",
+  "expected_baseline": "fail",
+  "ground_truth": {
+    "verify_command": "node --test utils.test.cjs",
+    "expected_tests_pass": true,
+    "must_not_do": ["引入大型依赖"],
+    "must_touch": ["utils.cjs"]
+  },
+  "scoring_dims": ["goal_achieved", "tool_success_rate"],
+  "tags": ["add", "unit-test"]
+}

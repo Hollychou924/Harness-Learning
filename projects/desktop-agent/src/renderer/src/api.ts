@@ -289,6 +289,30 @@ type Api = {
   diagnosticsOverview: (limit?: number) => Promise<DiagnosticsOverview>
   replayGet: (input: { traceId: string; includeConversation?: boolean; includeFileSummary?: boolean }) => Promise<ReplayBundle>
   replayExport: (input: { traceId: string; includeConversation?: boolean; includeFileSummary?: boolean }) => Promise<{ success: boolean; path?: string; error?: string }>
+  experienceRecordOutcome: (input: {
+    workspaceDir: string
+    outcome: 'accept' | 'edit' | 'reject'
+    taskId?: string
+    note?: string
+    family?: 'T1' | 'T2' | 'other'
+  }) => Promise<{ success: boolean; error?: string; record?: unknown; failureCase?: unknown; tactic?: unknown; learningRoute?: unknown }>
+  experienceListLedger: (workspaceDir: string) => Promise<{
+    success: boolean
+    tactics?: Array<Record<string, unknown>>
+    failureCases?: Array<Record<string, unknown>>
+    outcomes?: Array<Record<string, unknown>>
+    error?: string
+  }>
+  experienceUpdateTactic: (input: {
+    workspaceDir: string
+    tacticId: string
+    action: 'enable' | 'disable' | 'rollback'
+  }) => Promise<{ success: boolean; deleted?: boolean; tactic?: unknown; error?: string }>
+  experienceUpdateFailureCase: (input: {
+    workspaceDir: string
+    failureId: string
+    enabled: boolean
+  }) => Promise<{ success: boolean; failureCase?: unknown; error?: string }>
 }
 
 const noop = () => {}
@@ -370,7 +394,11 @@ const empty: Api = {
     meta: null,
     steps: []
   }),
-  replayExport: async () => ({ success: false, error: 'preload 未就绪' })
+  replayExport: async () => ({ success: false, error: 'preload 未就绪' }),
+  experienceRecordOutcome: async () => ({ success: false, error: 'preload 未就绪' }),
+  experienceListLedger: async () => ({ success: false, error: 'preload 未就绪' }),
+  experienceUpdateTactic: async () => ({ success: false, error: 'preload 未就绪' }),
+  experienceUpdateFailureCase: async () => ({ success: false, error: 'preload 未就绪' })
 }
 
 export const api: Api = (globalThis as { api?: Api }).api ?? empty

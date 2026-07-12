@@ -1,0 +1,231 @@
+{
+  "generated_at": "2026-07-12T08:57:30.411Z",
+  "mode": "stub",
+  "fixture_cases": 20,
+  "pass": 20,
+  "fail": 0,
+  "results": [
+    {
+      "case_id": "t1-001",
+      "strategy": "oracle-patch",
+      "verify_ok": true,
+      "verifier_passed": true,
+      "short_fail_would_trigger": false,
+      "reasons": [
+        "检测到验证类命令且成功",
+        "Verifier v1：通过"
+      ]
+    },
+    {
+      "case_id": "t1-002",
+      "strategy": "oracle-patch",
+      "verify_ok": true,
+      "verifier_passed": true,
+      "short_fail_would_trigger": false,
+      "reasons": [
+        "检测到验证类命令且成功",
+        "Verifier v1：通过"
+      ]
+    },
+    {
+      "case_id": "t1-003",
+      "strategy": "noop",
+      "verify_ok": true,
+      "verifier_passed": true,
+      "short_fail_would_trigger": false,
+      "reasons": [
+        "检测到验证类命令且成功",
+        "Verifier v1：通过"
+      ]
+    },
+    {
+      "case_id": "t1-004",
+      "strategy": "oracle-patch",
+      "verify_ok": true,
+      "verifier_passed": true,
+      "short_fail_would_trigger": false,
+      "reasons": [
+        "检测到验证类命令且成功",
+        "Verifier v1：通过"
+      ]
+    },
+    {
+      "case_id": "t1-005",
+      "strategy": "noop",
+      "verify_ok": true,
+      "verifier_passed": true,
+      "short_fail_would_trigger": false,
+      "reasons": [
+        "检测到验证类命令且成功",
+        "Verifier v1：通过"
+      ]
+    },
+    {
+      "case_id": "t1-006",
+      "strategy": "oracle-patch",
+      "verify_ok": true,
+      "verifier_passed": true,
+      "short_fail_would_trigger": false,
+      "reasons": [
+        "检测到验证类命令且成功",
+        "Verifier v1：通过"
+      ]
+    },
+    {
+      "case_id": "t1-007",
+      "strategy": "oracle-patch",
+      "verify_ok": true,
+      "verifier_passed": true,
+      "short_fail_would_trigger": false,
+      "reasons": [
+        "检测到验证类命令且成功",
+        "Verifier v1：通过"
+      ]
+    },
+    {
+      "case_id": "t1-008",
+      "strategy": "oracle-patch",
+      "verify_ok": true,
+      "verifier_passed": true,
+      "short_fail_would_trigger": false,
+      "reasons": [
+        "检测到验证类命令且成功",
+        "Verifier v1：通过"
+      ]
+    },
+    {
+      "case_id": "t1-009",
+      "strategy": "oracle-patch",
+      "verify_ok": true,
+      "verifier_passed": true,
+      "short_fail_would_trigger": false,
+      "reasons": [
+        "检测到验证类命令且成功",
+        "Verifier v1：通过"
+      ]
+    },
+    {
+      "case_id": "t1-010",
+      "strategy": "oracle-patch",
+      "verify_ok": true,
+      "verifier_passed": true,
+      "short_fail_would_trigger": false,
+      "reasons": [
+        "检测到验证类命令且成功",
+        "Verifier v1：通过"
+      ]
+    },
+    {
+      "case_id": "t1-011",
+      "strategy": "oracle-patch",
+      "verify_ok": true,
+      "verifier_passed": true,
+      "short_fail_would_trigger": false,
+      "reasons": [
+        "检测到验证类命令且成功",
+        "Verifier v1：通过"
+      ]
+    },
+    {
+      "case_id": "t1-012",
+      "strategy": "oracle-patch",
+      "verify_ok": true,
+      "verifier_passed": true,
+      "short_fail_would_trigger": false,
+      "reasons": [
+        "检测到验证类命令且成功",
+        "Verifier v1：通过"
+      ]
+    },
+    {
+      "case_id": "t1-013",
+      "strategy": "oracle-patch",
+      "verify_ok": true,
+      "verifier_passed": true,
+      "short_fail_would_trigger": false,
+      "reasons": [
+        "检测到验证类命令且成功",
+        "Verifier v1：通过"
+      ]
+    },
+    {
+      "case_id": "t1-014",
+      "strategy": "oracle-patch",
+      "verify_ok": true,
+      "verifier_passed": true,
+      "short_fail_would_trigger": false,
+      "reasons": [
+        "检测到验证类命令且成功",
+        "Verifier v1：通过"
+      ]
+    },
+    {
+      "case_id": "t1-015",
+      "strategy": "oracle-patch",
+      "verify_ok": true,
+      "verifier_passed": true,
+      "short_fail_would_trigger": false,
+      "reasons": [
+        "检测到验证类命令且成功",
+        "Verifier v1：通过"
+      ]
+    },
+    {
+      "case_id": "t1-016",
+      "strategy": "oracle-patch",
+      "verify_ok": true,
+      "verifier_passed": true,
+      "short_fail_would_trigger": false,
+      "reasons": [
+        "检测到验证类命令且成功",
+        "Verifier v1：通过"
+      ]
+    },
+    {
+      "case_id": "t1-017",
+      "strategy": "oracle-patch",
+      "verify_ok": true,
+      "verifier_passed": true,
+      "short_fail_would_trigger": false,
+      "reasons": [
+        "检测到验证类命令且成功",
+        "Verifier v1：通过"
+      ]
+    },
+    {
+      "case_id": "t1-018",
+      "strategy": "oracle-patch",
+      "verify_ok": true,
+      "verifier_passed": true,
+      "short_fail_would_trigger": false,
+      "reasons": [
+        "检测到验证类命令且成功",
+        "Verifier v1：通过"
+      ]
+    },
+    {
+      "case_id": "t1-019",
+      "strategy": "oracle-patch",
+      "verify_ok": true,
+      "verifier_passed": true,
+      "short_fail_would_trigger": false,
+      "reasons": [
+        "检测到验证类命令且成功",
+        "Verifier v1：通过"
+      ]
+    },
+    {
+      "case_id": "t1-020",
+      "strategy": "oracle-patch",
+      "verify_ok": true,
+      "verifier_passed": true,
+      "short_fail_would_trigger": false,
+      "reasons": [
+        "检测到验证类命令且成功",
+        "Verifier v1：通过"
+      ]
+    }
+  ],
+  "once_success_rate": 1,
+  "note": "stub = oracle 上界，不是真实模型能力。"
+}

@@ -1,18 +1,17 @@
 import { AlertCircle } from 'lucide-react'
 import { useTaskStore } from '../store/task'
 import { useSettingsStore } from './settings/settingsStore'
-import { ApprovalCard } from './ApprovalCard'
-import { PlanCard } from './PlanCard'
 import { TodoChecklist } from './TodoChecklist'
 import { SubtaskList } from './SubtaskList'
 import { TurnItemsView } from './TurnItemsView'
 import { CompactDivider } from './CompactDivider'
 import { ConnectionRecoveryBanner } from './ConnectionRecoveryBanner'
 import { ExecutionSummaryBar } from './ExecutionSummaryBar'
+import { OutcomeFeedbackCard } from './OutcomeFeedbackCard'
 import type { Turn } from '../../../agent/src/items'
 
-// 当前实时轮次的执行过程展示 + 全局态卡片(计划/待办/子任务/审批)
-// 条目本身的渲染逻辑在 TurnItemsView，历史轮次也共用它
+// 当前实时轮次的执行过程展示 + 全局态卡片(待办/子任务)
+// 计划/审批/询问卡挂在 Composer，条目渲染在 TurnItemsView，历史轮次也共用它
 export function ProcessFlow({ showTurnItems = true }: { showTurnItems?: boolean } = {}) {
   const { status, currentTurn, error, compactNotice, clearCompactNotice } = useTaskStore()
   const { showThinking } = useSettingsStore()
@@ -33,10 +32,8 @@ export function ProcessFlow({ showTurnItems = true }: { showTurnItems?: boolean 
 
       {showTurnItems && latestTurn && <TurnItemsView turn={latestTurn} showThinking={showThinking} />}
 
-      <PlanCard />
       <TodoChecklist />
       <SubtaskList />
-      <ApprovalCard />
 
       {error && (
         <div className="flex items-center gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-600">
@@ -44,6 +41,8 @@ export function ProcessFlow({ showTurnItems = true }: { showTurnItems?: boolean 
           {error}
         </div>
       )}
+
+      <OutcomeFeedbackCard />
     </div>
   )
 }

@@ -50,3 +50,25 @@ export function resolveContinuation(taskId: string, decision: ContinuationDecisi
   pending.resolve(decision)
   return true
 }
+
+export function stopAllPendingContinuations(): number {
+  let n = 0
+  for (const [id, pending] of [...pendingContinuations.entries()]) {
+    clearTimeout(pending.timer)
+    pendingContinuations.delete(id)
+    pending.resolve('stop')
+    n += 1
+  }
+  return n
+}
+
+export function skipAllPendingQuestions(): number {
+  let n = 0
+  for (const [id, pending] of [...pendingQuestions.entries()]) {
+    clearTimeout(pending.timer)
+    pendingQuestions.delete(id)
+    pending.resolve({ selectedOptionIds: [], customAnswer: '', skipped: true })
+    n += 1
+  }
+  return n
+}

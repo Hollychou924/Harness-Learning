@@ -1,0 +1,17 @@
+{
+  "case_id": "t1-004",
+  "family": "T1",
+  "subtype": "t1-fix",
+  "difficulty": "medium",
+  "input": "修复 greet 返回类型错误（应返回字符串），并跑测试。",
+  "workspace_fixture": "fixtures/t1-004",
+  "expected_baseline": "fail",
+  "ground_truth": {
+    "verify_command": "node --test greet.test.cjs",
+    "expected_tests_pass": true,
+    "must_not_do": ["删除测试"],
+    "must_touch": ["greet.cjs"]
+  },
+  "scoring_dims": ["goal_achieved", "tool_success_rate", "hitl_burden"],
+  "tags": ["fix", "type-contract"]
+}

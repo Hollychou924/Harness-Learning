@@ -110,9 +110,6 @@ export function ExternalImportReminder() {
     openSettings('import')
   }
 
-  const body = sources.length === 1
-    ? `检测到 ${sources[0].name}，可导入规则与对话等`
-    : `检测到 ${sources.length} 个智能体，可导入规则与对话等`
   const remaining = remainingImportReminders(timesShown)
   const snoozeHint = remaining <= 1
     ? '这是最后一次提醒'
@@ -125,8 +122,12 @@ export function ExternalImportReminder() {
           <Download size={18} />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="text-[13px] font-semibold text-[var(--ink)] leading-snug">可导入编程智能体配置</div>
-          <div className="text-xs text-[var(--ink-soft)] mt-1 leading-snug">{body}</div>
+          <div className="text-[13px] font-semibold text-[var(--ink)] leading-snug">
+            可导入{sources.length}个编程智能体配置
+          </div>
+          <div className="text-xs text-[var(--ink-soft)] mt-1 leading-snug">
+            包括规则/记忆/项目/对话记录/功能配置等
+          </div>
         </div>
       </div>
       <div className="mt-3.5 flex flex-col gap-2">

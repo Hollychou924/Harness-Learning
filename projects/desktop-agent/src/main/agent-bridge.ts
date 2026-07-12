@@ -71,8 +71,8 @@ export class AgentBridge {
     this.proc?.stdin.write(JSON.stringify(msg) + '\n')
   }
 
-  startTask(session_id: string, message: string, config: AgentConfig, workspace_dir?: string, history?: unknown[], attachments?: MessageAttachment[]): void {
-    this.send({ type: 'chat_request', session_id, message, config, workspace_dir, history: history as AgentMessage[] | undefined, attachments })
+  startTask(session_id: string, message: string, config: AgentConfig, workspace_dir?: string, history?: unknown[], attachments?: MessageAttachment[], mode?: 'work' | 'code'): void {
+    this.send({ type: 'chat_request', session_id, message, config, workspace_dir, history: history as AgentMessage[] | undefined, attachments, mode })
   }
 
   /** 取消当前任务：kill 前补发 stopped + turn_completed: cancelled，让 UI 立即反映停止态 */

@@ -1,0 +1,374 @@
+{
+  "generated_at": "2026-07-12T05:36:55.604Z",
+  "suite": "Golden-T1",
+  "case_count": 20,
+  "schema_ok": 20,
+  "fixture_baseline_runs": 20,
+  "baseline_expectation_match": 20,
+  "baseline_expectation_mismatch": 0,
+  "oracle_pass_count": 18,
+  "oracle_skip_count": 2,
+  "note": "不调用模型。stub Agent 见 run-agent-batch.ts；live Agent 需 API Key。",
+  "results": [
+    {
+      "case_id": "t1-001",
+      "subtype": "t1-fix",
+      "has_fixture": true,
+      "expected_baseline": "fail",
+      "verify_command": "node --test math.test.cjs",
+      "baseline": {
+        "verify_ok": false,
+        "verifier_passed": false,
+        "expected": "fail",
+        "match": true,
+        "output_head": "✖ add(2,3) === 5 (1.196791ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 104.359959\n\n✖ failing tests:\n\ntest at math.test.cjs:5:1\n✖ add(2,3) === 5 (1.196791ms)\n  AssertionError [ERR_ASSERTION]: Ex"
+      },
+      "oracle": {
+        "verify_ok": true,
+        "verifier_passed": true
+      }
+    },
+    {
+      "case_id": "t1-002",
+      "subtype": "t1-add",
+      "has_fixture": true,
+      "expected_baseline": "fail",
+      "verify_command": "node --test utils.test.cjs",
+      "baseline": {
+        "verify_ok": false,
+        "verifier_passed": false,
+        "expected": "fail",
+        "match": true,
+        "output_head": "✖ clamp (1.338416ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 129.043125\n\n✖ failing tests:\n\ntest at utils.test.cjs:4:1\n✖ clamp (1.338416ms)\n  AssertionError [ERR_ASSERTION]: Expected values to "
+      },
+      "oracle": {
+        "verify_ok": true,
+        "verifier_passed": true
+      }
+    },
+    {
+      "case_id": "t1-003",
+      "subtype": "t1-verify-only",
+      "has_fixture": true,
+      "expected_baseline": "pass",
+      "verify_command": "node --test ok.test.cjs",
+      "baseline": {
+        "verify_ok": true,
+        "verifier_passed": true,
+        "expected": "pass",
+        "match": true,
+        "output_head": "✔ ping (0.73325ms)\nℹ tests 1\nℹ suites 0\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 101.153334\n"
+      },
+      "oracle": {
+        "skipped": true,
+        "reason": "baseline already pass; no oracle needed"
+      }
+    },
+    {
+      "case_id": "t1-004",
+      "subtype": "t1-fix",
+      "has_fixture": true,
+      "expected_baseline": "fail",
+      "verify_command": "node --test greet.test.cjs",
+      "baseline": {
+        "verify_ok": false,
+        "verifier_passed": false,
+        "expected": "fail",
+        "match": true,
+        "output_head": "✖ greet returns string (1.487625ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 99.383333\n\n✖ failing tests:\n\ntest at greet.test.cjs:4:1\n✖ greet returns string (1.487625ms)\n  AssertionError [ERR_AS"
+      },
+      "oracle": {
+        "verify_ok": true,
+        "verifier_passed": true
+      }
+    },
+    {
+      "case_id": "t1-005",
+      "subtype": "t1-refactor-safe",
+      "has_fixture": true,
+      "expected_baseline": "pass",
+      "verify_command": "node --test fmt.test.cjs",
+      "baseline": {
+        "verify_ok": true,
+        "verifier_passed": true,
+        "expected": "pass",
+        "match": true,
+        "output_head": "✔ labels (0.638666ms)\nℹ tests 1\nℹ suites 0\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 112.392084\n"
+      },
+      "oracle": {
+        "skipped": true,
+        "reason": "baseline already pass; no oracle needed"
+      }
+    },
+    {
+      "case_id": "t1-006",
+      "subtype": "t1-fix",
+      "has_fixture": true,
+      "expected_baseline": "fail",
+      "verify_command": "node --test pagination.test.cjs",
+      "baseline": {
+        "verify_ok": false,
+        "verifier_passed": false,
+        "expected": "fail",
+        "match": true,
+        "output_head": "✖ pageSlice (2.280083ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 98.953833\n\n✖ failing tests:\n\ntest at pagination.test.cjs:4:1\n✖ pageSlice (2.280083ms)\n  AssertionError [ERR_ASSERTION]: Expecte"
+      },
+      "oracle": {
+        "verify_ok": true,
+        "verifier_passed": true
+      }
+    },
+    {
+      "case_id": "t1-007",
+      "subtype": "t1-add",
+      "has_fixture": true,
+      "expected_baseline": "fail",
+      "verify_command": "node --test http.test.cjs",
+      "baseline": {
+        "verify_ok": false,
+        "verifier_passed": false,
+        "expected": "fail",
+        "match": true,
+        "output_head": "✖ default timeout 10s (1.185208ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 98.562334\n\n✖ failing tests:\n\ntest at http.test.cjs:4:1\n✖ default timeout 10s (1.185208ms)\n  AssertionError [ERR_ASSER"
+      },
+      "oracle": {
+        "verify_ok": true,
+        "verifier_passed": true
+      }
+    },
+    {
+      "case_id": "t1-008",
+      "subtype": "t1-fix",
+      "has_fixture": true,
+      "expected_baseline": "fail",
+      "verify_command": "node --test store.test.cjs",
+      "baseline": {
+        "verify_ok": false,
+        "verifier_passed": false,
+        "expected": "fail",
+        "match": true,
+        "output_head": "✖ concurrent inc (1.14875ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 96.962625\n\n✖ failing tests:\n\ntest at store.test.cjs:4:1\n✖ concurrent inc (1.14875ms)\n  AssertionError [ERR_ASSERTION]: Expe"
+      },
+      "oracle": {
+        "verify_ok": true,
+        "verifier_passed": true
+      }
+    },
+    {
+      "case_id": "t1-009",
+      "subtype": "t1-fix",
+      "has_fixture": true,
+      "expected_baseline": "fail",
+      "verify_command": "node --test sum.test.cjs",
+      "baseline": {
+        "verify_ok": false,
+        "verifier_passed": false,
+        "expected": "fail",
+        "match": true,
+        "output_head": "✖ sum (1.217708ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 126.3085\n\n✖ failing tests:\n\ntest at sum.test.cjs:4:1\n✖ sum (1.217708ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be stric"
+      },
+      "oracle": {
+        "verify_ok": true,
+        "verifier_passed": true
+      }
+    },
+    {
+      "case_id": "t1-010",
+      "subtype": "t1-fix",
+      "has_fixture": true,
+      "expected_baseline": "fail",
+      "verify_command": "node --test isPal.test.cjs",
+      "baseline": {
+        "verify_ok": false,
+        "verifier_passed": false,
+        "expected": "fail",
+        "match": true,
+        "output_head": "✖ pal (1.126666ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 99.915709\n\n✖ failing tests:\n\ntest at isPal.test.cjs:4:1\n✖ pal (1.126666ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be st"
+      },
+      "oracle": {
+        "verify_ok": true,
+        "verifier_passed": true
+      }
+    },
+    {
+      "case_id": "t1-011",
+      "subtype": "t1-fix",
+      "has_fixture": true,
+      "expected_baseline": "fail",
+      "verify_command": "node --test safeGet.test.cjs",
+      "baseline": {
+        "verify_ok": false,
+        "verifier_passed": false,
+        "expected": "fail",
+        "match": true,
+        "output_head": "✖ safeGet (0.654375ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 97.623792\n\n✖ failing tests:\n\ntest at safeGet.test.cjs:4:1\n✖ safeGet (0.654375ms)\n  TypeError: Cannot read properties of null (rea"
+      },
+      "oracle": {
+        "verify_ok": true,
+        "verifier_passed": true
+      }
+    },
+    {
+      "case_id": "t1-012",
+      "subtype": "t1-fix",
+      "has_fixture": true,
+      "expected_baseline": "fail",
+      "verify_command": "node --test joinPath.test.cjs",
+      "baseline": {
+        "verify_ok": false,
+        "verifier_passed": false,
+        "expected": "fail",
+        "match": true,
+        "output_head": "✖ joinPath (1.242083ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 98.8585\n\n✖ failing tests:\n\ntest at joinPath.test.cjs:4:1\n✖ joinPath (1.242083ms)\n  AssertionError [ERR_ASSERTION]: Expected valu"
+      },
+      "oracle": {
+        "verify_ok": true,
+        "verifier_passed": true
+      }
+    },
+    {
+      "case_id": "t1-013",
+      "subtype": "t1-fix",
+      "has_fixture": true,
+      "expected_baseline": "fail",
+      "verify_command": "node --test load.test.cjs",
+      "baseline": {
+        "verify_ok": false,
+        "verifier_passed": false,
+        "expected": "fail",
+        "match": true,
+        "output_head": "✖ load awaits (1.388625ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 98.319792\n\n✖ failing tests:\n\ntest at load.test.cjs:4:1\n✖ load awaits (1.388625ms)\n  AssertionError [ERR_ASSERTION]: Expected "
+      },
+      "oracle": {
+        "verify_ok": true,
+        "verifier_passed": true
+      }
+    },
+    {
+      "case_id": "t1-014",
+      "subtype": "t1-fix",
+      "has_fixture": true,
+      "expected_baseline": "fail",
+      "verify_command": "node --test inRange.test.cjs",
+      "baseline": {
+        "verify_ok": false,
+        "verifier_passed": false,
+        "expected": "fail",
+        "match": true,
+        "output_head": "✖ inclusive end (1.172042ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 101.681667\n\n✖ failing tests:\n\ntest at inRange.test.cjs:4:1\n✖ inclusive end (1.172042ms)\n  AssertionError [ERR_ASSERTION]: E"
+      },
+      "oracle": {
+        "verify_ok": true,
+        "verifier_passed": true
+      }
+    },
+    {
+      "case_id": "t1-015",
+      "subtype": "t1-fix",
+      "has_fixture": true,
+      "expected_baseline": "fail",
+      "verify_command": "node --test parseJson.test.cjs",
+      "baseline": {
+        "verify_ok": false,
+        "verifier_passed": false,
+        "expected": "fail",
+        "match": true,
+        "output_head": "✖ parseJson (1.366083ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 105.404667\n\n✖ failing tests:\n\ntest at parseJson.test.cjs:4:1\n✖ parseJson (1.366083ms)\n  SyntaxError: Unexpected token 'o', \"not"
+      },
+      "oracle": {
+        "verify_ok": true,
+        "verifier_passed": true
+      }
+    },
+    {
+      "case_id": "t1-016",
+      "subtype": "t1-fix",
+      "has_fixture": true,
+      "expected_baseline": "fail",
+      "verify_command": "node --test extractTag.test.cjs",
+      "baseline": {
+        "verify_ok": false,
+        "verifier_passed": false,
+        "expected": "fail",
+        "match": true,
+        "output_head": "/private/var/folders/dn/jlmx96ns0_ldb9lkhkq4n10m0000gn/T/t1-016-GmmHft/extractTag.cjs:3\n  const m = html.match(/<b>(.*)<\\\\/b>/)\n                       ^\n\nSyntaxError: Invalid regular expression flags\n    at wrapSafe (node:internal/modules/c"
+      },
+      "oracle": {
+        "verify_ok": true,
+        "verifier_passed": true
+      }
+    },
+    {
+      "case_id": "t1-017",
+      "subtype": "t1-fix",
+      "has_fixture": true,
+      "expected_baseline": "fail",
+      "verify_command": "node --test sortBy.test.cjs",
+      "baseline": {
+        "verify_ok": false,
+        "verifier_passed": false,
+        "expected": "fail",
+        "match": true,
+        "output_head": "✖ asc (2.345459ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 101.986667\n\n✖ failing tests:\n\ntest at sortBy.test.cjs:4:1\n✖ asc (2.345459ms)\n  AssertionError [ERR_ASSERTION]: Expected values to be "
+      },
+      "oracle": {
+        "verify_ok": true,
+        "verifier_passed": true
+      }
+    },
+    {
+      "case_id": "t1-018",
+      "subtype": "t1-fix",
+      "has_fixture": true,
+      "expected_baseline": "fail",
+      "verify_command": "node --test cache.test.cjs",
+      "baseline": {
+        "verify_ok": false,
+        "verifier_passed": false,
+        "expected": "fail",
+        "match": true,
+        "output_head": "✖ cache by id (1.17275ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 100.335916\n\n✖ failing tests:\n\ntest at cache.test.cjs:4:1\n✖ cache by id (1.17275ms)\n  AssertionError [ERR_ASSERTION]: Expected "
+      },
+      "oracle": {
+        "verify_ok": true,
+        "verifier_passed": true
+      }
+    },
+    {
+      "case_id": "t1-019",
+      "subtype": "t1-fix",
+      "has_fixture": true,
+      "expected_baseline": "fail",
+      "verify_command": "node --test clone.test.cjs",
+      "baseline": {
+        "verify_ok": false,
+        "verifier_passed": false,
+        "expected": "fail",
+        "match": true,
+        "output_head": "✖ deep-ish clone settings (1.285542ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 96.7625\n\n✖ failing tests:\n\ntest at clone.test.cjs:4:1\n✖ deep-ish clone settings (1.285542ms)\n  AssertionError [ER"
+      },
+      "oracle": {
+        "verify_ok": true,
+        "verifier_passed": true
+      }
+    },
+    {
+      "case_id": "t1-020",
+      "subtype": "t1-fix",
+      "has_fixture": true,
+      "expected_baseline": "fail",
+      "verify_command": "node --test normalizeKey.test.cjs",
+      "baseline": {
+        "verify_ok": false,
+        "verifier_passed": false,
+        "expected": "fail",
+        "match": true,
+        "output_head": "✖ trim key (1.374333ms)\nℹ tests 1\nℹ suites 0\nℹ pass 0\nℹ fail 1\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 104.090542\n\n✖ failing tests:\n\ntest at normalizeKey.test.cjs:4:1\n✖ trim key (1.374333ms)\n  AssertionError [ERR_ASSERTION]: Expect"
+      },
+      "oracle": {
+        "verify_ok": true,
+        "verifier_passed": true
+      }
+    }
+  ]
+}

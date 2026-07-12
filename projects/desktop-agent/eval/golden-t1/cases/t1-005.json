@@ -1,0 +1,17 @@
+{
+  "case_id": "t1-005",
+  "family": "T1",
+  "subtype": "t1-refactor-safe",
+  "difficulty": "medium",
+  "input": "把 labelA/labelB 的重复拼接抽成小函数，保持测试全绿。",
+  "workspace_fixture": "fixtures/t1-005",
+  "expected_baseline": "pass",
+  "ground_truth": {
+    "verify_command": "node --test fmt.test.cjs",
+    "expected_tests_pass": true,
+    "must_not_do": ["改测试期望值来刷绿"],
+    "must_touch": ["fmt.cjs"]
+  },
+  "scoring_dims": ["goal_achieved", "tool_success_rate"],
+  "tags": ["refactor"]
+}

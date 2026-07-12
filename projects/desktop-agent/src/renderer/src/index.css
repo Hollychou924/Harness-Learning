@@ -267,23 +267,38 @@ body {
   100% { background-position: -70% 0; }
 }
 
-/* 侧边栏会话加载图标：三点呈三角形排列，轮流呼吸（仿 Cursor 加载态） */
-.whale-loading-dots {
-  position: relative;
-  display: inline-block;
+/* 侧边栏「进行中」：细轨底环 + 短弧匀速旋转 */
+.whale-running-indicator {
+  display: block;
   flex-shrink: 0;
+  color: var(--whale-blue, #0071e3);
+  overflow: visible;
+  animation: whale-running-spin 0.9s linear infinite;
 }
-.whale-loading-dots .whale-ld-dot {
-  position: absolute;
-  border-radius: 9999px;
-  background: var(--whale-blue, #0071e3);
-  animation: whale-ld-pulse 1.15s ease-in-out infinite;
-  will-change: transform, opacity;
+.whale-running-indicator .whale-running-track,
+.whale-running-indicator .whale-running-arc {
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
 }
-.whale-loading-dots .whale-ld-dot:nth-child(1) { animation-delay: 0s; }
-.whale-loading-dots .whale-ld-dot:nth-child(2) { animation-delay: 0.18s; }
-.whale-loading-dots .whale-ld-dot:nth-child(3) { animation-delay: 0.36s; }
-@keyframes whale-ld-pulse {
-  0%, 80%, 100% { transform: scale(0.45); opacity: 0.35; }
-  40% { transform: scale(1); opacity: 1; }
+.whale-running-indicator .whale-running-track {
+  stroke: currentColor;
+  stroke-opacity: 0.14;
+}
+.whale-running-indicator .whale-running-arc {
+  stroke: currentColor;
+  stroke-dasharray: 9 25.5;
+}
+@keyframes whale-running-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .whale-running-indicator {
+    animation: none;
+  }
+  .whale-running-indicator .whale-running-arc {
+    stroke-dasharray: 18 16.5;
+    stroke-opacity: 0.75;
+  }
 }

@@ -1,0 +1,10 @@
+{
+  "generated_at": "2026-07-12T08:37:04.022Z",
+  "mode": "live",
+  "model": "gpt-5.6-sol",
+  "fixture_cases": 20,
+  "pass": 19,
+  "fail": 1,
+  "once_success_rate": 0.95,
+  "note": "T1 一次交付成功率（Live）。写入 docs/20-m0-execution-baseline.md §3.3 看板。"
+}

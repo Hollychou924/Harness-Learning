@@ -1,0 +1,28 @@
+[
+  {
+    "id": "t1-map-object-as-key",
+    "family": "T1",
+    "title": "Map 禁止临时对象作 key",
+    "body": "Map/WeakMap 不要用每次新建的对象字面量当 key（如 map.set({id}, v) / map.get({id})）：引用不同则永远 miss。应使用稳定原始值（string/number）或同一对象引用。改完必须跑测试确认 get/set 对称。",
+    "trigger_tags": [
+      "t1",
+      "map",
+      "key",
+      "cache",
+      "object",
+      "logic"
+    ],
+    "priority": 92,
+    "enabled": true,
+    "hit_count": 0,
+    "updated_at": 1783845671146,
+    "attribution": "logic",
+    "scope": "project",
+    "validated": true,
+    "backtest_case_ids": [
+      "t1-018"
+    ],
+    "validated_at": 1783845671146,
+    "validation_note": "live pass t1-018"
+  }
+]

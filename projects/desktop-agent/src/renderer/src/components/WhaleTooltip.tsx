@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState, type ReactElement, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactElement, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
 type TooltipSide = 'top' | 'bottom'
@@ -13,6 +13,13 @@ interface WhaleTooltipProps {
   disabled?: boolean
 }
 
+const EDGE = 12
+const MAX_WIDTH = 360
+
+function labelIsLong(label: ReactNode): boolean {
+  return typeof label === 'string' && label.length > 48
+}
+
 export function WhaleTooltip({
   label,
   children,
@@ -22,63 +29,82 @@ export function WhaleTooltip({
   disabled = false
 }: WhaleTooltipProps) {
   const anchorRef = useRef<HTMLSpanElement>(null)
+  const tipRef = useRef<HTMLSpanElement>(null)
   const tooltipId = useId()
   const [visible, setVisible] = useState(false)
-  const [position, setPosition] = useState({ x: 0, y: 0 })
+  const [coords, setCoords] = useState({ left: 0, top: 0 })
+  const long = labelIsLong(label)
 
-  const updatePosition = useCallback(() => {
-    const rect = anchorRef.current?.getBoundingClientRect()
-    if (!rect) return
+  const place = useCallback(() => {
+    const anchor = anchorRef.current
+    const tip = tipRef.current
+    if (!anchor) return
 
-    const x = align === 'left'
-      ? rect.left
-      : align === 'right'
-        ? rect.right
-        : rect.left + rect.width / 2
-    const y = side === 'bottom' ? rect.bottom + 6 : rect.top - 6
-    setPosition({ x, y })
+    const rect = anchor.getBoundingClientRect()
+    const tipWidth = tip?.offsetWidth || Math.min(MAX_WIDTH, window.innerWidth - EDGE * 2)
+    const tipHeight = tip?.offsetHeight || 28
+
+    let left =
+      align === 'left'
+        ? rect.left
+        : align === 'right'
+          ? rect.right - tipWidth
+          : rect.left + rect.width / 2 - tipWidth / 2
+
+    left = Math.max(EDGE, Math.min(left, window.innerWidth - tipWidth - EDGE))
+
+    let top = side === 'bottom' ? rect.bottom + 6 : rect.top - tipHeight - 6
+    if (top < EDGE) top = rect.bottom + 6
+    if (top + tipHeight > window.innerHeight - EDGE) {
+      top = Math.max(EDGE, rect.top - tipHeight - 6)
+    }
+
+    setCoords({ left, top })
   }, [align, side])
+
+  useLayoutEffect(() => {
+    if (!visible) return
+    place()
+  }, [visible, label, place])
 
   useEffect(() => {
     if (!visible) return
-    updatePosition()
-    window.addEventListener('resize', updatePosition)
-    window.addEventListener('scroll', updatePosition, true)
+    const onReposition = () => place()
+    window.addEventListener('resize', onReposition)
+    window.addEventListener('scroll', onReposition, true)
     return () => {
-      window.removeEventListener('resize', updatePosition)
-      window.removeEventListener('scroll', updatePosition, true)
+      window.removeEventListener('resize', onReposition)
+      window.removeEventListener('scroll', onReposition, true)
     }
-  }, [updatePosition, visible])
+  }, [place, visible])
 
   if (disabled || !label) return children
-
-  const transform = [
-    align === 'center' ? 'translateX(-50%)' : align === 'right' ? 'translateX(-100%)' : '',
-    side === 'top' ? 'translateY(-100%)' : ''
-  ].filter(Boolean).join(' ')
 
   return (
     <span
       ref={anchorRef}
       className={`relative inline-flex min-w-0 ${className}`}
       aria-describedby={visible ? tooltipId : undefined}
-      onMouseEnter={() => {
-        updatePosition()
-        setVisible(true)
-      }}
+      onMouseEnter={() => setVisible(true)}
       onMouseLeave={() => setVisible(false)}
-      onFocusCapture={() => {
-        updatePosition()
-        setVisible(true)
-      }}
+      onFocusCapture={() => setVisible(true)}
       onBlurCapture={() => setVisible(false)}
     >
       {children}
       {createPortal(
         <span
+          ref={tipRef}
           id={tooltipId}
-          className={`pointer-events-none fixed z-[9999] whitespace-nowrap rounded-md floating-tooltip px-2 py-1 text-[11px] font-medium leading-none text-white transition-opacity duration-150 ${visible ? 'opacity-100' : 'opacity-0'}`}
-          style={{ left: position.x, top: position.y, transform }}
+          className={`pointer-events-none fixed z-[9999] rounded-lg floating-tooltip px-2.5 py-1.5 text-[11px] font-medium text-white shadow-lg transition-opacity duration-150 ${
+            long ? 'break-all whitespace-pre-wrap leading-snug' : 'whitespace-nowrap leading-none'
+          } ${visible ? 'opacity-100' : 'opacity-0'}`}
+          style={{
+            left: coords.left,
+            top: coords.top,
+            maxWidth: `min(${MAX_WIDTH}px, calc(100vw - ${EDGE * 2}px))`,
+            maxHeight: long ? 160 : undefined,
+            overflow: long ? 'auto' : undefined
+          }}
           role="tooltip"
         >
           {label}

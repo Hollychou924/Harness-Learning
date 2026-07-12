@@ -31,7 +31,7 @@ rl.on('line', (line) => {
 
 async function handleStdin(msg: StdinMessage): Promise<void> {
   if (msg.type === 'chat_request') {
-    const { session_id, message, config, history, workspace_dir, attachments } = msg
+    const { session_id, message, config, history, workspace_dir, attachments, mode } = msg
     const onEvent = (ev: StdoutMessage) => send(ev)
 
     onEvent({ type: 'status', status: 'EXECUTING', message: '开始执行任务' })
@@ -43,7 +43,7 @@ async function handleStdin(msg: StdinMessage): Promise<void> {
         history || sessionHistory.get(session_id) || [],
         onEvent,
         workspace_dir,
-        'work',
+        mode || 'work',
         session_id,
         attachments
       )
@@ -68,7 +68,16 @@ async function handleStdin(msg: StdinMessage): Promise<void> {
   }
 
   if (msg.type === 'task_control') {
-    // 一期 Work 不实现暂停/恢复/回滚的运行时，仅回执
+    if (msg.action === 'cancel') {
+      const { requestTaskCancel } = await import('./task-control.js')
+      const { resolved } = requestTaskCancel()
+      send({
+        type: 'status',
+        status: 'CANCELLED',
+        message: `任务取消已生效（已解除 ${resolved} 个等待中的人机卡点）`
+      })
+      return
+    }
     send({ type: 'status', status: msg.action.toUpperCase(), message: `任务 ${msg.action} 已收到` })
     return
   }

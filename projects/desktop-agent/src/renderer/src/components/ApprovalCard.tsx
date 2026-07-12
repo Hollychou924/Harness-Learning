@@ -22,12 +22,12 @@ export function ApprovalCard() {
   const details = JSON.stringify(args, null, 2)
 
   return (
-    <div className={`glass rounded-xl p-4 space-y-3 border ${isHigh ? 'border-red-200' : 'border-amber-200'}`}>
+    <div className={`overflow-hidden rounded-[26px] floating-surface px-5 py-4 space-y-3 border ${isHigh ? 'border-red-200' : 'border-amber-200'}`}>
       <div className="flex items-start gap-2">
         <ShieldAlert size={16} className={isHigh ? 'text-red-500 mt-0.5 flex-shrink-0' : 'text-amber-500 mt-0.5 flex-shrink-0'} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-[var(--ink)]">需要你确认</span>
+            <span className="text-sm font-semibold text-[var(--ink)]">需要你确认</span>
             {isHigh && (
               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-red-100 text-red-600">
                 高风险
@@ -43,18 +43,20 @@ export function ApprovalCard() {
       </div>
 
       <div className="space-y-1.5">
-        {SCOPE_OPTIONS.map((option) => (
+        {SCOPE_OPTIONS.map((option, optionIndex) => (
           <button
             key={option.value}
             type="button"
             onClick={() => setScope(option.value)}
-            className={`w-full text-left rounded-lg px-3 py-2 border transition ${scope === option.value ? 'border-sky-300 bg-sky-50/70' : 'border-black/[0.06] hover:bg-black/[0.02]'}`}
+            className={`w-full text-left rounded-2xl px-3 py-2 transition ${scope === option.value ? 'bg-black/[0.055]' : 'hover:bg-black/[0.025]'}`}
           >
-            <div className="flex items-center gap-2">
-              <span className={`w-3.5 h-3.5 rounded-full border flex-shrink-0 ${scope === option.value ? 'border-sky-500 bg-sky-500' : 'border-black/20'}`} />
-              <span className="text-sm text-[var(--ink)]">{option.label}</span>
+            <div className="flex items-center gap-2.5">
+              <span className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${scope === option.value ? 'bg-[var(--ink)] text-white' : 'bg-black/[0.06] text-[var(--ink-soft)]'}`}>
+                {scope === option.value ? <Check size={12} /> : optionIndex + 1}
+              </span>
+              <span className="text-sm font-medium text-[var(--ink)]">{option.label}</span>
             </div>
-            <div className="text-xs text-[var(--ink-soft)] ml-5 mt-1">{option.description}</div>
+            <div className="text-xs text-[var(--ink-soft)] ml-7 mt-1">{option.description}</div>
           </button>
         ))}
       </div>
@@ -68,7 +70,7 @@ export function ApprovalCard() {
         查看具体内容
       </button>
       {detailsOpen && (
-        <pre className="max-h-40 overflow-y-auto rounded-lg bg-black/[0.03] px-3 py-2 text-xs text-[var(--ink-soft)] whitespace-pre-wrap break-all font-mono">
+        <pre className="max-h-40 overflow-y-auto rounded-2xl bg-black/[0.025] px-3 py-2 text-xs text-[var(--ink-soft)] whitespace-pre-wrap break-all font-mono">
           {details}
         </pre>
       )}
@@ -76,18 +78,16 @@ export function ApprovalCard() {
       <div className="flex items-center gap-2">
         <button
           onClick={() => respondApproval(true, scope)}
-          className="h-8 px-4 rounded-lg bg-[#0071e3] text-white text-sm font-medium hover:brightness-110 transition"
+          className="inline-flex h-10 items-center gap-1.5 rounded-full bg-[#0071e3] px-4 text-sm font-medium text-white transition hover:brightness-110"
         >
-          <span className="flex items-center gap-1.5">
-            <Check size={14} />
-            允许并继续
-          </span>
+          <Check size={14} />
+          允许并继续
         </button>
         <button
           onClick={() => respondApproval(false, 'once')}
-          className="h-8 px-4 rounded-lg glass text-sm font-medium text-red-600 hover:bg-red-50 transition"
+          className="h-10 rounded-full px-3 text-sm font-medium text-red-600 transition hover:bg-red-50"
         >
-          <span className="flex items-center gap-1.5">
+          <span className="inline-flex items-center gap-1.5">
             <X size={14} />
             不允许
           </span>

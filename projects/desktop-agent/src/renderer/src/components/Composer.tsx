@@ -1,22 +1,24 @@
 import { useRef, useState } from 'react'
 import { useTaskStore } from '../store/task'
+import { ApprovalCard } from './ApprovalCard'
 import { ChatInput } from './ChatInput'
 import { ComposerQuestionPanel } from './ComposerQuestionPanel'
 import { ContinuationCard } from './ContinuationCard'
+import { PlanCard } from './PlanCard'
 import { ProgressPill } from './ProgressPill'
 import { QueueTray } from './QueueTray'
+import { DetailLevelControl } from './DetailLevelControl'
 
 export function Composer() {
-  const { status, message, attachments, setMessage, startTask, queueMessage, cancelTask, taskId, messages, currentTurn, approvalPending, pendingQuestion, respondQuestion, continuationPending, respondContinuation, todos } = useTaskStore()
+  const { status, message, attachments, setMessage, startTask, queueMessage, cancelTask, taskId, messages, currentTurn, approvalPending, pendingPlan, pendingQuestion, respondQuestion, continuationPending, todos } = useTaskStore()
   const [pending, setPending] = useState(false)
   const pendingRef = useRef(false)
 
-  // idle 状态不渲染底部 Composer（输入框在 HomeView 中间）
-  // 但恢复历史对话后（messages 非空）需要常驻输入框以继续聊
   if (status === 'idle' && messages.length === 0) return null
 
   const isExecuting = status === 'executing'
   const isFinished = status === 'completed' || status === 'failed'
+  const hitlBlocking = Boolean(approvalPending || pendingPlan || pendingQuestion || continuationPending)
 
   const handleSend = async () => {
     if (pendingRef.current) return
@@ -48,11 +50,18 @@ export function Composer() {
   return (
     <div className="flex-shrink-0 px-6 py-3">
       <div className="mx-auto max-w-4xl">
-        <div className="mb-2 flex justify-center">
-          <ProgressPill status={status} currentTurn={currentTurn} todos={todos} hasApprovalPending={Boolean(approvalPending)} />
-        </div>
+        {!hitlBlocking && (
+          <div className="mb-2 flex items-center justify-center gap-3">
+            <ProgressPill status={status} currentTurn={currentTurn} todos={todos} hasApprovalPending={false} />
+            <DetailLevelControl />
+          </div>
+        )}
         <QueueTray />
-        {continuationPending ? (
+        {approvalPending ? (
+          <ApprovalCard />
+        ) : pendingPlan ? (
+          <PlanCard />
+        ) : continuationPending ? (
           <ContinuationCard />
         ) : pendingQuestion ? (
           <ComposerQuestionPanel question={pendingQuestion} onAnswer={respondQuestion} />
@@ -65,6 +74,17 @@ export function Composer() {
             isRunning={isExecuting}
             placeholder={pending ? '发送中…' : placeholder}
           />
+        )}
+        {hitlBlocking && (
+          <div className="mt-2 flex justify-end">
+            <button
+              type="button"
+              onClick={() => void cancelTask()}
+              className="rounded-lg border border-[var(--line)] px-3 py-1.5 text-[12px] text-[var(--ink-soft)] hover:text-red-500"
+            >
+              停止任务
+            </button>
+          </div>
         )}
       </div>
     </div>

@@ -1,0 +1,17 @@
+{
+  "case_id": "t1-007",
+  "family": "T1",
+  "subtype": "t1-add",
+  "difficulty": "hard",
+  "input": "为 createClient 增加默认 timeout=10000，并补测试通过。",
+  "workspace_fixture": "fixtures/t1-007",
+  "expected_baseline": "fail",
+  "ground_truth": {
+    "verify_command": "node --test http.test.cjs",
+    "expected_tests_pass": true,
+    "must_not_do": ["破坏显式 timeout 传参"],
+    "must_touch": ["http.cjs"]
+  },
+  "scoring_dims": ["goal_achieved", "tool_success_rate", "cost_tokens"],
+  "tags": ["api", "timeout"]
+}

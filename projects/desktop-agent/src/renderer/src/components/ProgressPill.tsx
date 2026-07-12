@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle2 } from 'lucide-react'
+import { CheckCircle2 } from 'lucide-react'
 import type { Turn } from '../../../agent/src/items'
 import type { TodoItem } from '../store/task'
 import { countCompletedSteps, deriveFileChangeProgress, deriveProgressSteps } from './executionExperience'
@@ -12,14 +12,8 @@ type Props = {
 }
 
 export function ProgressPill({ status, currentTurn, todos, hasApprovalPending }: Props) {
-  if (hasApprovalPending) {
-    return (
-      <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-1 text-xs text-amber-700">
-        <AlertCircle size={13} />
-        等待你确认
-      </div>
-    )
-  }
+  // 审批卡已改挂 Composer，审批中不再单独显示「等待你确认」pill
+  if (hasApprovalPending) return null
 
   const steps = deriveProgressSteps(currentTurn, todos)
   if (status !== 'executing' || steps.length === 0) return null

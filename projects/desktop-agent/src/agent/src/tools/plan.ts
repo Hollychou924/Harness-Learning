@@ -37,6 +37,18 @@ export function resolvePlanResponse(requestId: string, decision: PlanDecision, f
   return true
 }
 
+export function rejectAllPendingPlans(feedback = '用户取消任务'): number {
+  let n = 0
+  for (const [id, pending] of [...pendingPlanResponses.entries()]) {
+    clearTimeout(pending.timer)
+    pendingPlanResponses.delete(id)
+    pending.resolve({ decision: 'reject_stop', feedback })
+    n += 1
+  }
+  pendingPlanRequestId = null
+  return n
+}
+
 export const planTool: AgentTool = {
   name: 'propose_plan',
   description: '提交执行计划给用户确认。调用此工具后任务暂停，等待用户批准、拒绝或要求修改。只在复杂任务开始前调用一次。',

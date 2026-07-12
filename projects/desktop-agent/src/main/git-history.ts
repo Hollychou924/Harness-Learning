@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process'
 import { isAbsolute } from 'node:path'
 import { promisify } from 'node:util'
+import { gitRootMissingMessage, resolveGitRoot } from './git-root.js'
 
 export type CommitFileChange = {
   path: string
@@ -69,6 +70,13 @@ async function runGit(workspaceDir: string, args: string[], timeout = READ_TIMEO
     timeout
   })
   return stdout
+}
+
+function requireGitRoot(workspaceDir: string): string {
+  if (!workspaceDir || !isAbsolute(workspaceDir)) throw new Error('当前项目没有绑定本地文件夹')
+  const root = resolveGitRoot(workspaceDir)
+  if (!root) throw new Error(gitRootMissingMessage())
+  return root
 }
 
 function errorMessage(error: unknown): string {
@@ -171,14 +179,15 @@ function baseCommitFormat(): string {
 
 export async function getCommitHistory(workspaceDir: string, offset = 0, limit = 100): Promise<CommitHistoryResult> {
   try {
-    await runGit(workspaceDir, ['rev-parse', '--is-inside-work-tree'])
+    const gitRoot = requireGitRoot(workspaceDir)
+    await runGit(gitRoot, ['rev-parse', '--is-inside-work-tree'])
     const safeOffset = Number.isFinite(offset) ? Math.max(0, Math.floor(offset)) : 0
     const safeLimit = Number.isFinite(limit) ? Math.min(100, Math.max(1, Math.floor(limit))) : 100
     const [output, currentHashOutput, currentBranchOutput, currentBranchHashOutput] = await Promise.all([
-      runGit(workspaceDir, ['log', '--all', `--skip=${safeOffset}`, `--max-count=${safeLimit + 1}`, `--format=${baseCommitFormat()}`, '--date-order']),
-      runGit(workspaceDir, ['rev-parse', 'HEAD']),
-      runGit(workspaceDir, ['branch', '--show-current']),
-      runGit(workspaceDir, ['rev-list', `--max-count=${safeOffset + safeLimit + 1}`, 'HEAD'])
+      runGit(gitRoot, ['log', '--all', `--skip=${safeOffset}`, `--max-count=${safeLimit + 1}`, `--format=${baseCommitFormat()}`, '--date-order']),
+      runGit(gitRoot, ['rev-parse', 'HEAD']),
+      runGit(gitRoot, ['branch', '--show-current']),
+      runGit(gitRoot, ['rev-list', `--max-count=${safeOffset + safeLimit + 1}`, 'HEAD'])
     ])
     const parsed = parseHistoryOutput(output)
     const currentHash = currentHashOutput.trim()
@@ -199,10 +208,11 @@ export async function getCommitHistory(workspaceDir: string, offset = 0, limit =
 
 export async function getCommitDetail(workspaceDir: string, hash: string): Promise<CommitDetailResult> {
   try {
+    const gitRoot = requireGitRoot(workspaceDir)
     const [metadata, nameStatusOutput, numstatOutput] = await Promise.all([
-      runGit(workspaceDir, ['show', '-s', `--format=${baseCommitFormat()}`, hash]),
-      runGit(workspaceDir, ['diff-tree', '--root', '--no-commit-id', '--name-status', '-r', '-M', hash]),
-      runGit(workspaceDir, ['diff-tree', '--root', '--no-commit-id', '--numstat', '-r', '-M', hash])
+      runGit(gitRoot, ['show', '-s', `--format=${baseCommitFormat()}`, hash]),
+      runGit(gitRoot, ['diff-tree', '--root', '--no-commit-id', '--name-status', '-r', '-M', hash]),
+      runGit(gitRoot, ['diff-tree', '--root', '--no-commit-id', '--numstat', '-r', '-M', hash])
     ])
     const commit = parseHistoryOutput(metadata)[0]
     if (!commit) return { success: false, error: '没有找到这条提交记录' }
@@ -219,12 +229,13 @@ export async function getCommitDetail(workspaceDir: string, hash: string): Promi
 
 export async function getCommitDiff(workspaceDir: string, fromHash: string, toHash = 'HEAD', filePath?: string): Promise<CommitDiffResult> {
   try {
+    const gitRoot = requireGitRoot(workspaceDir)
     const args = [fromHash, toHash]
     const pathArgs = filePath ? ['--', filePath] : []
     const [nameStatusOutput, numstatOutput, rawPatch] = await Promise.all([
-      runGit(workspaceDir, ['diff', '--name-status', '-M', ...args, ...pathArgs]),
-      runGit(workspaceDir, ['diff', '--numstat', '-M', ...args, ...pathArgs]),
-      runGit(workspaceDir, ['diff', '--no-ext-diff', '--unified=3', '--no-color', ...args, ...pathArgs])
+      runGit(gitRoot, ['diff', '--name-status', '-M', ...args, ...pathArgs]),
+      runGit(gitRoot, ['diff', '--numstat', '-M', ...args, ...pathArgs]),
+      runGit(gitRoot, ['diff', '--no-ext-diff', '--unified=3', '--no-color', ...args, ...pathArgs])
     ])
     const nameStatus = parseNameStatus(nameStatusOutput)
     const files = parseNumstat(numstatOutput, nameStatus)

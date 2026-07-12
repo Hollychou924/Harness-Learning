@@ -1,0 +1,17 @@
+{
+  "case_id": "t1-009",
+  "family": "T1",
+  "subtype": "t1-fix",
+  "difficulty": "easy",
+  "input": "修复 sum 漏加第一个元素的问题，并跑测试。",
+  "workspace_fixture": "fixtures/t1-009",
+  "expected_baseline": "fail",
+  "ground_truth": {
+    "verify_command": "node --test sum.test.cjs",
+    "expected_tests_pass": true,
+    "must_not_do": ["删除测试"],
+    "must_touch": ["sum.cjs"]
+  },
+  "scoring_dims": ["goal_achieved", "tool_success_rate"],
+  "tags": ["fix", "reduce"]
+}

@@ -87,7 +87,15 @@ const api = {
   workspaceReadFile: (relPath: string, workspaceDir?: string) =>
     ipcRenderer.invoke('workspace:readFile', { relPath, workspaceDir }) as Promise<{ content?: string; truncated?: boolean; error?: string }>,
   workspacePreviewFile: (filePath: string, workspaceDir?: string) =>
-    ipcRenderer.invoke('workspace:previewFile', { filePath, workspaceDir }) as Promise<{ kind?: string; content?: string; dataUrl?: string; truncated?: boolean; error?: string }>
+    ipcRenderer.invoke('workspace:previewFile', { filePath, workspaceDir }) as Promise<{ kind?: string; content?: string; dataUrl?: string; truncated?: boolean; error?: string }>,
+  experienceRecordOutcome: (input: { workspaceDir: string; outcome: 'accept' | 'edit' | 'reject'; taskId?: string; note?: string; family?: 'T1' | 'T2' | 'other' }) =>
+    ipcRenderer.invoke('experience:recordOutcome', input) as Promise<{ success: boolean; error?: string; record?: unknown; failureCase?: unknown; tactic?: unknown }>,
+  experienceListLedger: (workspaceDir: string) =>
+    ipcRenderer.invoke('experience:listLedger', { workspaceDir }) as Promise<{ success: boolean; tactics?: unknown[]; failureCases?: unknown[]; outcomes?: unknown[]; error?: string }>,
+  experienceUpdateTactic: (input: { workspaceDir: string; tacticId: string; action: 'enable' | 'disable' | 'rollback' }) =>
+    ipcRenderer.invoke('experience:updateTactic', input) as Promise<{ success: boolean; deleted?: boolean; tactic?: unknown; error?: string }>,
+  experienceUpdateFailureCase: (input: { workspaceDir: string; failureId: string; enabled: boolean }) =>
+    ipcRenderer.invoke('experience:updateFailureCase', input) as Promise<{ success: boolean; failureCase?: unknown; error?: string }>
 }
 
 contextBridge.exposeInMainWorld('api', api)

@@ -1081,6 +1081,11 @@ function ProjectPicker({
 
   const friendlyBranchError = (message?: string) => {
     const text = message || ''
+    if (/not a git repository|没有找到 Git 仓库/i.test(text)) {
+      return text.includes('没有找到 Git 仓库')
+        ? text
+        : '在当前项目文件夹及其上下级目录中都没有找到 Git 仓库。请绑定含有 .git 的目录，或先执行 git init。'
+    }
     if (/local changes.*overwritten|would be overwritten by (checkout|switch)/is.test(text)) return '当前有未保存的项目修改，请先提交或处理后再切换分支。'
     if (/untracked working tree files.*overwritten/is.test(text)) return '当前有未保存的新文件，请先处理后再切换分支。'
     if (/^[\x00-\x7F]{40,}$/.test(text) || text.length > 160) return '分支切换失败，请检查未保存的修改后重试。'
@@ -1107,7 +1112,7 @@ function ProjectPicker({
         setCurrentBranch('')
         setBranches([])
         setChangedFiles(0)
-        setBranchError(result.error || '无法读取分支')
+        setBranchError(friendlyBranchError(result.error || '无法读取分支'))
       }
     } catch {
       setCurrentBranch('')

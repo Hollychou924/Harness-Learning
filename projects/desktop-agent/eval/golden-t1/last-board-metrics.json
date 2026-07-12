@@ -1,0 +1,17 @@
+{
+  "generated_at": "2026-07-12T08:48:19.912Z",
+  "once_success_rate": 0.95,
+  "once_success_pass": 19,
+  "once_success_total": 20,
+  "hitl_burden_mean": null,
+  "hitl_note": "待首周采样（live 报告未含逐任务 hitl_burden）",
+  "repeat_failure_rate": 0,
+  "repeat_failure_repeats": 0,
+  "repeat_failure_total": 1,
+  "repeat_note": "ledger=/Users/zhouhao/桌面/桌面原有文件夹/AITR/ai-agent-competitive-analysis/projects/desktop-agent/eval/golden-t1/.promote-ledger window=30",
+  "sources": {
+    "live_baseline": true,
+    "live_report": true,
+    "ledger": true
+  }
+}

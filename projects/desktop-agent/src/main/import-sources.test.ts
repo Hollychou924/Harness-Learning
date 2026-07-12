@@ -505,3 +505,50 @@ test('Codex 带 recommended_plugins 前导的 AGENTS.md 指令块也会被丢弃
   assert.equal(result.session.messages[0].content, '真正的问题')
   assert.doesNotMatch(result.session.messages[0].content, /AGENTS\.md|INSTRUCTIONS|recommended_plugins|environment_context/)
 })
+
+test('Codex Files mentioned by the user 元数据块会被剥除并提取真实提问', () => {
+  const root = temp()
+  const imagePath = join(root, 'codex-clipboard-demo.png')
+  writeFileSync(imagePath, Buffer.from('png-bytes'))
+  const dirty = `# Files mentioned by the user:
+
+## codex-clipboard-demo.png: ${imagePath}
+
+## My request for Codex:
+还有一个逻辑是你调研一下左侧导航目录的逻辑
+
+<image name=[Image #1] path="${imagePath}">`
+  const path = join(root, 'codex-files-mentioned.jsonl')
+  jsonLines(path, [
+    { type: 'session_meta', payload: { id: 'codex-files', cwd: '/work/nav', timestamp: '2026-01-01T00:00:00Z' } },
+    { type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: dirty }] } },
+    { type: 'response_item', payload: { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: '好的，开始调研' }] } }
+  ])
+  const result = parseCodexFile(path)
+  assert.equal(result.session.messages[0].content, '还有一个逻辑是你调研一下左侧导航目录的逻辑')
+  assert.doesNotMatch(result.session.messages[0].content, /Files mentioned|codex-clipboard|<image/i)
+  assert.match(result.session.title, /左侧导航/)
+  assert.equal(result.session.assets.length, 1)
+  assert.equal((result.session.messages[0].attachments || []).length, 1)
+})
+
+test('修复历史 Codex 导入会剥除 Files mentioned 元数据块并补提剪贴板图片', () => {
+  const root = temp()
+  const imagePath = join(root, 'shot.png')
+  writeFileSync(imagePath, Buffer.from('shot-bytes'))
+  const dirty = `# Files mentioned by the user:\n\n## shot.png: ${imagePath}\n\n## My request for Codex:\n帮我改一下样式\n\n<image name=[Image #1] path="${imagePath}">`
+  const messages = [{ role: 'user', content: dirty }] as any
+  const turns = [{
+    id: 'turn-1', status: 'completed', startedAt: 1, items: [
+      { type: 'userMessage', id: 'item-0', content: [{ type: 'text', text: dirty }] }
+    ]
+  }] as any
+  const repaired = repairStoredSession('codex', messages, turns, '/work')
+  assert.equal(repaired.changed, true)
+  assert.equal(repaired.messages[0].content, '帮我改一下样式')
+  assert.doesNotMatch(repaired.messages[0].content, /Files mentioned|codex-clipboard|<image/i)
+  assert.equal(repaired.assets.length, 1)
+  assert.equal((repaired.messages[0].attachments || []).length, 1)
+  const again = repairStoredSession('codex', repaired.messages, repaired.turns, '/work')
+  assert.equal(again.changed, false)
+})

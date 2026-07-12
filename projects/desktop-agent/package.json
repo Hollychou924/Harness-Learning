@@ -9,7 +9,16 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "start": "electron-vite preview"
+    "start": "electron-vite preview",
+    "test:evolution": "tsx --test src/agent/src/evolution/evolution.test.ts",
+    "test:golden-t1": "tsx eval/golden-t1/run-smoke.ts",
+    "test:golden-t1-batch": "tsx eval/golden-t1/run-batch.ts",
+    "test:golden-t1-agent-stub": "tsx eval/golden-t1/run-agent-batch.ts --mode=stub",
+    "test:golden-t1-agent-live": "tsx eval/golden-t1/run-agent-batch.ts --mode=live --limit=1",
+    "test:golden-t1-agent-live-baseline": "tsx eval/golden-t1/run-agent-batch.ts --mode=live --write-baseline",
+    "test:promote-tactics": "tsx eval/golden-t1/promote-tactics.ts --gate=stub",
+    "test:promote-tactics-live": "tsx eval/golden-t1/promote-tactics.ts --gate=live --only=t1-map-object-as-key",
+    "test:board-metrics": "tsx eval/golden-t1/compute-board-metrics.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.0",

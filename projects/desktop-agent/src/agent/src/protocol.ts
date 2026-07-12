@@ -61,7 +61,7 @@ export interface MessageAttachment {
 
 // 主进程 -> Agent (stdin)
 export type StdinMessage =
-  | { type: 'chat_request'; session_id: string; message: string; config: AgentConfig; history?: AgentMessage[]; workspace_dir?: string; attachments?: MessageAttachment[] }
+  | { type: 'chat_request'; session_id: string; message: string; config: AgentConfig; history?: AgentMessage[]; workspace_dir?: string; mode?: TaskMode; attachments?: MessageAttachment[] }
   | { type: 'task_control'; task_id: string; action: 'pause' | 'resume' | 'cancel' | 'rollback' }
   | { type: 'approval_response'; request_id: string; approved: boolean; scope?: 'once' | 'task' | 'always' }
   | { type: 'question_response'; request_id: string; selected_option_ids?: string[]; custom_answer?: string; skipped?: boolean }
